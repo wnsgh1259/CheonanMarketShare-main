@@ -1,0 +1,31 @@
+import { createBrowserRouter } from "react-router";
+import { RootLayout } from "./components/RootLayout";
+import { LoginPage } from "./pages/LoginPage";
+import { HomePage } from "./pages/HomePage";
+import { MapPage } from "./pages/MapPage";
+import { StoreDetailPage } from "./pages/StoreDetailPage";
+import { CartPage } from "./pages/CartPage";
+import { ProfilePage } from "./pages/ProfilePage";
+import { ChatPage } from "./pages/ChatPage";
+import { SettingsPage } from "./pages/SettingsPage";
+import { StoreRegistrationPage } from "./pages/StoreRegistrationPage";
+import { AdminPage } from "./pages/AdminPage";
+
+export const router = createBrowserRouter([
+  {
+    path: "/",
+    Component: RootLayout,
+    children: [
+      { index: true, Component: LoginPage },
+      { path: "home", Component: HomePage },
+      { path: "map", Component: MapPage },
+      { path: "store/:id", Component: StoreDetailPage },
+      { path: "cart", Component: CartPage },
+      { path: "chat", Component: ChatPage },
+      { path: "profile", Component: ProfilePage },
+      { path: "settings", Component: SettingsPage },
+      { path: "owner/store-registration", Component: StoreRegistrationPage },
+      { path: "admin", Component: AdminPage },
+    ],
+  },
+]);
