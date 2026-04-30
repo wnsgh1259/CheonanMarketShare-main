@@ -1,20 +1,19 @@
 
   # 천안시장 (공유)
 
-  ## Running the code
+  각자 로컬에서 보는법은 터미널에서 npm install 해주면 구동에 필요한것들이 다운로드되고
+  그 후에 npm run dev 치면 
+   http://localhost:5173 에서 미리보기하면서 할 수 있어
 
-  Run `npm i` to install the dependencies.
+  그리고 여기 커밋하면 자동으로 몇초있다가 서버로 올라갈거야 서버로 올라갔을때 어떻게 되나도 확인하면서하면좋아
+  아무래도 로컬이랑 서버랑 조금 다르게 나오더라고
+  서버  # 천안시장 (공유)
 
-  Run `npm run dev` to start the development server.
+  각자 로컬에서 보는법은 터미널에서 npm install 해주면 구동에 필요한것들이 다운로드되고
+  그 후에 npm run dev 치면 
+   http://localhost:5173 에서 미리보기하면서 할 수 있어
 
-  ## Naver Map setup
-
-  1. Create `.env` in the project root.
-  2. Copy the value from `.env.example`.
-  3. Set your Naver Map client id:
-
-  `VITE_NAVER_MAP_CLIENT_ID=your_naver_map_client_id`
-
-  4. Register your development domain in Naver Cloud console
-     (for local development: `http://localhost:5173`).
+  그리고 여기 커밋하면 자동으로 몇초있다가 서버로 올라갈거야 서버로 올라갔을때 어떻게 되나도 확인하면서하면좋아
+  아무래도 로컬이랑 서버랑 조금 다르게 나오더라고
   
+  서버 주소: https://cheonan-market-share-main.vercel.app
