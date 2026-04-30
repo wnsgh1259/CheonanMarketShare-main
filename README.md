@@ -1,8 +1,6 @@
 
   # 천안시장 (공유)
 
-  This is a code bundle for 천안시장 (공유). The original project is available at https://www.figma.com/design/QXuD4BTqROZY6Bwc1ppKr7/%EC%B2%9C%EC%95%88%EC%8B%9C%EC%9E%A5--%EA%B3%B5%EC%9C%A0-.
-
   ## Running the code
 
   Run `npm i` to install the dependencies.
