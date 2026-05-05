@@ -12,6 +12,18 @@ export type SharedOwnerMenu = {
   photoName: string;
 };
 
+export type SharedFacility = {
+  id: number;
+  name: string;
+  lat: number;
+  lng: number;
+  color: string;
+  size?: number;
+  hours?: string;
+  image?: string;
+  marketId?: string;
+};
+
 export type SharedDraftStore = {
   id: number;
   name: string;
@@ -29,6 +41,7 @@ export type SharedDraftStore = {
 
 export type SharedOwnerDashboardDraft = {
   stores: SharedDraftStore[];
+  facilities?: SharedFacility[];
   menus?: SharedOwnerMenu[];
   todayDeal?: string;
   news?: string;

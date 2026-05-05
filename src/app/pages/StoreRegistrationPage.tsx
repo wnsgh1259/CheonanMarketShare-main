@@ -18,6 +18,7 @@ type NaverMapRef = {
 type NaverMarkerRef = {
   setMap: (map: unknown) => void;
   setPosition: (position: unknown) => void;
+  setIcon: (icon: unknown) => void;
 };
 
 type NaverPolygonRef = {
@@ -143,6 +144,7 @@ export function StoreRegistrationPage() {
   const marketPolygonsRef = useRef<NaverPolygonRef[]>([]);
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState(false);
+  const [mapZoomLevel, setMapZoomLevel] = useState(MARKET_VIEW_CONFIG[initialMarket].zoom);
   const [pin, setPin] = useState<{ lat: number; lng: number } | null>(null);
   const [selectedMarket, setSelectedMarket] = useState<MarketId>(initialMarket);
   const [stores, setStores] = useState<DraftStore[]>([]);
@@ -172,6 +174,13 @@ export function StoreRegistrationPage() {
   const clientId = import.meta.env.VITE_NAVER_MAP_CLIENT_ID as string | undefined;
   const isPlaceholderClientId = !clientId || clientId === "your_naver_map_client_id";
   const selectedMarketView = MARKET_VIEW_CONFIG[selectedMarket];
+
+  const getScaledPinSize = (baseSize: number) => {
+    const baseZoom = selectedMarketView.zoom;
+    const zoomGap = mapZoomLevel - baseZoom;
+    const scaled = baseSize + zoomGap * 2.4;
+    return Math.max(8, Math.min(30, Math.round(scaled)));
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -263,6 +272,10 @@ export function StoreRegistrationPage() {
         mapDataControl: false,
       });
       mapRef.current = map;
+      setMapZoomLevel(view.zoom);
+      naver.maps.Event.addListener(map, "zoom_changed", (zoom: number) => {
+        setMapZoomLevel(Number(zoom));
+      });
       marketPolygonsRef.current.forEach((polygon) => polygon.setMap(null));
       marketPolygonsRef.current = view.areaPaths.map(
         (path) =>
@@ -282,24 +295,34 @@ export function StoreRegistrationPage() {
       setMapError(false);
 
       naver.maps.Event.addListener(map, "click", (e: any) => {
-        const lat = e.coord.y;
-        const lng = e.coord.x;
+        const lat = typeof e?.coord?.lat === "function" ? e.coord.lat() : e?.coord?.y;
+        const lng = typeof e?.coord?.lng === "function" ? e.coord.lng() : e?.coord?.x;
+        if (typeof lat !== "number" || typeof lng !== "number") return;
         const next = { lat, lng };
         setPin(next);
 
         if (!pinMarkerRef.current) {
+          const markerSize = getScaledPinSize(12);
           pinMarkerRef.current = new naver.maps.Marker({
             map,
             position: new naver.maps.LatLng(lat, lng),
             title: "등록 핀",
             icon: {
               content:
-                '<div style="width:22px;height:22px;border-radius:999px;background:#111827;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.18);"></div>',
+                `<div style="width:${markerSize}px;height:${markerSize}px;border-radius:999px;background:#2563EB;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.18);"></div>`,
+              size: new naver.maps.Size(markerSize, markerSize),
+              anchor: new naver.maps.Point(markerSize / 2, markerSize / 2),
             },
           });
         } else {
           pinMarkerRef.current.setPosition(new naver.maps.LatLng(lat, lng));
           pinMarkerRef.current.setMap(map);
+          const markerSize = getScaledPinSize(12);
+          pinMarkerRef.current.setIcon({
+            content: `<div style="width:${markerSize}px;height:${markerSize}px;border-radius:999px;background:#2563EB;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.18);"></div>`,
+            size: new naver.maps.Size(markerSize, markerSize),
+            anchor: new naver.maps.Point(markerSize / 2, markerSize / 2),
+          });
         }
       });
     };
@@ -344,6 +367,7 @@ export function StoreRegistrationPage() {
 
     map.setCenter(new naver.maps.LatLng(view.center.lat, view.center.lng));
     map.setZoom(view.zoom);
+    setMapZoomLevel(view.zoom);
     marketPolygonsRef.current.forEach((polygon) => polygon.setMap(null));
     marketPolygonsRef.current = view.areaPaths.map(
       (path) =>
@@ -366,6 +390,7 @@ export function StoreRegistrationPage() {
     const naver = window.naver;
     const map = mapRef.current;
     const position = new naver.maps.LatLng(pin.lat, pin.lng);
+    const markerSize = getScaledPinSize(12);
     if (!pinMarkerRef.current) {
       pinMarkerRef.current = new naver.maps.Marker({
         map,
@@ -373,14 +398,21 @@ export function StoreRegistrationPage() {
         title: "등록 핀",
         icon: {
           content:
-            '<div style="width:22px;height:22px;border-radius:999px;background:#111827;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.18);"></div>',
+            `<div style="width:${markerSize}px;height:${markerSize}px;border-radius:999px;background:#2563EB;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.18);"></div>`,
+          size: new naver.maps.Size(markerSize, markerSize),
+          anchor: new naver.maps.Point(markerSize / 2, markerSize / 2),
         },
       });
     } else {
       pinMarkerRef.current.setPosition(position);
       pinMarkerRef.current.setMap(map);
+      pinMarkerRef.current.setIcon({
+        content: `<div style="width:${markerSize}px;height:${markerSize}px;border-radius:999px;background:#2563EB;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.18);"></div>`,
+        size: new naver.maps.Size(markerSize, markerSize),
+        anchor: new naver.maps.Point(markerSize / 2, markerSize / 2),
+      });
     }
-  }, [activeSection, pin]);
+  }, [activeSection, pin, mapZoomLevel, selectedMarketView]);
 
   const handleAddStore = () => {
     if (!pin || !form.name.trim() || selectedCategories.length === 0 || !form.location.trim()) return;
@@ -535,6 +567,15 @@ export function StoreRegistrationPage() {
     }
     onConfirm?.();
     setActiveSection(nextSection);
+  };
+
+  const handleCancel = (onConfirm?: () => void) => {
+    // If this page was opened for editing from admin list, cancel should return back.
+    if (editingStoreId !== null) {
+      navigate(-1);
+      return;
+    }
+    closeOrMoveSection(null, onConfirm);
   };
 
   return (
@@ -762,7 +803,7 @@ export function StoreRegistrationPage() {
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <button
                   type="button"
-                  onClick={() => closeOrMoveSection(null, resetStoreForm)}
+                  onClick={() => handleCancel(resetStoreForm)}
                   className="h-10 rounded-lg bg-gray-100 text-gray-600 text-[13px]"
                 >
                   취소
@@ -827,7 +868,7 @@ export function StoreRegistrationPage() {
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => closeOrMoveSection(null)}
+                onClick={() => handleCancel()}
                 className="h-10 rounded-lg bg-gray-100 text-gray-600 text-[13px]"
               >
                 취소
@@ -890,7 +931,7 @@ export function StoreRegistrationPage() {
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => closeOrMoveSection(null)}
+                    onClick={() => handleCancel()}
                     className="h-10 rounded-lg bg-gray-100 text-gray-600 text-[13px]"
                   >
                     취소
@@ -925,7 +966,7 @@ export function StoreRegistrationPage() {
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => closeOrMoveSection(null)}
+                    onClick={() => handleCancel()}
                     className="h-10 rounded-lg bg-gray-100 text-gray-600 text-[13px]"
                   >
                     취소
@@ -978,7 +1019,7 @@ export function StoreRegistrationPage() {
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => closeOrMoveSection(null)}
+                onClick={() => handleCancel()}
                 className="h-10 rounded-lg bg-gray-100 text-gray-600 text-[13px]"
               >
                 취소
