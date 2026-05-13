@@ -99,9 +99,11 @@ export function buildFacilityMarkerIcon(
   const content = `<div style="position:relative;width:${W}px;height:${H}px;box-sizing:border-box;">
     <div style="position:absolute;top:0;left:50%;transform:translateX(-50%);width:${pinSize}px;height:${pinSize}px;border-radius:999px;background:${color};border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.22);display:flex;align-items:center;justify-content:center;font-size:${fontPx}px;line-height:1;">${emoji}</div>
   </div>`;
+  // 등록 화면 임시 핀은 원 중심이 좌표와 맞춰져 있음. 아래쪽 anchor(W/2,H)면 타일 좌표가 원의 하단에 붙어
+  // 실제로는 핀이 북쪽(위)으로 떠 보이므로, 원의 중심과 동일하게 맞춤.
   return {
     content,
     size: new naver.maps.Size(W, H),
-    anchor: new naver.maps.Point(Math.round(W / 2), H),
+    anchor: new naver.maps.Point(Math.round(W / 2), Math.round(pinSize / 2)),
   };
 }
