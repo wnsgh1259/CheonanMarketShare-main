@@ -7,7 +7,7 @@ interface MarketConflictModalProps {
 export function MarketConflictModal({ open, onConfirm, onCancel }: MarketConflictModalProps) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-6">
+    <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/30 px-6">
       <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
         <h3 className="text-center text-[15px] text-gray-900 mb-2">시장을 변경할까요?</h3>
         <p className="text-[13px] text-gray-500 text-center mb-6 leading-relaxed">

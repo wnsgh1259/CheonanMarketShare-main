@@ -9,6 +9,7 @@ import { ProfilePage } from "./pages/ProfilePage";
 import { ChatPage } from "./pages/ChatPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { StoreRegistrationPage } from "./pages/StoreRegistrationPage";
+import { FacilityRegistrationPage } from "./pages/FacilityRegistrationPage";
 import { AdminPage } from "./pages/AdminPage";
 
 export const router = createBrowserRouter([
@@ -25,6 +26,7 @@ export const router = createBrowserRouter([
       { path: "profile", Component: ProfilePage },
       { path: "settings", Component: SettingsPage },
       { path: "owner/store-registration", Component: StoreRegistrationPage },
+      { path: "owner/facility-registration", Component: FacilityRegistrationPage },
       { path: "admin", Component: AdminPage },
     ],
   },

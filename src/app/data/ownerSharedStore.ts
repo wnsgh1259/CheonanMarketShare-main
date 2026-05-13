@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 export const OWNER_DASHBOARD_STORAGE_KEY = "owner-dashboard-draft-v1";
 export const OWNER_EDIT_STORE_KEY = "owner-edit-store-v1";
+export const OWNER_EDIT_FACILITY_KEY = "owner-edit-facility-v1";
 const OWNER_SHARED_ROW_ID = "global";
 const OWNER_SHARED_TABLE = "owner_dashboard_state";
 

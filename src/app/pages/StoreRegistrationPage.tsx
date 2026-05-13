@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ChevronLeft, MapPin, Plus, ImagePlus } from "lucide-react";
 import { useNavigate } from "react-router";
 import { STORES_BY_MARKET } from "../data/storeData";
@@ -131,12 +131,29 @@ export function StoreRegistrationPage() {
   const navigate = useNavigate();
   const query = new URLSearchParams(window.location.search);
   const queryMarket = query.get("market");
-  const queryEditStoreId = Number(query.get("editStoreId"));
+  const editStoreIdParam = query.get("editStoreId");
+  const queryEditStoreId =
+    editStoreIdParam != null && editStoreIdParam !== "" ? Number(editStoreIdParam) : Number.NaN;
   const initialMarket: MarketId =
     queryMarket === "jungang" || queryMarket === "byeongcheon" || queryMarket === "seonghwan"
       ? queryMarket
       : "byeongcheon";
   const initialEditStoreId = Number.isFinite(queryEditStoreId) ? queryEditStoreId : null;
+  const returnToAdmin = query.get("returnTo") === "admin" || initialEditStoreId !== null;
+  const adminReturnHint =
+    query.get("adminReturn") === "map" || query.get("adminReturn") === "list" ? query.get("adminReturn") : null;
+
+  const goBackToAdmin = (opts?: { replace?: boolean }) => {
+    const q = new URLSearchParams();
+    q.set("market", initialMarket);
+    if (adminReturnHint === "map") {
+      q.set("adminReturn", "map");
+    } else if (adminReturnHint === "list" && initialEditStoreId !== null) {
+      q.set("adminReturn", "list");
+      q.set("focusStore", String(initialEditStoreId));
+    }
+    navigate(`/admin?${q.toString()}`, { replace: opts?.replace === true });
+  };
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<NaverMapRef | null>(null);
@@ -170,6 +187,12 @@ export function StoreRegistrationPage() {
   const [inquiryReply, setInquiryReply] = useState("");
   const [saveNotice, setSaveNotice] = useState("");
   const [pageTitle, setPageTitle] = useState("~~사장님");
+  const saveNoticeRef = useRef<HTMLDivElement | null>(null);
+
+  useLayoutEffect(() => {
+    if (!saveNotice) return;
+    saveNoticeRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [saveNotice]);
 
   const clientId = import.meta.env.VITE_NAVER_MAP_CLIENT_ID as string | undefined;
   const isPlaceholderClientId = !clientId || clientId === "your_naver_map_client_id";
@@ -182,67 +205,95 @@ export function StoreRegistrationPage() {
     return Math.max(8, Math.min(30, Math.round(scaled)));
   };
 
+  const readStorageDraftRecord = (): Record<string, unknown> => {
+    try {
+      const raw = window.localStorage.getItem(OWNER_DASHBOARD_STORAGE_KEY);
+      if (!raw) return {};
+      const v = JSON.parse(raw) as unknown;
+      return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const persistOwnerDraftToStorage = (patch: Record<string, unknown>) => {
+    const base = readStorageDraftRecord();
+    const payload = { ...base, ...patch };
+    window.localStorage.setItem(OWNER_DASHBOARD_STORAGE_KEY, JSON.stringify(payload));
+    void saveSharedOwnerDraft(payload as SharedOwnerDashboardDraft);
+  };
+
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
       try {
         const remote = await loadSharedOwnerDraft();
-        const raw = remote ? JSON.stringify(remote) : window.localStorage.getItem(OWNER_DASHBOARD_STORAGE_KEY);
+        const localRaw = window.localStorage.getItem(OWNER_DASHBOARD_STORAGE_KEY);
+        let raw: string | null = null;
+        if (localRaw) {
+          try {
+            JSON.parse(localRaw);
+            raw = localRaw;
+          } catch {
+            raw = null;
+          }
+        }
+        if (!raw && remote) raw = JSON.stringify(remote);
         if (!raw || cancelled) return;
         const parsed = JSON.parse(raw) as OwnerDashboardDraft;
-      setStores(parsed.stores ?? []);
-      setMenus(parsed.menus?.length ? parsed.menus : [{ id: Date.now(), name: "", price: "", photoName: "" }]);
-      setTodayDeal(parsed.todayDeal ?? "");
-      setNews(parsed.news ?? "");
-      setCouponEvent(parsed.couponEvent ?? "");
-      setReviewReply(parsed.reviewReply ?? "");
-      setInquiryReply(parsed.inquiryReply ?? "");
+        setStores(parsed.stores ?? []);
+        setMenus(parsed.menus?.length ? parsed.menus : [{ id: Date.now(), name: "", price: "", photoName: "" }]);
+        setTodayDeal(parsed.todayDeal ?? "");
+        setNews(parsed.news ?? "");
+        setCouponEvent(parsed.couponEvent ?? "");
+        setReviewReply(parsed.reviewReply ?? "");
+        setInquiryReply(parsed.inquiryReply ?? "");
 
-      if (initialEditStoreId !== null) {
-        const directTarget = (parsed.stores ?? []).find((store) => store.id === initialEditStoreId);
-        const rawEdit = window.localStorage.getItem(OWNER_EDIT_STORE_KEY);
-        const editTarget = rawEdit ? (JSON.parse(rawEdit) as DraftStore) : null;
-        const target =
-          directTarget ??
-          (editTarget && editTarget.id === initialEditStoreId ? editTarget : null);
-        if (target) {
-          setPageTitle(target.name || "~~사장님");
-          if (target.marketId) setSelectedMarket(target.marketId);
-          const dummyMatch = target.marketId
-            ? STORES_BY_MARKET[target.marketId].find((store) => store.name === target.name)
-            : undefined;
-          setActiveSection("store");
-          setForm({
-            name: target.name,
-            location: target.location,
-            hours: target.hours ?? dummyMatch?.hours ?? "",
-            phone: target.phone,
-            description: target.description,
-            representativePhotoName: target.image || dummyMatch?.image ? "기존 대표사진" : "",
-            representativePhotoUrl: target.image ?? dummyMatch?.image ?? "",
-          });
-          setSelectedCategories(
-            target.category
-              .split(",")
-              .map((item) => item.trim())
-              .filter(Boolean),
-          );
-          setPin({ lat: target.lat, lng: target.lng });
-          if (target.menus?.length) {
-            setMenus(target.menus);
-          } else if (dummyMatch?.menus?.length) {
-            setMenus(
-              dummyMatch.menus.map((menu, index) => ({
-                id: Number(menu.id) || Date.now() + index,
-                name: menu.name,
-                price: String(menu.price),
-                photoName: "",
-              })),
+        if (initialEditStoreId !== null) {
+          const directTarget = (parsed.stores ?? []).find((store) => store.id === initialEditStoreId);
+          const rawEdit = window.localStorage.getItem(OWNER_EDIT_STORE_KEY);
+          const editTarget = rawEdit ? (JSON.parse(rawEdit) as DraftStore) : null;
+          const target =
+            directTarget ??
+            (editTarget && editTarget.id === initialEditStoreId ? editTarget : null);
+          if (target) {
+            setPageTitle(target.name || "~~사장님");
+            if (target.marketId) setSelectedMarket(target.marketId);
+            const dummyMatch = target.marketId
+              ? STORES_BY_MARKET[target.marketId].find((store) => store.name === target.name)
+              : undefined;
+            setActiveSection("store");
+            setForm({
+              name: target.name,
+              location: target.location,
+              hours: target.hours ?? dummyMatch?.hours ?? "",
+              phone: target.phone,
+              description: target.description,
+              representativePhotoName: target.image || dummyMatch?.image ? "기존 대표사진" : "",
+              representativePhotoUrl: target.image ?? dummyMatch?.image ?? "",
+            });
+            setSelectedCategories(
+              target.category
+                .split(",")
+                .map((item) => item.trim())
+                .filter(Boolean),
             );
+            setPin({ lat: target.lat, lng: target.lng });
+            if (target.menus?.length) {
+              setMenus(target.menus);
+            } else if (dummyMatch?.menus?.length) {
+              setMenus(
+                dummyMatch.menus.map((menu, index) => ({
+                  id: Number(menu.id) || Date.now() + index,
+                  name: menu.name,
+                  price: String(menu.price),
+                  photoName: "",
+                })),
+              );
+            }
+            setEditingStoreId(target.id);
           }
-          setEditingStoreId(target.id);
         }
-      }
         window.localStorage.setItem(OWNER_DASHBOARD_STORAGE_KEY, JSON.stringify(parsed));
       } catch {
         // Ignore corrupted local draft.
@@ -261,6 +312,7 @@ export function StoreRegistrationPage() {
 
     const initMap = () => {
       if (cancelled || !window.naver?.maps || !mapContainerRef.current) return;
+      setMapReady(false);
       const naver = window.naver;
       const view = MARKET_VIEW_CONFIG[selectedMarket];
       const map = new naver.maps.Map(mapContainerRef.current, {
@@ -331,6 +383,10 @@ export function StoreRegistrationPage() {
       initMap();
       return () => {
         cancelled = true;
+        setMapReady(false);
+        pinMarkerRef.current?.setMap(null);
+        pinMarkerRef.current = null;
+        mapRef.current = null;
       };
     }
 
@@ -340,6 +396,10 @@ export function StoreRegistrationPage() {
       else existingScript.addEventListener("load", initMap, { once: true });
       return () => {
         cancelled = true;
+        setMapReady(false);
+        pinMarkerRef.current?.setMap(null);
+        pinMarkerRef.current = null;
+        mapRef.current = null;
         existingScript.removeEventListener("load", initMap);
       };
     }
@@ -354,6 +414,10 @@ export function StoreRegistrationPage() {
 
     return () => {
       cancelled = true;
+      setMapReady(false);
+      pinMarkerRef.current?.setMap(null);
+      pinMarkerRef.current = null;
+      mapRef.current = null;
       script.onload = null;
       script.onerror = null;
     };
@@ -386,7 +450,7 @@ export function StoreRegistrationPage() {
   }, [activeSection, selectedMarket, selectedMarketView]);
 
   useEffect(() => {
-    if (!window.naver?.maps || !mapRef.current || activeSection !== "store" || !pin) return;
+    if (!mapReady || !window.naver?.maps || !mapRef.current || activeSection !== "store" || !pin) return;
     const naver = window.naver;
     const map = mapRef.current;
     const position = new naver.maps.LatLng(pin.lat, pin.lng);
@@ -396,6 +460,7 @@ export function StoreRegistrationPage() {
         map,
         position,
         title: "등록 핀",
+        zIndex: 50,
         icon: {
           content:
             `<div style="width:${markerSize}px;height:${markerSize}px;border-radius:999px;background:#2563EB;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.18);"></div>`,
@@ -412,22 +477,66 @@ export function StoreRegistrationPage() {
         anchor: new naver.maps.Point(markerSize / 2, markerSize / 2),
       });
     }
-  }, [activeSection, pin, mapZoomLevel, selectedMarketView]);
+  }, [activeSection, pin, mapReady, mapZoomLevel, selectedMarketView]);
 
   const handleAddStore = () => {
-    if (!pin || !form.name.trim() || selectedCategories.length === 0 || !form.location.trim()) return;
-    const isEditingMode = editingStoreId !== null;
+    const existingForEdit = editingStoreId !== null ? stores.find((s) => s.id === editingStoreId) : undefined;
+    let existingFromKey: DraftStore | undefined;
+    if (editingStoreId !== null) {
+      try {
+        const raw = window.localStorage.getItem(OWNER_EDIT_STORE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw) as DraftStore;
+          if (parsed.id === editingStoreId) existingFromKey = parsed;
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    const existing = existingForEdit ?? existingFromKey;
+    const isEditing = editingStoreId !== null;
+
+    const coords =
+      pin ??
+      (existing &&
+      typeof existing.lat === "number" &&
+      typeof existing.lng === "number" &&
+      !(existing.lat === 0 && existing.lng === 0)
+        ? { lat: existing.lat, lng: existing.lng }
+        : null);
+
+    const nameStr = (form.name.trim() || (isEditing ? (existing?.name ?? "").trim() : "")).trim();
+    const locationStr = (form.location.trim() || (isEditing ? (existing?.location ?? "").trim() : "")).trim();
+    const categoryStr =
+      selectedCategories.length > 0
+        ? selectedCategories.join(", ")
+        : isEditing
+          ? (existing?.category ?? "").trim()
+          : "";
+
+    if (!coords || !nameStr || !categoryStr || !locationStr) {
+      const msg = !coords
+        ? "지도에서 위치를 찍어 주세요. (편집 중이면 기존 좌표가 있어야 합니다. 시장 탭을 바꾸면 핀이 초기화될 수 있어요.)"
+        : !nameStr
+          ? "상점명을 입력해 주세요."
+          : !categoryStr
+            ? "카테고리를 하나 이상 선택해 주세요."
+            : "위치(호수)를 입력해 주세요.";
+      setSaveNotice(msg);
+      window.setTimeout(() => setSaveNotice(""), 4200);
+      return;
+    }
 
     const next: DraftStore = {
       id: editingStoreId ?? Date.now(),
-      name: form.name.trim(),
-      category: selectedCategories.join(", "),
-      location: form.location.trim(),
+      name: nameStr,
+      category: categoryStr,
+      location: locationStr,
       hours: form.hours.trim(),
       phone: form.phone.trim(),
       description: form.description.trim(),
-      lat: Number(pin.lat.toFixed(6)),
-      lng: Number(pin.lng.toFixed(6)),
+      lat: Number(coords.lat.toFixed(6)),
+      lng: Number(coords.lng.toFixed(6)),
       marketId: selectedMarket,
       image: form.representativePhotoUrl || undefined,
       menus: menus.filter((menu) => menu.name.trim()).map((menu) => ({
@@ -441,19 +550,7 @@ export function StoreRegistrationPage() {
         : [next, ...stores]
       : [next, ...stores];
     setStores(updatedStores);
-    window.localStorage.setItem(
-      OWNER_DASHBOARD_STORAGE_KEY,
-      JSON.stringify({
-        stores: updatedStores,
-        menus,
-        todayDeal,
-        news,
-        couponEvent,
-        reviewReply,
-        inquiryReply,
-      } satisfies OwnerDashboardDraft),
-    );
-    void saveSharedOwnerDraft({
+    persistOwnerDraftToStorage({
       stores: updatedStores,
       menus,
       todayDeal,
@@ -461,9 +558,9 @@ export function StoreRegistrationPage() {
       couponEvent,
       reviewReply,
       inquiryReply,
-    } satisfies SharedOwnerDashboardDraft);
-    if (isEditingMode) {
-      navigate(-1);
+    });
+    if (returnToAdmin) {
+      goBackToAdmin({ replace: true });
       return;
     }
     setForm({ name: "", location: "", hours: "", phone: "", description: "", representativePhotoName: "", representativePhotoUrl: "" });
@@ -518,8 +615,7 @@ export function StoreRegistrationPage() {
       inquiryReply,
     };
     setStores(patchedStores);
-    window.localStorage.setItem(OWNER_DASHBOARD_STORAGE_KEY, JSON.stringify(payload));
-    void saveSharedOwnerDraft(payload as SharedOwnerDashboardDraft);
+    persistOwnerDraftToStorage(payload as Record<string, unknown>);
     if (notice) {
       setSaveNotice(notice);
       window.setTimeout(() => setSaveNotice(""), 1800);
@@ -571,8 +667,8 @@ export function StoreRegistrationPage() {
 
   const handleCancel = (onConfirm?: () => void) => {
     // If this page was opened for editing from admin list, cancel should return back.
-    if (editingStoreId !== null) {
-      navigate(-1);
+    if (returnToAdmin) {
+      goBackToAdmin();
       return;
     }
     closeOrMoveSection(null, onConfirm);
@@ -584,7 +680,13 @@ export function StoreRegistrationPage() {
         <div className="flex items-center justify-between px-4 py-3">
           <button
             type="button"
-            onClick={() => navigate(-1)}
+            onClick={() => {
+              if (returnToAdmin) {
+                goBackToAdmin();
+                return;
+              }
+              navigate(-1);
+            }}
             className="p-1"
             aria-label="뒤로가기"
           >
@@ -620,7 +722,15 @@ export function StoreRegistrationPage() {
           ))}
         </div>
         {saveNotice && (
-          <div className="rounded-lg bg-emerald-50 text-emerald-700 text-[12px] px-3 py-2">
+          <div
+            ref={saveNoticeRef}
+            id="owner-save-feedback"
+            className={`rounded-lg text-[13px] px-3 py-2 border ${
+              /저장(되었|됐)/.test(saveNotice)
+                ? "bg-emerald-50 text-emerald-800 border-emerald-100"
+                : "bg-amber-50 text-amber-900 border-amber-200"
+            }`}
+          >
             {saveNotice}
           </div>
         )}
@@ -673,7 +783,13 @@ export function StoreRegistrationPage() {
               </div>
             </div>
 
-            <form className="bg-white rounded-xl p-4 space-y-3">
+            <form
+              className="bg-white rounded-xl p-4 space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleAddStore();
+              }}
+            >
               <div>
                 <label className="block text-[12px] text-gray-500 mb-1">상점명</label>
                 <input
@@ -801,6 +917,17 @@ export function StoreRegistrationPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-2 pt-1">
+                {saveNotice ? (
+                  <p
+                    className={`col-span-2 rounded-lg border px-3 py-2 text-[12px] ${
+                      /저장(되었|됐)/.test(saveNotice)
+                        ? "border-emerald-100 bg-emerald-50 text-emerald-800"
+                        : "border-amber-200 bg-amber-50 text-amber-900"
+                    }`}
+                  >
+                    {saveNotice}
+                  </p>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => handleCancel(resetStoreForm)}
@@ -809,8 +936,7 @@ export function StoreRegistrationPage() {
                   취소
                 </button>
                 <button
-                  type="button"
-                  onClick={handleAddStore}
+                  type="submit"
                   className="h-10 rounded-lg bg-gray-900 text-white text-[13px]"
                 >
                   저장
