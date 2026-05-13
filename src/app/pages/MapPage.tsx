@@ -68,6 +68,18 @@ type DraftStorePin = {
   menus?: Array<{ id: number; name: string; price: string }>;
 };
 
+type DraftFacilityPin = {
+  id: number;
+  name: string;
+  lat: number;
+  lng: number;
+  color: string;
+  size?: number;
+  hours?: string;
+  image?: string;
+  marketId?: MarketId;
+};
+
 declare global {
   interface Window {
     naver?: any;
@@ -233,23 +245,36 @@ function getStoreLatLng(store: StoreData, center: { lat: number; lng: number }) 
 function NaverMarketMap({
   selectedMarket,
   visibleStores,
+  facilities,
   selectedStore,
   mapExpanded,
   onSelectStore,
+  onSelectFacility,
 }: {
   selectedMarket: MarketId;
   visibleStores: StoreData[];
+  facilities: DraftFacilityPin[];
   selectedStore: StoreData | null;
   mapExpanded: boolean;
   onSelectStore: (store: StoreData) => void;
+  onSelectFacility: (facility: DraftFacilityPin) => void;
 }) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<NaverMapRef | null>(null);
   const marketPolygonsRef = useRef<NaverPolygonRef[]>([]);
   const storeMarkersRef = useRef<NaverMarkerRef[]>([]);
+  const facilityMarkersRef = useRef<NaverMarkerRef[]>([]);
   const [mapLoadError, setMapLoadError] = useState(false);
   const [mapInitError, setMapInitError] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState<number>(MARKET_VIEW_CONFIG[selectedMarket].zoom);
   const centerRef = useRef(MARKET_COORDS[selectedMarket]);
+  const getScaledMarkerSize = (baseSize: number) => {
+    const baseZoom = MARKET_VIEW_CONFIG[selectedMarket].zoom;
+    const zoomGap = zoomLevel - baseZoom;
+    const scaled = baseSize + zoomGap * 2.4;
+    return Math.max(8, Math.min(30, Math.round(scaled)));
+  };
+
   const clientId = import.meta.env.VITE_NAVER_MAP_CLIENT_ID as string | undefined;
   const isPlaceholderClientId = !clientId || clientId === "your_naver_map_client_id";
 
@@ -281,6 +306,10 @@ function NaverMarketMap({
         scaleControl: false,
         logoControl: false,
         mapDataControl: false,
+      });
+      setZoomLevel(view.zoom);
+      naver.maps.Event.addListener(mapRef.current, "zoom_changed", (zoom: number) => {
+        setZoomLevel(Number(zoom));
       });
 
       marketPolygonsRef.current = createMarketPolygons(mapRef.current, view);
@@ -320,6 +349,8 @@ function NaverMarketMap({
       marketPolygonsRef.current = [];
       clearStoreMarkers(storeMarkersRef.current);
       storeMarkersRef.current = [];
+      clearStoreMarkers(facilityMarkersRef.current);
+      facilityMarkersRef.current = [];
       script.onload = null;
       script.onerror = null;
     };
@@ -334,6 +365,7 @@ function NaverMarketMap({
 
     map.setCenter(new naver.maps.LatLng(view.center.lat, view.center.lng));
     map.setZoom(view.zoom);
+    setZoomLevel(view.zoom);
 
     clearMarketPolygons(marketPolygonsRef.current);
     marketPolygonsRef.current = createMarketPolygons(map, view);
@@ -349,12 +381,15 @@ function NaverMarketMap({
     storeMarkersRef.current = visibleStores.map((store) => {
       const point = getStoreLatLng(store, center);
       const isSelected = selectedStore?.id === store.id;
+      const markerSize = getScaledMarkerSize(isSelected ? 14 : 12);
       const marker = new naver.maps.Marker({
         map,
         position: new naver.maps.LatLng(point.lat, point.lng),
         title: store.name,
         icon: {
-          content: `<div style="width:${isSelected ? 16 : 14}px;height:${isSelected ? 16 : 14}px;border-radius:999px;background:${isSelected ? "#111827" : "#2563EB"};border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.18);"></div>`,
+          content: `<div style="width:${markerSize}px;height:${markerSize}px;border-radius:999px;background:${isSelected ? "#111827" : "#2563EB"};border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.18);"></div>`,
+          size: new naver.maps.Size(markerSize, markerSize),
+          anchor: new naver.maps.Point(markerSize / 2, markerSize / 2),
         },
       });
       naver.maps.Event.addListener(marker, "click", () => {
@@ -362,7 +397,32 @@ function NaverMarketMap({
       });
       return marker;
     });
-  }, [visibleStores, selectedStore, onSelectStore]);
+  }, [visibleStores, selectedStore, onSelectStore, zoomLevel, selectedMarket]);
+
+  useEffect(() => {
+    if (!window.naver?.maps || !mapRef.current) return;
+    const naver = window.naver;
+    const map = mapRef.current;
+
+    clearStoreMarkers(facilityMarkersRef.current);
+    facilityMarkersRef.current = facilities.map((facility) => {
+      const markerSize = getScaledMarkerSize(15);
+      const marker = new naver.maps.Marker({
+        map,
+        position: new naver.maps.LatLng(facility.lat, facility.lng),
+        title: facility.name,
+        icon: {
+          content: `<div style="width:${markerSize}px;height:${markerSize}px;border-radius:999px;background:${facility.color || "#2563eb"};border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.18);"></div>`,
+          size: new naver.maps.Size(markerSize, markerSize),
+          anchor: new naver.maps.Point(markerSize / 2, markerSize / 2),
+        },
+      });
+      naver.maps.Event.addListener(marker, "click", () => {
+        onSelectFacility(facility);
+      });
+      return marker;
+    });
+  }, [facilities, zoomLevel, selectedMarket, onSelectFacility]);
 
   useEffect(() => {
     if (!window.naver?.maps || !mapRef.current || !mapExpanded) return;
@@ -437,6 +497,7 @@ export function MapPage() {
   });
   const [selectedCategory, setSelectedCategory] = useState<CategoryKey>("전체");
   const [selectedStore, setSelectedStore] = useState<StoreData | null>(null);
+  const [selectedFacility, setSelectedFacility] = useState<DraftFacilityPin | null>(null);
   const [mapExpanded, setMapExpanded] = useState(true);
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [pendingCartItem, setPendingCartItem] = useState<CartItem | null>(null);
@@ -444,6 +505,7 @@ export function MapPage() {
   const [likedStores, setLikedStores] = useState<Set<number>>(new Set());
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [sharedStores, setSharedStores] = useState<DraftStorePin[] | null>(null);
+  const [sharedFacilities, setSharedFacilities] = useState<DraftFacilityPin[] | null>(null);
 
   const { addItem, switchMarketAndAdd, totalCount } = useCart();
 
@@ -453,6 +515,7 @@ export function MapPage() {
       const remote = await loadSharedOwnerDraft();
       if (!remote || cancelled) return;
       setSharedStores((remote.stores ?? []) as DraftStorePin[]);
+      setSharedFacilities((remote.facilities ?? []) as DraftFacilityPin[]);
       window.localStorage.setItem(OWNER_DASHBOARD_STORAGE_KEY, JSON.stringify(remote));
     };
     void load();
@@ -492,6 +555,19 @@ export function MapPage() {
     });
   }, [selectedMarket, sharedStores]);
   const marketInfo = MARKET_INFO[selectedMarket];
+  const facilities = useMemo(() => {
+    const source = sharedFacilities ?? (() => {
+      try {
+        const raw = window.localStorage.getItem(OWNER_DASHBOARD_STORAGE_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw) as { facilities?: DraftFacilityPin[] };
+        return parsed.facilities ?? [];
+      } catch {
+        return [];
+      }
+    })();
+    return source.filter((facility) => facility.marketId === selectedMarket);
+  }, [selectedMarket, sharedFacilities]);
 
   const filteredStores = allStores.filter((s) => {
     const matchFav = !showFavoritesOnly || likedStores.has(s.id);
@@ -514,6 +590,7 @@ export function MapPage() {
     setSelectedMarket(id);
     setSelectedCategory("전체");
     setSelectedStore(null);
+    setSelectedFacility(null);
     setSearchQuery("");
   };
 
@@ -647,11 +724,17 @@ export function MapPage() {
           <NaverMarketMap
             selectedMarket={selectedMarket}
             visibleStores={filteredStores}
+            facilities={facilities}
             selectedStore={selectedStore}
             mapExpanded={mapExpanded}
             onSelectStore={(store) => {
               setSelectedStore(store);
+              setSelectedFacility(null);
               setAddedMenuIds(new Set());
+            }}
+            onSelectFacility={(facility) => {
+              setSelectedFacility(facility);
+              setSelectedStore(null);
             }}
           />
           <div className="absolute bottom-2 left-2 bg-white rounded-md px-2 py-1 text-[11px] text-gray-500 shadow-sm">
@@ -838,6 +921,48 @@ export function MapPage() {
                   닫기
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedFacility && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end max-w-md mx-auto">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setSelectedFacility(null)} />
+          <div className="relative bg-white rounded-t-2xl overflow-hidden max-h-[80vh] flex flex-col">
+            <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
+              <div className="w-10 h-1 bg-gray-300 rounded-full" />
+            </div>
+            <div className="relative h-40 flex-shrink-0">
+              {selectedFacility.image ? (
+                <img src={selectedFacility.image} alt={selectedFacility.name} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-gray-200" />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+              <button onClick={() => setSelectedFacility(null)} className="absolute top-3 right-3 w-8 h-8 bg-black/30 rounded-full flex items-center justify-center text-white">
+                <X className="w-4 h-4" />
+              </button>
+              <div className="absolute bottom-3 left-4 right-4">
+                <h2 className="text-white text-[17px]">{selectedFacility.name}</h2>
+                <p className="text-[12px] text-white/80 mt-0.5">편의시설</p>
+              </div>
+            </div>
+            <div className="px-4 py-4 space-y-2">
+              <div className="flex items-center gap-2 text-[12px] text-gray-500">
+                <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>{selectedFacility.lat}, {selectedFacility.lng}</span>
+              </div>
+              <div className="flex items-center gap-2 text-[12px] text-gray-500">
+                <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>{selectedFacility.hours || "운영시간 정보 없음"}</span>
+              </div>
+              <button
+                onClick={() => setSelectedFacility(null)}
+                className="w-full mt-2 py-3 text-[13px] text-gray-400 active:text-gray-600 transition-colors"
+              >
+                닫기
+              </button>
             </div>
           </div>
         </div>

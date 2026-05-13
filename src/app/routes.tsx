@@ -10,6 +10,8 @@ import { ChatPage } from "./pages/ChatPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { StoreRegistrationPage } from "./pages/StoreRegistrationPage";
 import { AdminPage } from "./pages/AdminPage";
+import { WritePage } from "./pages/WritePage";
+import { PostDetailPage } from "./pages/PostDetailPage";
 
 export const router = createBrowserRouter([
   {
@@ -26,6 +28,8 @@ export const router = createBrowserRouter([
       { path: "settings", Component: SettingsPage },
       { path: "owner/store-registration", Component: StoreRegistrationPage },
       { path: "admin", Component: AdminPage },
+      { path: "write", Component: WritePage },
+      { path: "post/:id", Component: PostDetailPage },
     ],
   },
 ]);
