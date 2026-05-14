@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback, useLayoutEffect } fr
 import { Link } from "react-router";
 import {
   ChevronLeft, Search, X, MapPin, Heart, ShoppingCart,
-  Clock, Phone, Star, Plus, MessageCircle, ChevronRight,
+  Clock, Phone, Star, Plus, MessageCircle, ChevronRight, ChevronUp,
 } from "lucide-react";
 import { useCart, type CartItem } from "../components/CartContext";
 import type { MarketId } from "../components/CartContext";
@@ -519,7 +519,6 @@ export function MapPage() {
   const [facilitySheetOpen, setFacilitySheetOpen] = useState(false);
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [pendingCartItem, setPendingCartItem] = useState<CartItem | null>(null);
-  const [addedMenuIds, setAddedMenuIds] = useState<Set<string>>(new Set());
   const [likedStores, setLikedStores] = useState<Set<number>>(new Set());
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [sharedStores, setSharedStores] = useState<DraftStorePin[] | null>(null);
@@ -650,10 +649,12 @@ export function MapPage() {
     [allStores, showFavoritesOnly, likedStores, selectedCategory, searchQuery],
   );
 
-  /** 최소 스냅: 핸들 + 시장명·개수 한 줄 (~52px) */
+  /** 최소 스냅: 핸들 + 시장명·개수 한 줄 — 픽셀 확보 후 비율로 변환(짧은 뷰포트에서 상한만으로 잘리지 않게) */
   const listSnapMin = useMemo(() => {
     const vh = Math.max(360, viewportH);
-    return Math.min(0.10, Math.max(0.06, 52 / vh));
+    const minBarPx = 80;
+    const ratio = minBarPx / vh;
+    return Math.min(0.24, Math.max(0.085, ratio));
   }, [viewportH]);
 
   /**
@@ -858,7 +859,7 @@ export function MapPage() {
       setPendingCartItem(cartItem);
       setShowConflictModal(true);
     } else if (result === "added") {
-      setAddedMenuIds(prev => new Set(prev).add(menu.id));
+      // 담기 성공 - 추가 처리 없음 (버튼은 항상 활성 상태 유지)
     }
   };
 
@@ -1021,7 +1022,6 @@ export function MapPage() {
               suppressHighlightPanRef.current = false; // 핀 클릭 → pan 허용
               setBarPreviewStore(store);
               setSelectedFacility(null);
-              setAddedMenuIds(new Set());
               setStoreSheetOpen(false);
               setFacilitySheetOpen(false);
               setListActiveSnap(listSnapMin);
@@ -1066,7 +1066,6 @@ export function MapPage() {
             className="relative bg-white rounded-2xl shadow-[0_4px_28px_rgba(0,0,0,0.18)] overflow-hidden cursor-pointer active:scale-[0.99] transition-transform"
             onClick={() => {
               setSelectedStore(barPreviewStore);
-              setAddedMenuIds(new Set());
               setFacilitySheetOpen(false);
               setStoreSheetOpen(true);
             }}
@@ -1131,10 +1130,16 @@ export function MapPage() {
           onPointerUp={handleSheetPointerUp}
           onPointerCancel={handleSheetPointerUp}
         >
-          <div className="mx-auto mb-2 mt-3 h-1 w-10 rounded-full bg-gray-300" />
-          <div className="flex items-center justify-between px-4 pb-3">
-            <span className="text-[14px] font-semibold text-gray-900">{marketInfo.name}</span>
-            <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[12px] text-gray-500">{filteredStores.length}개</span>
+          {isStoreSheetCollapsed ? (
+            <div className="flex justify-center pb-1.5 pt-2.5">
+              <ChevronUp className="w-7 h-7 text-gray-400" strokeWidth={2.25} />
+            </div>
+          ) : (
+            <div className="mx-auto mb-2 mt-3 h-1 w-10 rounded-full bg-gray-300" />
+          )}
+          <div className="flex items-center justify-between px-4 pb-3.5 pt-0.5">
+            <span className="text-[14px] font-semibold leading-snug text-gray-900">{marketInfo.name}</span>
+            <span className="shrink-0 rounded-full bg-gray-100 px-2.5 py-0.5 text-[12px] leading-snug text-gray-500">{filteredStores.length}개</span>
           </div>
         </div>
         {/* 목록 영역 — 최소 스냅일 때 CSS로 숨김(스크롤 위치 보존을 위해 언마운트 안 함) */}
@@ -1165,7 +1170,6 @@ export function MapPage() {
                 className="bg-gray-50 rounded-xl overflow-hidden active:bg-gray-100 transition-colors cursor-pointer"
                 onClick={() => {
                   setSelectedStore(store);
-                  setAddedMenuIds(new Set());
                   setBarPreviewStore(null);
                   setFacilitySheetOpen(false);
                   setStoreSheetOpen(true);
@@ -1242,12 +1246,14 @@ export function MapPage() {
         >
           <DrawerContent
             className={cn(
-              "mx-auto w-full max-w-md gap-0 rounded-t-2xl border-0 bg-white p-0 mt-0 max-h-[85vh]",
+              "mx-auto w-full max-w-md gap-0 rounded-t-2xl border-0 bg-white p-0",
+              "data-[vaul-drawer-direction=bottom]:mt-0",
+              "data-[vaul-drawer-direction=bottom]:max-h-[96dvh]",
               "[&>div:first-of-type]:hidden",
             )}
           >
             <DrawerTitle className="sr-only">{selectedStore.name}</DrawerTitle>
-            <div className="flex max-h-[85vh] flex-col overflow-hidden rounded-t-2xl bg-white">
+            <div className="flex h-[96dvh] flex-col overflow-hidden rounded-t-2xl bg-white">
               <div className="flex flex-shrink-0 justify-center pb-1 pt-3">
                 <div className="h-1 w-10 rounded-full bg-gray-300" />
               </div>
@@ -1297,9 +1303,8 @@ export function MapPage() {
                   <h3 className="mb-2.5 text-[14px] text-gray-900">메뉴 / 상품</h3>
                   <div className="space-y-2">
                     {selectedStore.menus.map((menu) => {
-                      const isAdded = addedMenuIds.has(menu.id);
                       return (
-                        <div key={menu.id} className={`flex items-center justify-between rounded-lg p-3 transition-all ${isAdded ? "bg-sky-50" : "bg-gray-50"}`}>
+                        <div key={menu.id} className="flex items-center justify-between rounded-lg bg-gray-50 p-3">
                           <div className="flex-1">
                             <p className="text-[14px] text-gray-800">{menu.name}</p>
                             <div className="mt-0.5 flex items-center gap-2">
@@ -1315,10 +1320,10 @@ export function MapPage() {
                           <button
                             type="button"
                             onClick={() => handleAddToCart(menu, selectedStore)}
-                            className={`flex items-center gap-1 rounded-lg px-3 py-2 text-[12px] transition-all ${isAdded ? "bg-gray-200 text-gray-500" : "bg-gray-900 text-white active:bg-gray-800"}`}
+                            className="flex items-center gap-1 rounded-lg px-3 py-2 text-[12px] bg-gray-900 text-white active:bg-gray-700"
                           >
                             <Plus className="h-3.5 w-3.5" />
-                            {isAdded ? "담김" : "담기"}
+                            담기
                           </button>
                         </div>
                       );
