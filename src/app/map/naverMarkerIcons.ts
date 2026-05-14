@@ -104,10 +104,6 @@ export function buildFacilityMarkerIcon(
   return {
     content,
     size: new naver.maps.Size(W, H),
-<<<<<<< HEAD
     anchor: new naver.maps.Point(Math.round(W / 2), Math.round(H / 2)),
-=======
-    anchor: new naver.maps.Point(Math.round(W / 2), Math.round(pinSize / 2)),
->>>>>>> def0f9ecf39079c4cad6642b0d31ff37ea4b80cb
   };
 }
