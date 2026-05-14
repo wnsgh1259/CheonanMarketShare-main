@@ -1,14 +1,18 @@
 // src/app/pages/ChatPage.tsx
 import { useState, useRef, useEffect } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router";
-import { ChevronLeft, Send, MessageCircle, Search, RefreshCw, Bell, Settings, Eye, ThumbsUp, MessageSquare, MoreHorizontal, Plus, Phone, X, Trash2, EyeOff } from "lucide-react";
+import {
+  ChevronLeft, Send, MessageCircle, Search, RefreshCw, Bell, Settings,
+  Eye, ThumbsUp, MessageSquare, MoreHorizontal, Plus, Phone, X, Trash2,
+  EyeOff, Image, Camera, AlignLeft, CalendarClock,
+} from "lucide-react";
 import { BottomNav } from "../components/BottomNav";
 import { INITIAL_POSTS, postStore, savePostStore } from "../data/postStore";
 import type { PostItem } from "../data/postStore";
 import { UserAvatar } from "../components/UserAvatar";
 
 interface ChatRoom { id: string; storeName: string; lastMessage: string; time: string; unread: number; image: string; read: boolean; }
-interface Message { id: string; text: string; sender: "user" | "store"; time: string; }
+interface Message { id: string; text?: string; imageUrl?: string; sender: "user" | "store"; time: string; }
 
 const STORE_IMAGES: Record<string, string> = {
   "천안순대국밥": "https://images.unsplash.com/photo-1769558688746-7ac36d8ce999?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=200",
@@ -17,6 +21,23 @@ const STORE_IMAGES: Record<string, string> = {
   "신선정육점":   "https://images.unsplash.com/photo-1758788701706-327f3a0d6820?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=200",
   "싱싱채소마트": "https://images.unsplash.com/photo-1759663783570-520674af30d6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=200",
 };
+
+// 가게별 전화번호 (나중에 storeData.ts 등에서 연동 예정)
+const STORE_PHONES: Record<string, string> = {
+  "천안순대국밥": "010-1234-5678",
+  "호두과자 본점": "010-2345-6789",
+  "중앙칼국수":   "010-3456-7890",
+  "신선정육점":   "010-4567-8901",
+  "싱싱채소마트": "010-5678-9012",
+};
+
+// 자주 쓰는 문구
+const QUICK_PHRASES = [
+  "안녕하세요, 재고 있나요?",
+  "오늘 영업하시나요?",
+  "몇 시까지 하세요?",
+  "예약 가능한가요?",
+];
 
 const INITIAL_ROOMS: ChatRoom[] = [
   { id: "chat-천안순대국밥", storeName: "천안순대국밥", lastMessage: "안녕하세요! 무엇을 도와드릴까요?", time: "9:41", unread: 1, image: STORE_IMAGES["천안순대국밥"], read: false },
@@ -49,7 +70,6 @@ const CATEGORY_STYLE: Record<PostItem["category"], string> = {
   후기:   "bg-purple-100 text-purple-700",
 };
 
-// localStorage 키
 const HIDDEN_KEY  = "cheonan_hidden_posts";
 const DELETED_KEY = "cheonan_deleted_posts";
 
@@ -74,7 +94,6 @@ export function ChatPage() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
 
-  // 숨기기/삭제 - localStorage에서 불러오기
   const [hiddenPostIds, setHiddenPostIds]   = useState<Set<number>>(() => loadIds(HIDDEN_KEY));
   const [deletedPostIds, setDeletedPostIds] = useState<Set<number>>(() => loadIds(DELETED_KEY));
 
@@ -103,8 +122,40 @@ export function ChatPage() {
   const [inputText, setInputText] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // ── 전화 팝업 ──
+  const [phonePopupOpen, setPhonePopupOpen] = useState(false);
+  const phonePopupRef = useRef<HTMLDivElement>(null);
+
+  // ── + 메뉴 ──
+  const [plusMenuOpen, setPlusMenuOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  // ── 자주쓰는문구 팝업 ──
+  const [phrasePopupOpen, setPhrasePopupOpen] = useState(false);
+
+  // ── 약속 팝업 ──
+  const [appointmentPopupOpen, setAppointmentPopupOpen] = useState(false);
+  const [appointmentDate, setAppointmentDate] = useState("");
+  const [appointmentTime, setAppointmentTime] = useState("");
+  const [appointmentNote, setAppointmentNote] = useState("");
+
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, activeChatId]);
   useEffect(() => { if (searchOpen) setTimeout(() => searchInputRef.current?.focus(), 100); }, [searchOpen]);
+
+  // 전화 팝업 외부 클릭 닫기
+  useEffect(() => {
+    if (!phonePopupOpen) return;
+    const close = (e: MouseEvent) => {
+      if (phonePopupRef.current && !phonePopupRef.current.contains(e.target as Node)) {
+        setPhonePopupOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [phonePopupOpen]);
+
+  // openMenuId 외부 클릭 닫기
   useEffect(() => {
     if (openMenuId === null) return;
     const close = () => setOpenMenuId(null);
@@ -114,20 +165,58 @@ export function ChatPage() {
 
   const activeRoom = chatRooms.find((r) => r.id === activeChatId);
   const activeMessages = activeChatId ? (messages[activeChatId] || []) : [];
+  const activePhone = activeRoom ? (STORE_PHONES[activeRoom.storeName] || "010-0000-0000") : "";
 
-  const handleSend = () => {
-    if (!inputText.trim() || !activeChatId) return;
-    const newMsg: Message = { id: `msg-${Date.now()}`, text: inputText.trim(), sender: "user", time: new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) };
+  const now = () => new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+
+  const pushUserMessage = (msg: Omit<Message, "id" | "sender" | "time">) => {
+    if (!activeChatId) return;
+    const newMsg: Message = { id: `msg-${Date.now()}`, sender: "user", time: now(), ...msg };
     setMessages((prev) => ({ ...prev, [activeChatId]: [...(prev[activeChatId] || []), newMsg] }));
-    setChatRooms((prev) => prev.map((r) => r.id === activeChatId ? { ...r, lastMessage: inputText.trim(), time: "방금", unread: 0, read: true } : r));
-    setInputText("");
+    setChatRooms((prev) => prev.map((r) => r.id === activeChatId ? { ...r, lastMessage: msg.text || "사진을 보냈습니다", time: "방금", unread: 0, read: true } : r));
+    // 자동 답장
     setTimeout(() => {
-      const reply: Message = { id: `msg-${Date.now() + 1}`, text: "감사합니다! 확인 후 답변 드리겠습니다 😊", sender: "store", time: new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) };
+      const reply: Message = { id: `msg-${Date.now() + 1}`, text: "감사합니다! 확인 후 답변 드리겠습니다 😊", sender: "store", time: now() };
       setMessages((prev) => ({ ...prev, [activeChatId]: [...(prev[activeChatId] || []), reply] }));
     }, 1500);
   };
 
-  // postStore에 있으면 내 글
+  const handleSend = () => {
+    if (!inputText.trim() || !activeChatId) return;
+    pushUserMessage({ text: inputText.trim() });
+    setInputText("");
+  };
+
+  const handleImageFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const imageUrl = e.target?.result as string;
+      pushUserMessage({ imageUrl });
+    };
+    reader.readAsDataURL(file);
+    setPlusMenuOpen(false);
+  };
+
+  const handleAlbum = () => { fileInputRef.current?.click(); };
+  const handleCamera = () => { cameraInputRef.current?.click(); };
+
+  const handleSendPhrase = (phrase: string) => {
+    setInputText(phrase);
+    setPhrasePopupOpen(false);
+    setPlusMenuOpen(false);
+  };
+
+  const handleSendAppointment = () => {
+    if (!appointmentDate || !appointmentTime) return;
+    const text = `📅 약속 제안\n날짜: ${appointmentDate}\n시간: ${appointmentTime}${appointmentNote ? `\n메모: ${appointmentNote}` : ""}`;
+    pushUserMessage({ text });
+    setAppointmentDate("");
+    setAppointmentTime("");
+    setAppointmentNote("");
+    setAppointmentPopupOpen(false);
+    setPlusMenuOpen(false);
+  };
+
   const isMyPost = (post: PostItem) => postStore.some((p) => p.id === post.id);
 
   const handleDeletePost = (postId: number) => {
@@ -166,48 +255,252 @@ export function ChatPage() {
     return true;
   });
 
-  /* ── 채팅 상세 뷰 ── */
+  /* ══════════════════════════════════════════
+     채팅 상세 뷰
+  ══════════════════════════════════════════ */
   if (activeChatId) {
     return (
       <div className="min-h-screen bg-[#F7F8FA] flex flex-col max-w-md mx-auto">
+
+        {/* 헤더 */}
         <div className="sticky top-0 bg-white z-10 border-b border-gray-100">
           <div className="flex items-center gap-3 px-4 py-3">
-            <button onClick={() => setActiveChatId(null)} className="p-1"><ChevronLeft className="w-5 h-5 text-gray-700" /></button>
+            <button onClick={() => setActiveChatId(null)} className="p-1">
+              <ChevronLeft className="w-5 h-5 text-gray-700" />
+            </button>
             <div className="flex items-center gap-2 flex-1">
-              {activeRoom && <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0"><img src={activeRoom.image} alt="" className="w-full h-full object-cover" /></div>}
+              {activeRoom && (
+                <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
+                  <img src={activeRoom.image} alt="" className="w-full h-full object-cover" />
+                </div>
+              )}
               <div>
                 <h1 className="text-[14px] text-gray-900">{activeRoom?.storeName}</h1>
                 <p className="text-[10px] text-gray-400">사장님</p>
               </div>
             </div>
-            <button className="p-1 text-gray-400"><Phone className="w-5 h-5" /></button>
+
+            {/* 전화 아이콘 + 팝업 */}
+            <div className="relative" ref={phonePopupRef}>
+              <button
+                onClick={() => setPhonePopupOpen((v) => !v)}
+                className="p-1 text-gray-400 active:text-gray-700 transition-colors"
+              >
+                <Phone className="w-5 h-5" />
+              </button>
+
+              {phonePopupOpen && (
+                <div className="absolute top-9 right-0 z-50 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden min-w-[180px]">
+                  <div className="px-4 py-2.5 border-b border-gray-50">
+                    <p className="text-[10px] text-gray-400 mb-0.5">전화 연결</p>
+                    <p className="text-[13px] text-gray-700 font-medium">{activeRoom?.storeName}</p>
+                  </div>
+                  <a
+                    href={`tel:${activePhone.replace(/-/g, "")}`}
+                    className="flex items-center gap-3 px-4 py-3 active:bg-gray-50 transition-colors"
+                    onClick={() => setPhonePopupOpen(false)}
+                  >
+                    <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
+                      <Phone className="w-4 h-4 text-white" />
+                    </div>
+                    <span className="text-[14px] text-gray-900 font-medium">{activePhone}</span>
+                  </a>
+                </div>
+              )}
+            </div>
           </div>
         </div>
+
+        {/* 메시지 목록 */}
         <div className="flex-1 px-4 py-4 space-y-3 overflow-y-auto pb-24">
           {activeMessages.map((msg) => (
             <div key={msg.id} className={`flex items-end gap-2 ${msg.sender === "user" ? "justify-end" : "justify-start"}`}>
-              {msg.sender === "store" && <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0"><img src={activeRoom?.image} alt="" className="w-full h-full object-cover" /></div>}
+              {msg.sender === "store" && (
+                <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
+                  <img src={activeRoom?.image} alt="" className="w-full h-full object-cover" />
+                </div>
+              )}
               <div className={`max-w-[72%] flex flex-col gap-0.5 ${msg.sender === "user" ? "items-end" : "items-start"}`}>
-                <div className={`px-3.5 py-2.5 rounded-2xl text-[14px] whitespace-pre-line ${msg.sender === "user" ? "bg-gray-900 text-white rounded-br-sm" : "bg-white text-gray-800 rounded-bl-sm"}`}>{msg.text}</div>
+                {msg.imageUrl ? (
+                  <div className={`rounded-2xl overflow-hidden ${msg.sender === "user" ? "rounded-br-sm" : "rounded-bl-sm"}`}>
+                    <img src={msg.imageUrl} alt="전송된 이미지" className="max-w-[220px] max-h-[220px] object-cover" />
+                  </div>
+                ) : (
+                  <div className={`px-3.5 py-2.5 rounded-2xl text-[14px] whitespace-pre-line ${msg.sender === "user" ? "bg-gray-900 text-white rounded-br-sm" : "bg-white text-gray-800 rounded-bl-sm"}`}>
+                    {msg.text}
+                  </div>
+                )}
                 <p className="text-[10px] text-gray-400 px-1">{msg.time}</p>
               </div>
             </div>
           ))}
           <div ref={messagesEndRef} />
         </div>
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-4 py-3 max-w-md mx-auto">
-          <div className="flex items-center gap-2">
-            <input type="text" value={inputText} onChange={(e) => setInputText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSend()} placeholder="메시지..." className="flex-1 px-4 py-2.5 bg-gray-100 rounded-full text-[14px] focus:outline-none placeholder:text-gray-400" />
-            <button onClick={handleSend} disabled={!inputText.trim()} className="w-9 h-9 bg-gray-900 text-white rounded-full flex items-center justify-center disabled:opacity-30 active:bg-gray-800 transition-colors"><Send className="w-4 h-4" /></button>
+
+        {/* 입력창 */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 max-w-md mx-auto">
+          {/* + 메뉴 패널 */}
+          {plusMenuOpen && (
+            <div className="border-t border-gray-100 px-4 py-4">
+              <div className="grid grid-cols-4 gap-3">
+                {/* 앨범 */}
+                <button onClick={handleAlbum} className="flex flex-col items-center gap-1.5">
+                  <div className="w-12 h-12 rounded-2xl bg-purple-100 flex items-center justify-center active:scale-95 transition-transform">
+                    <Image className="w-5 h-5 text-purple-500" />
+                  </div>
+                  <span className="text-[10px] text-gray-500">앨범</span>
+                </button>
+                {/* 카메라 */}
+                <button onClick={handleCamera} className="flex flex-col items-center gap-1.5">
+                  <div className="w-12 h-12 rounded-2xl bg-blue-100 flex items-center justify-center active:scale-95 transition-transform">
+                    <Camera className="w-5 h-5 text-blue-500" />
+                  </div>
+                  <span className="text-[10px] text-gray-500">카메라</span>
+                </button>
+                {/* 자주쓰는문구 */}
+                <button onClick={() => setPhrasePopupOpen(true)} className="flex flex-col items-center gap-1.5">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center active:scale-95 transition-transform">
+                    <AlignLeft className="w-5 h-5 text-amber-500" />
+                  </div>
+                  <span className="text-[10px] text-gray-500">자주쓰는문구</span>
+                </button>
+                {/* 약속 */}
+                <button onClick={() => setAppointmentPopupOpen(true)} className="flex flex-col items-center gap-1.5">
+                  <div className="w-12 h-12 rounded-2xl bg-green-100 flex items-center justify-center active:scale-95 transition-transform">
+                    <CalendarClock className="w-5 h-5 text-green-500" />
+                  </div>
+                  <span className="text-[10px] text-gray-500">약속</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 px-4 py-3">
+            {/* + 버튼 */}
+            <button
+              onClick={() => { setPlusMenuOpen((v) => !v); setPhrasePopupOpen(false); setAppointmentPopupOpen(false); }}
+              className={`w-9 h-9 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${plusMenuOpen ? "bg-gray-900 text-white rotate-45" : "bg-gray-100 text-gray-500"}`}
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+
+            <input
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSend()}
+              onFocus={() => setPlusMenuOpen(false)}
+              placeholder="메시지..."
+              className="flex-1 px-4 py-2.5 bg-gray-100 rounded-full text-[14px] focus:outline-none placeholder:text-gray-400"
+            />
+            <button
+              onClick={handleSend}
+              disabled={!inputText.trim()}
+              className="w-9 h-9 bg-gray-900 text-white rounded-full flex items-center justify-center disabled:opacity-30 active:bg-gray-800 transition-colors flex-shrink-0"
+            >
+              <Send className="w-4 h-4" />
+            </button>
           </div>
         </div>
+
+        {/* 숨겨진 파일 인풋 — 앨범 */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageFile(f); e.target.value = ""; }}
+        />
+        {/* 숨겨진 파일 인풋 — 카메라 */}
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageFile(f); e.target.value = ""; }}
+        />
+
+        {/* 자주쓰는문구 바텀시트 */}
+        {phrasePopupOpen && (
+          <div className="fixed inset-0 z-50 flex flex-col justify-end max-w-md mx-auto">
+            <div className="absolute inset-0 bg-black/30" onClick={() => setPhrasePopupOpen(false)} />
+            <div className="relative bg-white rounded-t-2xl pt-4 pb-8 shadow-xl">
+              <div className="flex items-center justify-between px-4 mb-3">
+                <h3 className="text-[15px] font-semibold text-gray-900">자주 쓰는 문구</h3>
+                <button onClick={() => setPhrasePopupOpen(false)}><X className="w-5 h-5 text-gray-400" /></button>
+              </div>
+              {QUICK_PHRASES.map((phrase, i) => (
+                <button
+                  key={i}
+                  onClick={() => handleSendPhrase(phrase)}
+                  className="w-full text-left px-4 py-3.5 text-[14px] text-gray-700 border-b border-gray-50 active:bg-gray-50 transition-colors"
+                >
+                  {phrase}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 약속 바텀시트 */}
+        {appointmentPopupOpen && (
+          <div className="fixed inset-0 z-50 flex flex-col justify-end max-w-md mx-auto">
+            <div className="absolute inset-0 bg-black/30" onClick={() => setAppointmentPopupOpen(false)} />
+            <div className="relative bg-white rounded-t-2xl pt-4 pb-8 shadow-xl px-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-[15px] font-semibold text-gray-900">약속 제안</h3>
+                <button onClick={() => setAppointmentPopupOpen(false)}><X className="w-5 h-5 text-gray-400" /></button>
+              </div>
+              <div className="space-y-3 mb-4">
+                <div>
+                  <label className="text-[11px] text-gray-400 mb-1 block">날짜</label>
+                  <input
+                    type="date"
+                    value={appointmentDate}
+                    onChange={(e) => setAppointmentDate(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-gray-100 rounded-xl text-[14px] text-gray-800 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-gray-400 mb-1 block">시간</label>
+                  <input
+                    type="time"
+                    value={appointmentTime}
+                    onChange={(e) => setAppointmentTime(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-gray-100 rounded-xl text-[14px] text-gray-800 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-gray-400 mb-1 block">메모 (선택)</label>
+                  <input
+                    type="text"
+                    value={appointmentNote}
+                    onChange={(e) => setAppointmentNote(e.target.value)}
+                    placeholder="예) 배추 2포기 픽업"
+                    className="w-full px-3 py-2.5 bg-gray-100 rounded-xl text-[14px] text-gray-800 focus:outline-none placeholder:text-gray-400"
+                  />
+                </div>
+              </div>
+              <button
+                onClick={handleSendAppointment}
+                disabled={!appointmentDate || !appointmentTime}
+                className="w-full py-3 bg-gray-900 text-white rounded-xl text-[14px] font-medium disabled:opacity-30 active:bg-gray-800 transition-colors"
+              >
+                약속 보내기
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
-  /* ── 리스트 뷰 ── */
+  /* ══════════════════════════════════════════
+     리스트 뷰
+  ══════════════════════════════════════════ */
   return (
-    <div className="min-h-screen bg-[#F7F8FA] pb-20">
+    <div className="min-h-screen bg-[#F7F8FA] pb-20 max-w-md mx-auto relative">
       <div className="sticky top-0 bg-white z-20 border-b border-gray-100">
         <div className="flex items-center justify-between px-4 pt-3 pb-1">
           <div className="flex gap-4">
@@ -273,7 +566,7 @@ export function ChatPage() {
               <p className="text-[12px] text-gray-400"><span className="text-gray-700 font-medium">"{searchQuery}"</span> 검색 결과 {filteredPosts.length}개</p>
             </div>
           )}
-          <div className="px-4">
+          <div className="px-4 pb-24">
             {filteredPosts.length === 0 ? (
               <div className="flex flex-col items-center py-16 text-gray-400">
                 <MessageSquare className="w-10 h-10 mb-3 text-gray-300" />
@@ -292,7 +585,6 @@ export function ChatPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between mb-1">
                             <span className={`text-[10px] px-1.5 py-0.5 rounded ${CATEGORY_STYLE[post.category]}`}>{post.category}</span>
-                            {/* ... 버튼 */}
                             <button
                               className="text-gray-300 p-1 -mr-1"
                               onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === post.id ? null : post.id); }}
@@ -321,7 +613,6 @@ export function ChatPage() {
                       </div>
                     </button>
 
-                    {/* 드롭다운 메뉴 */}
                     {openMenuId === post.id && (
                       <div
                         className="absolute top-9 right-3 z-30 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden min-w-[110px]"
@@ -349,7 +640,11 @@ export function ChatPage() {
               })
             )}
           </div>
-          <Link to="/write" className="fixed bottom-24 right-4 flex items-center gap-1.5 bg-gray-900 text-white px-4 py-3 rounded-full shadow-lg active:bg-gray-800 transition-colors z-10">
+
+          <Link
+            to="/write"
+            className="fixed bottom-24 right-[max(16px,calc(50%-208px))] flex items-center gap-1.5 bg-gray-900 text-white px-4 py-3 rounded-full shadow-lg active:bg-gray-800 transition-colors z-10"
+          >
             <Plus className="w-4 h-4" /><span className="text-[13px]">글쓰기</span>
           </Link>
         </div>
