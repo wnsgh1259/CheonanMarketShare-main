@@ -61,7 +61,7 @@ export function buildStoreMarkerIcon(
     return {
       content,
       size: new naver.maps.Size(W, circleSize),
-      anchor: new naver.maps.Point(Math.round(W / 2), circleSize),
+      anchor: new naver.maps.Point(Math.round(W / 2), Math.round(circleSize / 2)),
     };
   }
 
@@ -73,7 +73,7 @@ export function buildStoreMarkerIcon(
   return {
     content,
     size: new naver.maps.Size(W, H),
-    anchor: new naver.maps.Point(Math.round(W / 2), H),
+    anchor: new naver.maps.Point(Math.round(W / 2), Math.round(H / 2)),
   };
 }
 
@@ -102,6 +102,6 @@ export function buildFacilityMarkerIcon(
   return {
     content,
     size: new naver.maps.Size(W, H),
-    anchor: new naver.maps.Point(Math.round(W / 2), H),
+    anchor: new naver.maps.Point(Math.round(W / 2), Math.round(H / 2)),
   };
 }
