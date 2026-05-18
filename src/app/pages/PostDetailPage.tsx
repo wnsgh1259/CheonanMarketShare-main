@@ -23,6 +23,38 @@ const INITIAL_COMMENTS_KEY = "cheonan_initial_comments";
 const LIKES_KEY            = "cheonan_liked_posts";
 const HIDDEN_KEY           = "cheonan_hidden_posts";
 const DELETED_KEY          = "cheonan_deleted_posts";
+const POLL_VOTES_KEY       = "cheonan_poll_votes";
+const POLL_MY_VOTE_KEY     = "cheonan_poll_my_votes";
+
+function loadPollVotes(postId: number, optionCount: number): number[] {
+  try {
+    const all = JSON.parse(localStorage.getItem(POLL_VOTES_KEY) || "{}");
+    const saved: number[] | undefined = all[postId];
+    if (Array.isArray(saved) && saved.length === optionCount) return saved;
+    return Array(optionCount).fill(0);
+  } catch { return Array(optionCount).fill(0); }
+}
+function savePollVotes(postId: number, votes: number[]) {
+  try {
+    const all = JSON.parse(localStorage.getItem(POLL_VOTES_KEY) || "{}");
+    all[postId] = votes;
+    localStorage.setItem(POLL_VOTES_KEY, JSON.stringify(all));
+  } catch {}
+}
+function loadMyVote(postId: number): number | null {
+  try {
+    const all = JSON.parse(localStorage.getItem(POLL_MY_VOTE_KEY) || "{}");
+    const v = all[postId];
+    return typeof v === "number" ? v : null;
+  } catch { return null; }
+}
+function saveMyVote(postId: number, optionIndex: number) {
+  try {
+    const all = JSON.parse(localStorage.getItem(POLL_MY_VOTE_KEY) || "{}");
+    all[postId] = optionIndex;
+    localStorage.setItem(POLL_MY_VOTE_KEY, JSON.stringify(all));
+  } catch {}
+}
 
 function loadInitialComments(postId: number): Comment[] {
   try { const all = JSON.parse(localStorage.getItem(INITIAL_COMMENTS_KEY) || "{}"); return all[postId] ?? []; } catch { return []; }
@@ -98,6 +130,23 @@ export function PostDetailPage() {
   const [commentText, setCommentText] = useState("");
 
   const [deleteCommentId, setDeleteCommentId] = useState<number | null>(null);
+
+  const pollCount = post.pollOptions?.length ?? 0;
+  const [pollVotes, setPollVotes] = useState<number[]>(() =>
+    pollCount > 0 ? loadPollVotes(postId, pollCount) : [],
+  );
+  const [myVote, setMyVote] = useState<number | null>(() =>
+    pollCount > 0 ? loadMyVote(postId) : null,
+  );
+
+  const handleVote = (optionIndex: number) => {
+    if (myVote !== null) return;
+    const next = pollVotes.map((v, i) => (i === optionIndex ? v + 1 : v));
+    setPollVotes(next);
+    setMyVote(optionIndex);
+    savePollVotes(postId, next);
+    saveMyVote(postId, optionIndex);
+  };
 
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -177,7 +226,7 @@ export function PostDetailPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F7F8FA] flex flex-col max-w-md mx-auto pb-24">
+    <div className="min-h-screen bg-[#F7F8FA] flex flex-col max-w-md mx-auto pb-40">
       {/* 헤더 */}
       <div className="sticky top-0 bg-white z-10 border-b border-gray-100">
         <div className="flex items-center justify-between px-4 py-3">
@@ -211,7 +260,7 @@ export function PostDetailPage() {
         </div>
         <h1 className="text-[18px] font-semibold text-gray-900 mb-1 leading-snug">{post.title}</h1>
 
-        <div className="flex items-center gap-1.5 text-[12px] text-gray-400 mb-4 mt-2">
+        <div className="flex items-center gap-1.5 text-[12px] text-gray-400 mb-4 mt-2 flex-wrap">
           {isMyPost
             ? <UserAvatar size="sm" />
             : <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] text-gray-500 flex-shrink-0">{post.author[0]}</div>
@@ -219,6 +268,14 @@ export function PostDetailPage() {
           <span className={isMyPost ? "text-gray-800 font-medium" : ""}>{post.author}</span>
           <span>·</span>
           <span>{post.time}</span>
+          {post.tags && post.tags.length > 0 && (
+            <>
+              <span>·</span>
+              {post.tags.map((t) => (
+                <span key={t} className="text-blue-400">#{t}</span>
+              ))}
+            </>
+          )}
         </div>
 
         <div className="h-px bg-gray-100 mb-4" />
@@ -237,19 +294,68 @@ export function PostDetailPage() {
           </div>
         )}
 
-        {post.pollOptions && post.pollOptions.length > 0 && (
-          <div className="bg-gray-50 rounded-xl px-4 py-4 mb-4">
-            <div className="flex items-center gap-1.5 mb-3">
-              <BarChart2 className="w-4 h-4 text-gray-500" />
-              <span className="text-[13px] font-semibold text-gray-700">투표</span>
+        {post.pollOptions && post.pollOptions.length > 0 && (() => {
+          const totalVotes = pollVotes.reduce((s, v) => s + v, 0);
+          const voted = myVote !== null;
+          return (
+            <div className="bg-gray-50 rounded-xl px-4 py-4 mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-1.5">
+                  <BarChart2 className="w-4 h-4 text-gray-500" />
+                  <span className="text-[13px] font-semibold text-gray-700">투표</span>
+                </div>
+                {voted && (
+                  <span className="text-[11px] text-gray-400">총 {totalVotes}명 참여</span>
+                )}
+              </div>
+              <div className="space-y-2">
+                {post.pollOptions.map((opt, i) => {
+                  const pct = totalVotes > 0 ? Math.round((pollVotes[i] / totalVotes) * 100) : 0;
+                  const isMyPick = myVote === i;
+                  if (voted) {
+                    return (
+                      <div key={i} className="relative rounded-xl overflow-hidden border border-gray-200 bg-white px-3 py-2.5">
+                        {/* 진행 바 */}
+                        <div
+                          className={`absolute inset-y-0 left-0 rounded-xl transition-all duration-500 ${isMyPick ? "bg-gray-900/10" : "bg-gray-100"}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                        <div className="relative flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            {isMyPick && (
+                              <span className="flex-shrink-0 w-4 h-4 rounded-full bg-gray-900 flex items-center justify-center">
+                                <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              </span>
+                            )}
+                            <span className={`text-[13px] truncate ${isMyPick ? "font-semibold text-gray-900" : "text-gray-700"}`}>{opt}</span>
+                          </div>
+                          <div className="flex-shrink-0 flex items-center gap-1.5">
+                            <span className={`text-[12px] font-semibold ${isMyPick ? "text-gray-900" : "text-gray-500"}`}>{pct}%</span>
+                            <span className="text-[11px] text-gray-400">({pollVotes[i]}표)</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => handleVote(i)}
+                      className="w-full text-left px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-[13px] text-gray-700 active:bg-gray-50 active:border-gray-400 transition-colors"
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+              {!voted && (
+                <p className="text-[11px] text-gray-400 mt-2 text-center">항목을 클릭해 투표하세요</p>
+              )}
             </div>
-            <div className="space-y-2">
-              {post.pollOptions.map((opt, i) => (
-                <div key={i} className="w-full text-left px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-[13px] text-gray-700">{opt}</div>
-              ))}
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         <div className="flex items-center gap-4 pt-2 border-t border-gray-100">
           <button onClick={handleLike} className={`flex items-center gap-1.5 text-[13px] transition-colors ${liked ? "text-gray-900" : "text-gray-400"}`}>

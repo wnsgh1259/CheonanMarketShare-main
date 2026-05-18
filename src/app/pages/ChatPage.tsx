@@ -573,7 +573,7 @@ export function ChatPage() {
                           </div>
                           <h3 className="text-[14px] text-gray-900 mb-1 line-clamp-2">{post.title}</h3>
                           <p className="text-[12px] text-gray-400 line-clamp-2 mb-2">{post.preview}</p>
-                          <div className="flex items-center gap-1.5 text-[10px] text-gray-400 mb-1.5">
+                          <div className="flex items-center gap-1.5 text-[10px] text-gray-400 mb-1.5 flex-wrap">
                             {mine
                               ? <UserAvatar size="sm" />
                               : <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-[9px] text-gray-500 flex-shrink-0">{post.author[0]}</div>
@@ -581,6 +581,17 @@ export function ChatPage() {
                             <span className={mine ? "text-gray-600 font-medium" : ""}>{post.author}</span>
                             <span>·</span>
                             <span>{post.time}</span>
+                            {post.tags && post.tags.length > 0 && (
+                              <>
+                                <span>·</span>
+                                {post.tags.slice(0, 3).map((t) => (
+                                  <span key={t} className="text-blue-400">#{t}</span>
+                                ))}
+                                {post.tags.length > 3 && (
+                                  <span className="text-gray-300">+{post.tags.length - 3}</span>
+                                )}
+                              </>
+                            )}
                           </div>
                           <div className="flex items-center gap-3 text-[10px] text-gray-400">
                             <span className="flex items-center gap-0.5"><Eye className="w-3 h-3" /> {post.views.toLocaleString()}</span>
