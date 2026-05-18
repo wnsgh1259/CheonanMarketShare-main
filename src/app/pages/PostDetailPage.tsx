@@ -1,7 +1,7 @@
 // src/app/pages/PostDetailPage.tsx
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router";
-import { ChevronLeft, Eye, ThumbsUp, MessageSquare, MoreHorizontal, Send, BarChart2, Trash2, EyeOff } from "lucide-react";
+import { ChevronLeft, Eye, ThumbsUp, MessageSquare, MoreHorizontal, Send, BarChart2, Trash2, EyeOff, MapPin } from "lucide-react";
 import { BottomNav } from "../components/BottomNav";
 import { postStore, INITIAL_POSTS, addComment, savePostStore, type PostItem, type Comment } from "../data/postStore";
 import { UserAvatar } from "../components/UserAvatar";
@@ -291,6 +291,81 @@ export function PostDetailPage() {
         {post.tags && post.tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-4">
             {post.tags.map((t) => <span key={t} className="text-[12px] text-blue-500">#{t}</span>)}
+          </div>
+        )}
+
+        {/* 장소 카드 */}
+        {post.locationPin && (
+          <div className="mb-4 border border-gray-200 rounded-2xl overflow-hidden bg-white">
+            {post.locationPin.type === "store" ? (
+              <button
+                className="w-full text-left active:bg-gray-50 transition-colors"
+                onClick={() =>
+                  navigate(
+                    `/map?market=${post.locationPin!.type === "store" ? post.locationPin!.market : "jungang"}&store=${encodeURIComponent(post.locationPin!.name)}`,
+                  )
+                }
+              >
+                <div className="flex gap-3 p-3 items-center">
+                  <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0">
+                    <img src={post.locationPin.image} alt={post.locationPin.name} className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1">
+                      <MapPin className="w-3 h-3 text-blue-500 flex-shrink-0" />
+                      <span className="text-[13px] font-semibold text-gray-900 truncate">{post.locationPin.name}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="text-[11px] text-gray-400">{post.locationPin.category}</span>
+                      <span className="text-gray-200">·</span>
+                      <span className="text-[11px] text-gray-400 truncate">{post.locationPin.location}</span>
+                    </div>
+                    <div className="flex items-center gap-0.5 mt-0.5">
+                      <svg className="w-3 h-3 fill-amber-400 text-amber-400" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                      <span className="text-[11px] text-gray-600">{post.locationPin.rating}</span>
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0">
+                    <span className="text-[11px] text-blue-500 font-medium">상점 보기 →</span>
+                  </div>
+                </div>
+              </button>
+            ) : (
+              (() => {
+                const pin = post.locationPin as Extract<typeof post.locationPin, { type: "custom" }>;
+                const canNavigate = typeof pin.lat === "number" && typeof pin.lng === "number";
+                const inner = (
+                  <div className="flex gap-3 p-3 items-center">
+                    <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <MapPin className="w-5 h-5 text-red-500" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-semibold text-gray-900">{pin.name}</p>
+                      {pin.description && (
+                        <p className="text-[11px] text-gray-400 mt-0.5">{pin.description}</p>
+                      )}
+                    </div>
+                    {canNavigate && (
+                      <div className="flex-shrink-0">
+                        <span className="text-[11px] text-red-400 font-medium">지도 보기 →</span>
+                      </div>
+                    )}
+                  </div>
+                );
+                return canNavigate ? (
+                  <button
+                    className="w-full text-left active:bg-gray-50 transition-colors"
+                    onClick={() =>
+                      navigate(
+                        `/map?customPin=${encodeURIComponent(pin.name)}&lat=${pin.lat}&lng=${pin.lng}&desc=${encodeURIComponent(pin.description || "")}&postId=${postId}`,
+                      )
+                    }
+                  >
+                    {inner}
+                  </button>
+                ) : inner;
+              })()
+            )}
           </div>
         )}
 

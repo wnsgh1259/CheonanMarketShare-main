@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback, useLayoutEffect } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import {
   ChevronLeft, Search, X, MapPin, Heart, ShoppingCart,
   Clock, Phone, Star, Plus, MessageCircle, ChevronRight, ChevronUp,
@@ -184,6 +184,8 @@ function NaverMarketMap({
   onMapDragEnd,
   onDeselect,
   suppressHighlightPanRef,
+  customLocationPin,
+  onCustomPinClick,
 }: {
   selectedMarket: MarketId;
   visibleStores: StoreData[];
@@ -198,12 +200,19 @@ function NaverMarketMap({
   onDeselect?: () => void;
   /** 지도 드래그 직후 pan 억제 플래그 */
   suppressHighlightPanRef?: React.RefObject<boolean>;
+  customLocationPin?: { name: string; lat: number; lng: number } | null;
+  onCustomPinClick?: () => void;
 }) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<NaverMapRef | null>(null);
   const marketPolygonsRef = useRef<NaverPolygonRef[]>([]);
   const storeMarkersRef = useRef<NaverMarkerRef[]>([]);
   const facilityMarkersRef = useRef<NaverMarkerRef[]>([]);
+  const customPinMarkerRef = useRef<NaverMarkerRef | null>(null);
+  const onCustomPinClickRef = useRef(onCustomPinClick);
+  onCustomPinClickRef.current = onCustomPinClick;
+  const customLocationPinRef = useRef(customLocationPin);
+  customLocationPinRef.current = customLocationPin;
   const onMapDragStartRef = useRef(onMapDragStart);
   onMapDragStartRef.current = onMapDragStart;
   const onMapDragEndRef = useRef(onMapDragEnd);
@@ -250,8 +259,14 @@ function NaverMarketMap({
       setMapLoadError(false);
       setMapInitError(false);
 
+      // 커스텀 핀이 있으면 핀 위치에서 지도 시작 (시장 중심 대신)
+      const pinForInit = customLocationPinRef.current;
+      const initCenter = pinForInit
+        ? { lat: pinForInit.lat, lng: pinForInit.lng }
+        : view.center;
+
       mapRef.current = new naver.maps.Map(mapContainerRef.current, {
-        center: new naver.maps.LatLng(view.center.lat, view.center.lng),
+        center: new naver.maps.LatLng(initCenter.lat, initCenter.lng),
         zoom: view.zoom,
         mapTypeId: naver.maps.MapTypeId.NORMAL,
         scaleControl: false,
@@ -480,6 +495,53 @@ function NaverMarketMap({
     }
   }, [highlightedStore?.id, highlightBandCenterY, mapInstanceEpoch]);
 
+  /** 커스텀 빨간 핀 마커 (포스트에서 직접 찍은 장소) */
+  useEffect(() => {
+    if (!window.naver?.maps || !mapRef.current) return;
+    const naver = window.naver;
+    let rafId: number | undefined;
+
+    if (customPinMarkerRef.current) {
+      customPinMarkerRef.current.setMap(null);
+      customPinMarkerRef.current = null;
+    }
+
+    if (customLocationPin) {
+      const pinHtml = `<div style="width:28px;height:36px;display:flex;justify-content:center;align-items:flex-start;cursor:pointer;">
+        <svg width="28" height="36" viewBox="0 0 28 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14 0C8.477 0 4 4.477 4 10c0 7.18 10 22 10 22s10-14.82 10-22c0-5.523-4.477-10-10-10z" fill="#EF4444"/>
+          <circle cx="14" cy="10" r="4" fill="white"/>
+        </svg>
+      </div>`;
+      const marker = new naver.maps.Marker({
+        map: mapRef.current,
+        position: new naver.maps.LatLng(customLocationPin.lat, customLocationPin.lng),
+        icon: { content: pinHtml, anchor: new naver.maps.Point(14, 36) },
+        zIndex: 120,
+      });
+      naver.maps.Event.addListener(marker, "click", () => {
+        onCustomPinClickRef.current?.();
+      });
+      customPinMarkerRef.current = marker;
+
+      // 모든 동기 effect (selectedMarket setCenter 등)가 완료된 뒤에 핀 위치로 이동
+      // requestAnimationFrame 두 번 중첩으로 React commit + paint 이후 실행 보장
+      const lat = customLocationPin.lat;
+      const lng = customLocationPin.lng;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = window.requestAnimationFrame(() => {
+          if (mapRef.current) {
+            mapRef.current.setCenter(new naver.maps.LatLng(lat, lng));
+          }
+        });
+      });
+    }
+
+    return () => {
+      if (rafId !== undefined) window.cancelAnimationFrame(rafId);
+    };
+  }, [customLocationPin, mapInstanceEpoch]);
+
   if (isPlaceholderClientId) {
     return (
       <div className="w-full h-full bg-gray-100 flex items-center justify-center text-[12px] text-gray-500">
@@ -503,13 +565,52 @@ function NaverMarketMap({
   );
 }
 
+type CustomMapPin = {
+  name: string;
+  description: string;
+  lat: number;
+  lng: number;
+  postId: number;
+};
+
 export function MapPage() {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedMarket, setSelectedMarket] = useState<MarketId>(() => {
     const param = new URLSearchParams(window.location.search).get("market");
     if (param === "jungang" || param === "byeongcheon" || param === "seonghwan") return param;
     return "byeongcheon";
   });
+
+  /** URL ?store=<이름> 으로 진입 시 자동으로 해당 상점 상세를 열기 위한 초기값 */
+  const initialStoreNameRef = useRef<string | null>(
+    new URLSearchParams(window.location.search).get("store"),
+  );
+  const initialStoreOpenedRef = useRef(false);
+
+  /** URL ?customPin=... 으로 진입 시 커스텀 핀 표시 */
+  const [customMapPin, setCustomMapPin] = useState<CustomMapPin | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const name = params.get("customPin");
+    const lat = parseFloat(params.get("lat") || "");
+    const lng = parseFloat(params.get("lng") || "");
+    const desc = params.get("desc") || "";
+    const postId = parseInt(params.get("postId") || "0", 10);
+    if (name && Number.isFinite(lat) && Number.isFinite(lng) && postId) {
+      return { name: decodeURIComponent(name), description: decodeURIComponent(desc), lat, lng, postId };
+    }
+    return null;
+  });
+  /** 카드 열림 여부 (핀 자체와 분리 — X는 카드만 닫고 핀은 유지) */
+  const [customPinCardOpen, setCustomPinCardOpen] = useState<boolean>(() => {
+    return !!new URLSearchParams(window.location.search).get("customPin");
+  });
+  /** 매 렌더마다 새 객체 생성 방지 → customLocationPin 동일성 보장 (드래그 시 재팬 방지) */
+  const customLocationPinForMap = useMemo(
+    () => customMapPin ? { name: customMapPin.name, lat: customMapPin.lat, lng: customMapPin.lng } : null,
+    [customMapPin],
+  );
+
   const [selectedCategory, setSelectedCategory] = useState<CategoryKey>("전체");
   const [selectedStore, setSelectedStore] = useState<StoreData | null>(null);
   /** 지도·목록에서 고른 뒤 상세 시트 열기 전 단계(상점바 미리보기 카드) */
@@ -649,6 +750,22 @@ export function MapPage() {
     [allStores, showFavoritesOnly, likedStores, selectedCategory, searchQuery],
   );
 
+  /** URL ?store=<이름>으로 진입했을 때 allStores가 준비되면
+   *  해당 핀을 하이라이트하고 미리보기 카드만 표시한다 (상세 시트는 열지 않음) */
+  useEffect(() => {
+    const targetName = initialStoreNameRef.current;
+    if (!targetName || initialStoreOpenedRef.current || allStores.length === 0) return;
+    const found = allStores.find((s) => s.name === decodeURIComponent(targetName));
+    if (found) {
+      initialStoreOpenedRef.current = true;
+      setBarPreviewStore(found);
+      setSelectedStore(null);
+      setStoreSheetOpen(false);
+      setFacilitySheetOpen(false);
+      setListActiveSnap(listSnapMinRef.current);
+    }
+  }, [allStores]);
+
   /** 최소 스냅: 핸들 + 시장명·개수 한 줄 — 픽셀 확보 후 비율로 변환(짧은 뷰포트에서 상한만으로 잘리지 않게) */
   const listSnapMin = useMemo(() => {
     const vh = Math.max(360, viewportH);
@@ -727,6 +844,7 @@ export function MapPage() {
     preMapDragSnapRef.current = snap;
     suppressHighlightPanRef.current = true; // 드래그 시작 → pan 억제
     setIsMapDragging(true);
+    setCustomPinCardOpen(false); // 드래그하면 커스텀 핀 카드 닫기 (핀은 유지)
 
     if (typeof snap === "number" && typeof max === "number" && Math.abs(snap - max) < 0.04) {
       setStoreSheetOpen(false);
@@ -1037,6 +1155,8 @@ export function MapPage() {
             onMapDragEnd={handleMapDragEnd}
             onDeselect={() => setBarPreviewStore(null)}
             suppressHighlightPanRef={suppressHighlightPanRef}
+            customLocationPin={customLocationPinForMap}
+            onCustomPinClick={() => setCustomPinCardOpen(true)}
           />
           <div className="pointer-events-none absolute inset-x-0 bottom-0 top-0">
             <div className="pointer-events-auto absolute bottom-3 left-3 rounded-md bg-white px-2 py-1 text-[11px] text-gray-500 shadow-md">
@@ -1102,6 +1222,50 @@ export function MapPage() {
               onClick={(e) => { e.stopPropagation(); setBarPreviewStore(null); }}
             >
               <X className="w-3 h-3 text-white" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 커스텀 장소 핀 카드 — customPinCardOpen일 때만 표시. 핀 마커 자체는 customMapPin 있으면 항상 표시 */}
+      {customMapPin && customPinCardOpen && isStoreSheetCollapsed && !barPreviewStore && (
+        <div
+          className="fixed left-0 right-0 z-[142] mx-auto max-w-md px-3 pointer-events-auto"
+          style={{
+            bottom: `calc(3.5rem + env(safe-area-inset-bottom, 0px) + ${Math.round(listSnapMin * viewportH) + 10}px)`,
+          }}
+        >
+          <div className="relative bg-white rounded-2xl shadow-[0_4px_28px_rgba(0,0,0,0.18)] overflow-hidden">
+            <div className="flex items-center gap-3 px-4 py-4">
+              <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <MapPin className="w-5 h-5 text-red-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[14px] font-semibold text-gray-900">{customMapPin.name}</p>
+                {customMapPin.description && (
+                  <p className="text-[11px] text-gray-400 mt-0.5">{customMapPin.description}</p>
+                )}
+              </div>
+              {/* X: 카드만 닫기 — 핀 마커는 지도에 그대로 유지 */}
+              <button
+                className="flex-shrink-0 w-5 h-5 rounded-full bg-black/40 flex items-center justify-center"
+                onClick={() => setCustomPinCardOpen(false)}
+              >
+                <X className="w-3 h-3 text-white" />
+              </button>
+            </div>
+            {/* 핀 삭제: 지도 뷰에서만 제거 (포스트 데이터는 유지) */}
+            <button
+              onClick={() => {
+                setCustomMapPin(null);
+                setCustomPinCardOpen(false);
+              }}
+              className="w-full flex items-center justify-center gap-1.5 py-3 border-t border-gray-100 text-[13px] font-medium text-red-500 active:bg-red-50 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              핀 삭제하기
             </button>
           </div>
         </div>

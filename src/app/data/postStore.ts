@@ -3,6 +3,10 @@
  
 export type Category = "사장님" | "질문" | "정보" | "후기";
 export type MarketKey = "jungang" | "byeongcheon" | "seonghwan";
+
+export type PostLocationPin =
+  | { type: "store"; name: string; category: string; location: string; image: string; rating: number; market: MarketKey }
+  | { type: "custom"; name: string; description: string; lat?: number; lng?: number };
  
 export interface Comment {
   id: number;
@@ -28,6 +32,7 @@ export interface PostItem {
   pollOptions?: string[];
   commentList: Comment[];
   isMyPost?: boolean;
+  locationPin?: PostLocationPin;
 }
  
 export const INITIAL_POSTS: PostItem[] = [

@@ -4,7 +4,7 @@ import {
   X, ChevronDown, Image, MapPin, BarChart2, Hash, Check, Plus, Trash2, Star,
 } from "lucide-react";
 import { addPost } from "../data/postStore";
-import type { Category, MarketKey } from "../data/postStore";
+import type { Category, MarketKey, PostLocationPin } from "../data/postStore";
 import { STORES_BY_MARKET, type StoreData } from "../data/storeData";
 import { MARKET_VIEW_CONFIG, pickStoreDisplayLatLng } from "../map/storeMapPlacement";
 import { buildStoreMarkerIcon } from "../map/naverMarkerIcons";
@@ -428,6 +428,22 @@ export function WritePage() {
       setPollOptions((prev) => prev.filter((_, idx) => idx !== i));
   };
 
+  const toPostPin = (pin: LocationPin | null): PostLocationPin | undefined => {
+    if (!pin) return undefined;
+    if (pin.type === "store") {
+      return {
+        type: "store",
+        name: pin.store.name,
+        category: pin.store.category,
+        location: pin.store.location,
+        image: pin.store.image,
+        rating: pin.store.rating,
+        market: pin.market,
+      };
+    }
+    return { type: "custom", name: pin.name, description: pin.description, lat: pin.lat, lng: pin.lng };
+  };
+
   const handleSubmit = () => {
     if (!canSubmit) return;
     const userName = localStorage.getItem("user_name") || "익명";
@@ -447,6 +463,7 @@ export function WritePage() {
       tags,
       pollOptions: showPoll ? pollOptions.filter((o) => o.trim()) : undefined,
       commentList: [],
+      locationPin: toPostPin(locationPin),
     });
     navigate(-1);
   };
