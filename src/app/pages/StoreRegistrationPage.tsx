@@ -703,7 +703,7 @@ export function StoreRegistrationPage() {
             { key: "store" as OwnerSection, label: "상점 관리" },
             { key: "product" as OwnerSection, label: "상품 관리" },
             { key: "communication" as OwnerSection, label: "고객 소통" },
-            { key: "promotion" as OwnerSection, label: "홍보 및 소식" },
+            { key: "promotion" as OwnerSection, label: "SNS 홍보" },
           ].map((section) => (
             <button
               key={section.key}
@@ -1113,33 +1113,13 @@ export function StoreRegistrationPage() {
         {activeSection === "promotion" && (
           <div className="bg-white rounded-xl p-4 space-y-3">
             <div>
-              <label className="block text-[12px] text-gray-500 mb-1">오늘의 특가</label>
-              <textarea
-                value={todayDeal}
-                onChange={(e) => setTodayDeal(e.target.value)}
-                rows={2}
-                placeholder='예: "오늘만 갈치 3마리 만 원"'
-                className="w-full rounded-lg bg-gray-100 px-3 py-2 text-[13px]"
-              />
-            </div>
-            <div>
-              <label className="block text-[12px] text-gray-500 mb-1">가게 소식</label>
+              <label className="block text-[13px] font-medium text-gray-700 mb-2">홍보 내용</label>
               <textarea
                 value={news}
                 onChange={(e) => setNews(e.target.value)}
-                rows={3}
-                placeholder="신상품 입고, 휴무 공지 등"
-                className="w-full rounded-lg bg-gray-100 px-3 py-2 text-[13px]"
-              />
-            </div>
-            <div>
-              <label className="block text-[12px] text-gray-500 mb-1">쿠폰/이벤트</label>
-              <textarea
-                value={couponEvent}
-                onChange={(e) => setCouponEvent(e.target.value)}
-                rows={3}
-                placeholder="앱 사용자 전용 쿠폰 내용 작성"
-                className="w-full rounded-lg bg-gray-100 px-3 py-2 text-[13px]"
+                rows={10}
+                placeholder="신상품 입고, 특가, 쿠폰/이벤트 등 다양한 홍보내용을 입력해주세요."
+                className="w-full rounded-lg bg-gray-100 px-3 py-2.5 text-[13px] resize-none leading-relaxed"
               />
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -1152,7 +1132,7 @@ export function StoreRegistrationPage() {
               </button>
               <button
                 type="button"
-                onClick={() => saveOwnerDraft("홍보 및 소식 내용이 저장됐어요.")}
+                onClick={() => saveOwnerDraft("SNS 홍보 내용이 저장됐어요.")}
                 className="h-10 rounded-lg bg-gray-900 text-white text-[13px]"
               >
                 저장

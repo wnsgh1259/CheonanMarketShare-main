@@ -11,6 +11,8 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { StoreRegistrationPage } from "./pages/StoreRegistrationPage";
 import { FacilityRegistrationPage } from "./pages/FacilityRegistrationPage";
 import { AdminPage } from "./pages/AdminPage";
+import { WritePage } from "./pages/WritePage";
+import { PostDetailPage } from "./pages/PostDetailPage";
 
 export const router = createBrowserRouter([
   {
@@ -28,6 +30,8 @@ export const router = createBrowserRouter([
       { path: "owner/store-registration", Component: StoreRegistrationPage },
       { path: "owner/facility-registration", Component: FacilityRegistrationPage },
       { path: "admin", Component: AdminPage },
+      { path: "write", Component: WritePage },
+      { path: "post/:id", Component: PostDetailPage },
     ],
   },
 ]);
