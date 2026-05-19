@@ -4,7 +4,7 @@ import { Home, MapPin, Newspaper, Heart } from "lucide-react";
 const NAV_ITEMS = [
   { to: "/home", icon: Home, label: "홈" },
   { to: "/map", icon: MapPin, label: "지도" },
-  { to: "/community", icon: Newspaper, label: "대조소식" },
+  { to: "/community", icon: Newspaper, label: "천안소식" },
   { to: "/favorites", icon: Heart, label: "즐겨찾기" },
 ] as const;
 

@@ -33,9 +33,9 @@ const COMMUNITY_POSTS = [
 
 // ── nearby spots ─────────────────────────────────────────────────
 const NEARBY_SPOTS = [
-  { id: 1, name: "진관사", image: "https://images.unsplash.com/photo-1590677197221-43af4beba05e?w=300&q=80" },
-  { id: 2, name: "불광천", image: "https://images.unsplash.com/photo-1617369120004-4fc70312c5e6?w=300&q=80" },
-  { id: 3, name: "북한산 둘레길", image: "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=300&q=80" },
+  { id: 1, name: "독립기념관", image: "https://images.unsplash.com/photo-1590677197221-43af4beba05e?w=300&q=80" },
+  { id: 2, name: "유관순 열사 사적지", image: "https://images.unsplash.com/photo-1617369120004-4fc70312c5e6?w=300&q=80" },
+  { id: 3, name: "각원사", image: "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=300&q=80" },
 ];
 
 export function HomePage() {
@@ -63,7 +63,7 @@ export function HomePage() {
           </button>
 
           {/* Logo */}
-          <span className="text-[20px] font-black text-[#FF6B2B] tracking-tight">은평교시장</span>
+          <span className="text-[20px] font-black text-[#FF6B2B] tracking-tight">천안시장</span>
 
           <button className="p-1 relative">
             <Bell className="w-6 h-6 text-gray-700" />
@@ -102,7 +102,7 @@ export function HomePage() {
       {/* ── 인기 가게들 ── */}
       <div className="mt-5 px-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[15px] font-bold text-gray-900">대조시 인기 가게들 🔥</h2>
+          <h2 className="text-[15px] font-bold text-gray-900">천안 인기 가게들 🔥</h2>
           <Link to="/map" className="flex items-center text-[12px] text-gray-400">
             모두보기 <ChevronRight className="w-3.5 h-3.5" />
           </Link>
@@ -140,10 +140,10 @@ export function HomePage() {
         </div>
       </div>
 
-      {/* ── 지금 대조시 사람들 ── */}
+      {/* ── 지금 천안 사람들 ── */}
       <div className="mt-5 px-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[15px] font-bold text-gray-900">지금 대조시 사람들 💬</h2>
+          <h2 className="text-[15px] font-bold text-gray-900">지금 천안 사람들 💬</h2>
           <Link to="/community" className="flex items-center text-[12px] text-gray-400">
             모두보기 <ChevronRight className="w-3.5 h-3.5" />
           </Link>
@@ -183,7 +183,7 @@ export function HomePage() {
       {/* ── 근처 명소 ── */}
       <div className="mt-5 px-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[15px] font-bold text-gray-900">대조시장 근처 명소</h2>
+          <h2 className="text-[15px] font-bold text-gray-900">천안 근처 명소</h2>
           <Link to="/community" className="flex items-center text-[12px] text-gray-400">
             모두보기 <ChevronRight className="w-3.5 h-3.5" />
           </Link>

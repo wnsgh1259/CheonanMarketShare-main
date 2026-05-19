@@ -12,9 +12,9 @@ const COMMUNITY_STORIES = [
 ];
 
 const NEARBY_SPOTS = [
-  { id: 1, name: "진관사", location: "서울 은평구", image: "https://images.unsplash.com/photo-1590677197221-43af4beba05e?w=400&q=80" },
-  { id: 2, name: "불광천", location: "서울 은평구", image: "https://images.unsplash.com/photo-1617369120004-4fc70312c5e6?w=400&q=80" },
-  { id: 3, name: "북한산 둘레길", location: "서울 은평구", image: "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=400&q=80" },
+  { id: 1, name: "독립기념관", location: "충남 천안시", image: "https://images.unsplash.com/photo-1590677197221-43af4beba05e?w=400&q=80" },
+  { id: 2, name: "유관순 열사 사적지", location: "충남 천안시", image: "https://images.unsplash.com/photo-1617369120004-4fc70312c5e6?w=400&q=80" },
+  { id: 3, name: "각원사", location: "충남 천안시", image: "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=400&q=80" },
 ];
 
 const COURSES = [
@@ -57,7 +57,7 @@ export function CommunityPage() {
           <button onClick={() => setSideMenuOpen(true)} className="p-1">
             <Menu className="w-6 h-6 text-gray-700" />
           </button>
-          <span className="text-[20px] font-black text-[#FF6B2B] tracking-tight">은평교시장</span>
+          <span className="text-[20px] font-black text-[#FF6B2B] tracking-tight">천안시장</span>
           <button className="p-1 relative">
             <Bell className="w-6 h-6 text-gray-700" />
             <span className="absolute top-1 right-1 w-2 h-2 bg-[#FF6B2B] rounded-full" />
@@ -69,7 +69,7 @@ export function CommunityPage() {
       <div className="bg-white mx-4 mt-4 rounded-2xl overflow-hidden">
         <div className="bg-gradient-to-br from-[#FF6B2B] to-[#FF8C5A] px-5 pt-5 pb-4 relative">
           <div className="pr-24">
-            <p className="text-white/80 text-[12px]">대조시장의 즐거움을 한눈에!</p>
+            <p className="text-white/80 text-[12px]">천안시장의 즐거움을 한눈에!</p>
             <p className="text-white text-[16px] font-bold leading-snug mt-1">
               시장 이야기부터<br />주변 관광 정보까지<br />한눈에 즐겨보세요
             </p>
@@ -84,7 +84,7 @@ export function CommunityPage() {
       {/* ── 사람들 이야기 ── */}
       <div className="mt-5 px-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[15px] font-bold text-gray-900">대조시장 사람들 이야기</h2>
+          <h2 className="text-[15px] font-bold text-gray-900">천안시장 사람들 이야기</h2>
           <Link to="/chat" className="flex items-center text-[12px] text-gray-400">
             모두보기 <ChevronRight className="w-3.5 h-3.5" />
           </Link>
@@ -126,7 +126,7 @@ export function CommunityPage() {
       {/* ── 근처 명소 ── */}
       <div className="mt-5 px-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[15px] font-bold text-gray-900">대조시장 근처 명소에요</h2>
+          <h2 className="text-[15px] font-bold text-gray-900">천안 근처 명소에요</h2>
           <button className="flex items-center text-[12px] text-gray-400">
             모두보기 <ChevronRight className="w-3.5 h-3.5" />
           </button>
@@ -170,10 +170,10 @@ export function CommunityPage() {
         </button>
       </div>
 
-      {/* ── 대조의 맛 ── */}
+      {/* ── 천안의 맛 ── */}
       <div className="mt-5 px-4 mb-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[15px] font-bold text-gray-900">대조의 맛을 만나다</h2>
+          <h2 className="text-[15px] font-bold text-gray-900">천안의 맛을 만나다</h2>
           <Link to="/map" className="flex items-center text-[12px] text-gray-400">
             모두보기 <ChevronRight className="w-3.5 h-3.5" />
           </Link>

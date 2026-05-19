@@ -13,9 +13,9 @@ export function LoginPage() {
         {/* Brand logo text */}
         <div className="mb-2 text-center">
           <span className="text-[42px] leading-none font-black text-[#FF6B2B] tracking-tight">
-            은평교시장
+            천안시장
           </span>
-          <p className="text-[13px] text-gray-400 mt-1 tracking-widest">Eunpyeong Daejo Market</p>
+          <p className="text-[13px] text-gray-400 mt-1 tracking-widest">Cheonan Market</p>
         </div>
 
         {/* Illustration placeholder — orange-tinted card */}
