@@ -9,7 +9,6 @@ import {
 import { BottomNav } from "../components/BottomNav";
 import { INITIAL_POSTS, postStore, savePostStore } from "../data/postStore";
 import type { PostItem } from "../data/postStore";
-import { UserAvatar } from "../components/UserAvatar";
 
 interface ChatRoom { id: string; storeName: string; lastMessage: string; time: string; unread: number; image: string; read: boolean; }
 interface Message { id: string; text?: string; imageUrl?: string; sender: "user" | "store"; time: string; }
@@ -574,10 +573,16 @@ export function ChatPage() {
                           <h3 className="text-[14px] text-gray-900 mb-1 line-clamp-2">{post.title}</h3>
                           <p className="text-[12px] text-gray-400 line-clamp-2 mb-2">{post.preview}</p>
                           <div className="flex items-center gap-1.5 text-[10px] text-gray-400 mb-1.5 flex-wrap">
-                            {mine
-                              ? <UserAvatar size="sm" />
-                              : <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-[9px] text-gray-500 flex-shrink-0">{post.author[0]}</div>
-                            }
+                            {post.authorTitleEmoji ? (
+                              // 실명: 칭호 이모지만 표시 (회색 원 없음)
+                              <span className="text-[14px] leading-none">{post.authorTitleEmoji}</span>
+                            ) : mine ? (
+                              // 익명 내 글: 아무것도 없는 회색 원
+                              <div className="w-5 h-5 rounded-full bg-gray-200 flex-shrink-0" />
+                            ) : (
+                              // 다른 사람 글: 이름 첫 글자 원
+                              <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-[9px] text-gray-500 flex-shrink-0">{post.author[0]}</div>
+                            )}
                             <span className={mine ? "text-gray-600 font-medium" : ""}>{post.author}</span>
                             <span>·</span>
                             <span>{post.time}</span>

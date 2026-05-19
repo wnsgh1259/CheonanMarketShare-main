@@ -23,6 +23,7 @@ export interface PostItem {
   preview: string;
   body: string;
   author: string;
+  authorTitleEmoji?: string;
   time: string;
   views: number;
   likes: number;

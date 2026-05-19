@@ -261,10 +261,16 @@ export function PostDetailPage() {
         <h1 className="text-[18px] font-semibold text-gray-900 mb-1 leading-snug">{post.title}</h1>
 
         <div className="flex items-center gap-1.5 text-[12px] text-gray-400 mb-4 mt-2 flex-wrap">
-          {isMyPost
-            ? <UserAvatar size="sm" />
-            : <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] text-gray-500 flex-shrink-0">{post.author[0]}</div>
-          }
+          {post.authorTitleEmoji ? (
+            // 실명: 칭호 이모지만 표시
+            <span className="text-[15px] leading-none">{post.authorTitleEmoji}</span>
+          ) : isMyPost ? (
+            // 익명 내 글: 아무것도 없는 회색 원
+            <div className="w-6 h-6 rounded-full bg-gray-200 flex-shrink-0" />
+          ) : (
+            // 다른 사람 글: 이름 첫 글자 원
+            <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] text-gray-500 flex-shrink-0">{post.author[0]}</div>
+          )}
           <span className={isMyPost ? "text-gray-800 font-medium" : ""}>{post.author}</span>
           <span>·</span>
           <span>{post.time}</span>

@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router";
 import {
-  X, ChevronDown, Image, MapPin, BarChart2, Hash, Check, Plus, Trash2, Star,
+  X, ChevronDown, Image, MapPin, BarChart2, Hash, Check, Plus, Trash2, Star, UserX, User,
 } from "lucide-react";
 import { addPost } from "../data/postStore";
 import type { Category, MarketKey, PostLocationPin } from "../data/postStore";
+import { TITLE_LIST, getActiveTitle } from "../data/userStore";
 import { STORES_BY_MARKET, type StoreData } from "../data/storeData";
 import { MARKET_VIEW_CONFIG, pickStoreDisplayLatLng } from "../map/storeMapPlacement";
 import { buildStoreMarkerIcon } from "../map/naverMarkerIcons";
@@ -392,7 +393,20 @@ export function WritePage() {
   const [pollOptions, setPollOptions]               = useState<string[]>(["", ""]);
   const [locationPin, setLocationPin]               = useState<LocationPin | null>(null);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [isAnonymous, setIsAnonymous]               = useState(false);
 
+  const savedName = localStorage.getItem("user_name") || "익명";
+  // localStorage에 저장된 칭호 우선, 없으면 ProfilePage와 동일하게 스탬프 4개 기준 자동 결정
+  const titleEmoji = (() => {
+    try {
+      const savedId = localStorage.getItem("user_active_title");
+      if (savedId) {
+        const found = TITLE_LIST.find((t) => t.id === savedId);
+        if (found) return found.emoji;
+      }
+    } catch {}
+    return getActiveTitle(4).emoji;
+  })();
   const canSubmit = title.trim().length > 0 && category !== null;
 
   const handleImageAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -446,7 +460,6 @@ export function WritePage() {
 
   const handleSubmit = () => {
     if (!canSubmit) return;
-    const userName = localStorage.getItem("user_name") || "익명";
     addPost({
       id: Date.now(),
       category: category!,
@@ -454,7 +467,8 @@ export function WritePage() {
       title: title.trim(),
       preview: body.trim().slice(0, 60) + (body.length > 60 ? "..." : ""),
       body: body.trim(),
-      author: isSajangnim ? "사장님" : userName,
+      author: isSajangnim ? "사장님" : isAnonymous ? "익명" : savedName,
+      authorTitleEmoji: isSajangnim || isAnonymous ? undefined : titleEmoji,
       time: "방금",
       views: 0,
       likes: 0,
@@ -499,8 +513,11 @@ export function WritePage() {
       {/* ── 작성 영역 ── */}
       <div className="flex-1 px-4 pt-4 pb-36">
 
+        {/* 주제 선택 + 익명 토글 */}
+        <div className="flex items-center gap-2 mb-3">
+
         {/* 주제 선택 인라인 드롭다운 */}
-        <div className="relative mb-3">
+        <div className="relative">
           <button
             onClick={() => setShowCategorySheet((v) => !v)}
             className="flex items-center gap-1"
@@ -549,6 +566,25 @@ export function WritePage() {
               </div>
             </>
           )}
+        </div>
+
+        {/* 익명 토글 버튼 */}
+        <button
+          onClick={() => setIsAnonymous((v) => !v)}
+          className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-[12px] font-medium transition-all ${
+            isAnonymous
+              ? "bg-gray-900 border-gray-900 text-white"
+              : "bg-white border-gray-200 text-gray-500"
+          }`}
+        >
+          {isAnonymous ? (
+            <UserX className="w-3 h-3" />
+          ) : (
+            <span className="text-[13px] leading-none">{titleEmoji}</span>
+          )}
+          {isAnonymous ? "익명" : savedName}
+        </button>
+
         </div>
 
         <input
