@@ -239,6 +239,8 @@ export function AdminPage() {
         byId.set(store.id, {
           ...base,
           ...store,
+          // draft에 marketId가 없으면 시드 데이터의 marketId 유지
+          marketId: store.marketId ?? base.marketId,
           image: store.image || base.image,
           menus: store.menus?.length ? store.menus : base.menus,
         });
