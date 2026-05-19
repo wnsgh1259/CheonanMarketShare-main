@@ -1,6 +1,21 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { Bell, MapPin, Store, ChevronRight, Clock, Tag, ShoppingCart } from "lucide-react";
+import {
+  Bell,
+  MapPin,
+  Store,
+  ChevronRight,
+  Clock,
+  Tag,
+  ShoppingCart,
+  Search,
+  Utensils,
+  ShoppingBag,
+  Carrot,
+  Fish,
+  Coffee,
+  Package,
+} from "lucide-react";
 import { useCart } from "../components/CartContext";
 import { BottomNav } from "../components/BottomNav";
 
@@ -86,6 +101,15 @@ const coursesByMarket: Record<MarketId, { id: number; title: string; image: stri
   ],
 };
 
+const CATEGORIES = [
+  { label: "음식점", Icon: Utensils },
+  { label: "농산물", Icon: Carrot },
+  { label: "수산물", Icon: Fish },
+  { label: "의류", Icon: ShoppingBag },
+  { label: "카페", Icon: Coffee },
+  { label: "잡화", Icon: Package },
+];
+
 export function HomePage() {
   const [selectedMarketId, setSelectedMarketId] = useState<MarketId>("jungang");
   const { totalCount } = useCart();
@@ -97,31 +121,52 @@ export function HomePage() {
   return (
     <div className="min-h-screen bg-[#F7F8FA] pb-20">
       {/* Header */}
-      <div className="sticky top-0 bg-white z-10 px-4 py-3 border-b border-gray-100">
+      <div className="sticky top-0 bg-white z-10 px-4 py-3 border-b border-[rgba(0,0,0,0.06)]">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-[11px] text-gray-400 tracking-wide">천안 스마트 장보기</p>
-            <h1 className="text-[17px] font-bold text-gray-900 tracking-tight">{selectedMarket.name}</h1>
+            <p className="text-[11px] text-[#868b94] tracking-wide">천안 스마트 장보기</p>
+            <h1 className="text-[18px] font-bold text-[#1a1c20] tracking-tight">{selectedMarket.name}</h1>
           </div>
           <div className="flex items-center gap-1">
             <Link to="/cart" className="w-10 h-10 flex items-center justify-center relative">
-              <ShoppingCart className="w-[20px] h-[20px] text-gray-600" />
+              <ShoppingCart className="w-[20px] h-[20px] text-[#555d6d]" />
               {totalCount > 0 && (
-                <span className="absolute top-1 right-0.5 bg-[#FF6B2B] text-white text-[10px] min-w-[16px] h-4 rounded-full flex items-center justify-center px-1">
+                <span className="absolute top-1 right-0.5 bg-[#ff6600] text-white text-[10px] min-w-[16px] h-4 rounded-full flex items-center justify-center px-1">
                   {totalCount}
                 </span>
               )}
             </Link>
             <button className="w-10 h-10 flex items-center justify-center relative">
-              <Bell className="w-[20px] h-[20px] text-gray-600" />
-              <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-[#FF6B2B] rounded-full" />
+              <Bell className="w-[20px] h-[20px] text-[#555d6d]" />
+              <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-[#ff6600] rounded-full" />
             </button>
           </div>
+        </div>
+
+        {/* Search bar */}
+        <div className="mt-2 flex items-center gap-2 bg-[#f7f8f9] border border-[#dcdee3] rounded-xl px-3 h-10">
+          <Search className="w-4 h-4 text-[#b0b3ba] flex-shrink-0" />
+          <span className="text-[14px] text-[#b0b3ba]">시장, 가게, 상품 검색</span>
+        </div>
+      </div>
+
+      {/* Category quick links */}
+      <div className="bg-white px-4 py-4 border-b border-[rgba(0,0,0,0.06)]">
+        <div className="grid grid-cols-6 gap-1">
+          {CATEGORIES.map(({ label, Icon }) => (
+            <button key={label} className="flex flex-col items-center gap-1.5">
+              <div className="w-11 h-11 rounded-2xl bg-orange-50 flex items-center justify-center">
+                <Icon className="w-5 h-5 text-[#ff6600]" strokeWidth={1.8} />
+              </div>
+              <span className="text-[11px] text-[#555d6d]">{label}</span>
+            </button>
+          ))}
         </div>
       </div>
 
       {/* Market Selector */}
-      <div className="bg-white px-4 pt-4 pb-4 border-b border-gray-100">
+      <div className="bg-white px-4 pt-4 pb-4 border-b border-[rgba(0,0,0,0.06)] mt-2">
+        <h2 className="text-[14px] font-bold text-[#1a1c20] mb-3">시장 선택</h2>
         <div className="flex gap-2.5">
           {markets.map((market) => (
             <button
@@ -129,7 +174,7 @@ export function HomePage() {
               onClick={() => setSelectedMarketId(market.id)}
               className={`flex-1 relative rounded-2xl overflow-hidden h-[96px] transition-all duration-200 ${
                 selectedMarketId === market.id
-                  ? "ring-2 ring-[#FF6B2B] ring-offset-2 scale-[1.02]"
+                  ? "ring-2 ring-[#ff6600] ring-offset-2 scale-[1.02]"
                   : "opacity-60"
               }`}
             >
@@ -140,9 +185,9 @@ export function HomePage() {
                 <p className="text-white/70 text-[10px] mt-0.5">{market.openDays}</p>
               </div>
               {selectedMarketId === market.id && (
-                <div className="absolute top-2 right-2 w-5 h-5 bg-[#FF6B2B] rounded-full flex items-center justify-center">
+                <div className="absolute top-2 right-2 w-5 h-5 bg-[#ff6600] rounded-full flex items-center justify-center">
                   <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                    <path d="M1 4l3 3 5-6" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M1 4l3 3 5-6" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </div>
               )}
@@ -152,30 +197,30 @@ export function HomePage() {
       </div>
 
       {/* Selected Market Info */}
-      <div className="mx-4 mt-3 bg-white rounded-2xl p-4 shadow-sm">
+      <div className="mx-4 mt-3 bg-white rounded-2xl p-4 border border-[rgba(0,0,0,0.08)] shadow-[0px_2px_10px_rgba(0,0,0,0.06)]">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Store className="w-5 h-5 text-[#FF6B2B]" />
+            <Store className="w-5 h-5 text-[#ff6600]" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
-              <h3 className="text-[15px] font-bold text-gray-900">{selectedMarket.name}</h3>
-              <span className="text-[11px] text-[#FF6B2B] bg-orange-50 px-2 py-0.5 rounded-md font-medium">
+              <h3 className="text-[15px] font-bold text-[#1a1c20]">{selectedMarket.name}</h3>
+              <span className="text-[11px] text-[#ff6600] bg-orange-50 px-2 py-0.5 rounded-md font-medium">
                 {selectedMarket.tag}
               </span>
             </div>
-            <div className="flex items-center gap-1 text-[12px] text-gray-400 mb-0.5">
+            <div className="flex items-center gap-1 text-[12px] text-[#868b94] mb-0.5">
               <MapPin className="w-3 h-3" />{selectedMarket.location}
             </div>
-            <div className="flex items-center gap-1 text-[12px] text-gray-400 mb-2">
+            <div className="flex items-center gap-1 text-[12px] text-[#868b94] mb-2">
               <Clock className="w-3 h-3" />{selectedMarket.openDays}
             </div>
-            <p className="text-[13px] text-gray-500 leading-relaxed">{selectedMarket.description}</p>
+            <p className="text-[13px] text-[#555d6d] leading-relaxed">{selectedMarket.description}</p>
           </div>
         </div>
         <Link
           to={`/map?market=${selectedMarketId}`}
-          className="mt-3 flex items-center justify-center gap-1.5 w-full py-2.5 bg-[#FF6B2B] text-white rounded-xl text-[14px] font-semibold active:bg-[#e5601f] transition-colors"
+          className="mt-3 flex items-center justify-center gap-1.5 w-full py-2.5 bg-[#ff6600] text-white rounded-[9999px] text-[14px] font-semibold active:bg-[#e14d00] transition-colors"
         >
           <MapPin className="w-4 h-4" />
           지도 보기
@@ -187,15 +232,15 @@ export function HomePage() {
         {/* Spots */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-[15px] font-bold text-gray-900">인기 명소</h2>
-            <button className="flex items-center gap-0.5 text-[12px] text-gray-400">
+            <h2 className="text-[15px] font-bold text-[#1a1c20]">인기 명소</h2>
+            <button className="flex items-center gap-0.5 text-[12px] text-[#868b94]">
               모두보기 <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
           <div className="flex gap-2.5 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {spots.map((spot) => (
               <Link key={spot.id} to="/map" className="flex-none w-[120px]">
-                <div className="relative h-[120px] rounded-2xl overflow-hidden mb-1.5">
+                <div className="relative h-[120px] rounded-2xl overflow-hidden mb-1.5 shadow-[0px_2px_10px_rgba(0,0,0,0.10)]">
                   <img src={spot.image} alt={spot.name} className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                   <div className="absolute bottom-2 left-2 right-2 text-white">
@@ -210,8 +255,8 @@ export function HomePage() {
           </div>
         </div>
 
-        {/* Flash Sale */}
-        <div className="bg-gradient-to-r from-[#FF6B2B] to-[#FF8C5A] rounded-2xl p-4 mb-6">
+        {/* Flash Sale banner */}
+        <div className="bg-gradient-to-r from-[#ff6600] to-[#ff8533] rounded-2xl p-4 mb-6">
           <div className="flex items-center gap-2 mb-1">
             <Tag className="w-4 h-4 text-white/80" />
             <span className="text-[14px] font-semibold text-white">마감 할인 알림</span>
@@ -221,7 +266,7 @@ export function HomePage() {
           </p>
           <Link
             to="/map"
-            className="inline-flex items-center gap-1 bg-white text-[#FF6B2B] text-[12px] font-semibold px-3 py-1.5 rounded-lg active:bg-orange-50 transition-colors"
+            className="inline-flex items-center gap-1 bg-white text-[#ff6600] text-[12px] font-semibold px-3 py-1.5 rounded-[9999px] active:bg-orange-50 transition-colors"
           >
             할인 상품 보기 <ChevronRight className="w-3 h-3" />
           </Link>
@@ -229,10 +274,10 @@ export function HomePage() {
 
         {/* Courses */}
         <div className="mb-4">
-          <h2 className="text-[15px] font-bold text-gray-900 mb-3">추천 코스</h2>
+          <h2 className="text-[15px] font-bold text-[#1a1c20] mb-3">추천 코스</h2>
           <div className="space-y-2.5">
             {courses.map((course) => (
-              <Link key={course.id} to="/map" className="block relative h-[130px] rounded-2xl overflow-hidden">
+              <Link key={course.id} to="/map" className="block relative h-[130px] rounded-2xl overflow-hidden shadow-[0px_2px_10px_rgba(0,0,0,0.08)]">
                 <img src={course.image} alt={course.title} className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                 <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between">

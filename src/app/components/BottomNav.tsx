@@ -25,7 +25,7 @@ export function BottomNav() {
               key={to}
               to={to}
               className={`flex-1 flex flex-col items-center justify-center gap-0.5 relative ${
-                isActive ? "text-[#FF6B2B]" : "text-gray-400"
+                isActive ? "text-[#ff6600]" : "text-gray-400"
               }`}
             >
               <div className="relative">
@@ -34,7 +34,7 @@ export function BottomNav() {
                   strokeWidth={isActive ? 2.2 : 1.8}
                 />
                 {isCart && totalCount > 0 && (
-                  <span className="absolute -top-1.5 -right-2.5 bg-[#FF6B2B] text-white text-[10px] min-w-[16px] h-4 rounded-full flex items-center justify-center px-1">
+                  <span className="absolute -top-1.5 -right-2.5 bg-[#ff6600] text-white text-[10px] min-w-[16px] h-4 rounded-full flex items-center justify-center px-1">
                     {totalCount}
                   </span>
                 )}

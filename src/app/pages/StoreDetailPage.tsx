@@ -46,7 +46,7 @@ export function StoreDetailPage() {
           <div className="flex items-center gap-1">
             <Link to="/cart" className="p-1 relative">
               <ShoppingCart className="w-5 h-5 text-gray-600" />
-              {totalCount > 0 && <span className="absolute -top-1 -right-1 bg-[#FF6B2B] text-white text-[10px] min-w-[16px] h-4 rounded-full flex items-center justify-center px-1">{totalCount}</span>}
+              {totalCount > 0 && <span className="absolute -top-1 -right-1 bg-[#ff6600] text-white text-[10px] min-w-[16px] h-4 rounded-full flex items-center justify-center px-1">{totalCount}</span>}
             </Link>
             <button className="p-1"><Share2 className="w-5 h-5 text-gray-600" /></button>
             <button className="p-1"><Heart className="w-5 h-5 text-gray-600" /></button>
@@ -63,7 +63,7 @@ export function StoreDetailPage() {
       <div className="px-4 py-4 border-b border-gray-100">
         <div className="flex items-center gap-2 mb-1">
           <h2 className="text-[17px] text-gray-900">{store.name}</h2>
-          {store.badge && <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-md ${store.badge === "마감할인" ? "bg-[#FF6B2B] text-white" : "bg-orange-50 text-[#FF6B2B]"}`}>{store.badge}</span>}
+          {store.badge && <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-md ${store.badge === "마감할인" ? "bg-[#ff6600] text-white" : "bg-orange-50 text-[#ff6600]"}`}>{store.badge}</span>}
           <div className="flex items-center gap-0.5 ml-auto">
             <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
             <span className="text-[14px] text-gray-700">{store.rating}</span>
@@ -104,7 +104,7 @@ export function StoreDetailPage() {
                       <span className="text-[12px] text-gray-400 line-through">{item.originalPrice.toLocaleString()}원</span>
                     </div>
                   </div>
-                  <button onClick={() => handleAddToCart(item)} className="w-9 h-9 rounded-xl bg-[#FF6B2B] text-white flex items-center justify-center active:bg-[#e5601f]">
+                  <button onClick={() => handleAddToCart(item)} className="w-9 h-9 rounded-xl bg-[#ff6600] text-white flex items-center justify-center active:bg-[#e5601f]">
                     <Plus className="w-4 h-4" />
                   </button>
                 </div>
