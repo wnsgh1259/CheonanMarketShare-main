@@ -156,6 +156,57 @@ function readStoredDraftOverrides(marketId: MarketId): DraftOverrides {
   }
 }
 
+/** localStorage에서 특정 시장의 모든 draft 상점을 반환 (신규 포함) */
+function readAllRawDraftStores(marketId: MarketId): DraftStorePin[] {
+  try {
+    const raw = window.localStorage.getItem(OWNER_DASHBOARD_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as { stores?: DraftStorePin[] };
+    return (parsed.stores ?? []).filter(
+      (s) => s.marketId === marketId && typeof s.lat === "number" && typeof s.lng === "number" && s.name,
+    );
+  } catch {
+    return [];
+  }
+}
+
+/** 관리자에서 새로 추가한 상점(시드에 없는 상점)을 StoreData로 변환 */
+function draftOnlyToStoreData(drafts: DraftStorePin[], marketId: MarketId): import("../data/storeData").StoreData[] {
+  const seedSyntheticIds = new Set(
+    STORES_BY_MARKET[marketId].map((s) => syntheticSeedStoreId(marketId, s.id)),
+  );
+  const seedNames = new Set(STORES_BY_MARKET[marketId].map((s) => s.name));
+
+  return drafts
+    .filter((d) => {
+      if (typeof d.id !== "number") return false;
+      if (seedSyntheticIds.has(d.id)) return false;
+      if (seedNames.has(d.name)) return false;
+      return true;
+    })
+    .map((d) => ({
+      id: d.id!,
+      name: d.name,
+      category: (d.category as import("../data/storeData").CategoryKey) || "기타·생활",
+      location: d.location || "",
+      hours: d.hours || "",
+      phone: d.phone || "",
+      rating: 0,
+      bookmark: false,
+      image: d.image || "https://images.unsplash.com/photo-1594021113115-f1b48e63ef06?w=400",
+      mx: 50,
+      my: 50,
+      lat: d.lat,
+      lng: d.lng,
+      description: d.description || "",
+      menus: d.menus?.map((m) => ({
+        id: String(m.id),
+        name: m.name,
+        price: Number(m.price) || 0,
+      })) ?? [],
+    }));
+}
+
 function resolveDraftOverride(
   marketId: MarketId,
   seedStore: StoreData,
@@ -213,6 +264,8 @@ function NaverMarketMap({
   onCustomPinClickRef.current = onCustomPinClick;
   const customLocationPinRef = useRef(customLocationPin);
   customLocationPinRef.current = customLocationPin;
+  /** 첫 번째 selectedMarket effect 실행 여부 추적 (초기 마운트 판별) */
+  const isInitialMarketEffectRef = useRef(true);
   const onMapDragStartRef = useRef(onMapDragStart);
   onMapDragStartRef.current = onMapDragStart;
   const onMapDragEndRef = useRef(onMapDragEnd);
@@ -338,9 +391,16 @@ function NaverMarketMap({
     const naver = window.naver;
     const map = mapRef.current;
 
-    map.setCenter(new naver.maps.LatLng(view.center.lat, view.center.lng));
-    map.setZoom(view.zoom);
-    setZoomLevel(view.zoom);
+    const isInitial = isInitialMarketEffectRef.current;
+    isInitialMarketEffectRef.current = false;
+
+    // 초기 마운트이고 커스텀 핀이 있으면 시장 중심으로 이동하지 않음
+    // (initMap에서 이미 핀 위치로 지도를 초기화했기 때문)
+    if (!(isInitial && customLocationPinRef.current)) {
+      map.setCenter(new naver.maps.LatLng(view.center.lat, view.center.lng));
+      map.setZoom(view.zoom);
+      setZoomLevel(view.zoom);
+    }
 
     clearMarketPolygons(marketPolygonsRef.current);
     marketPolygonsRef.current = createMarketPolygons(map, view);
@@ -413,7 +473,9 @@ function NaverMarketMap({
     const resizeMap = () => {
       naver.maps.Event.trigger(map, "resize");
       map.setSize(new naver.maps.Size(el.clientWidth, el.clientHeight));
-      const center = centerRef.current;
+      // 커스텀 핀 표시 중에는 pinRef 위치를 유지 (시장 중심으로 리셋하지 않음)
+      const pin = customLocationPinRef.current;
+      const center = pin ? { lat: pin.lat, lng: pin.lng } : centerRef.current;
       map.setCenter(new naver.maps.LatLng(center.lat, center.lng));
     };
 
@@ -499,7 +561,7 @@ function NaverMarketMap({
   useEffect(() => {
     if (!window.naver?.maps || !mapRef.current) return;
     const naver = window.naver;
-    let rafId: number | undefined;
+    let timerId: ReturnType<typeof setTimeout> | undefined;
 
     if (customPinMarkerRef.current) {
       customPinMarkerRef.current.setMap(null);
@@ -523,22 +585,12 @@ function NaverMarketMap({
         onCustomPinClickRef.current?.();
       });
       customPinMarkerRef.current = marker;
-
-      // 모든 동기 effect (selectedMarket setCenter 등)가 완료된 뒤에 핀 위치로 이동
-      // requestAnimationFrame 두 번 중첩으로 React commit + paint 이후 실행 보장
-      const lat = customLocationPin.lat;
-      const lng = customLocationPin.lng;
-      rafId = window.requestAnimationFrame(() => {
-        rafId = window.requestAnimationFrame(() => {
-          if (mapRef.current) {
-            mapRef.current.setCenter(new naver.maps.LatLng(lat, lng));
-          }
-        });
-      });
+      // highlightedStore 방식과 동일: 직접 panTo (resizeMap의 setCenter 버그 수정으로 타이밍 이슈 해소)
+      mapRef.current.panTo(new naver.maps.LatLng(customLocationPin.lat, customLocationPin.lng));
     }
 
     return () => {
-      if (rafId !== undefined) window.cancelAnimationFrame(rafId);
+      if (timerId !== undefined) clearTimeout(timerId);
     };
   }, [customLocationPin, mapInstanceEpoch]);
 
@@ -690,10 +742,16 @@ export function MapPage() {
   }, []);
 
   const allStores = useMemo(() => {
-    const maps = sharedStores
-      ? buildDraftOverridesForMarket(sharedStores, selectedMarket)
-      : readStoredDraftOverrides(selectedMarket);
-    return STORES_BY_MARKET[selectedMarket].map((store) => {
+    const rawDrafts = sharedStores
+      ? sharedStores.filter(
+          (s) => s.marketId === selectedMarket && typeof s.lat === "number" && typeof s.lng === "number" && s.name,
+        )
+      : readAllRawDraftStores(selectedMarket);
+
+    const maps = buildDraftOverridesForMarket(rawDrafts, selectedMarket);
+
+    // 기존 시드 상점 (draft 오버라이드 적용)
+    const seedStores = STORES_BY_MARKET[selectedMarket].map((store) => {
       const override = resolveDraftOverride(selectedMarket, store, maps);
       if (!override) {
         const pos = pickStoreDisplayLatLng(selectedMarket, store);
@@ -722,6 +780,11 @@ export function MapPage() {
             : store.menus,
       };
     });
+
+    // 관리자에서 새로 추가한 상점 (시드에 없는 상점) 추가
+    const newStores = draftOnlyToStoreData(rawDrafts, selectedMarket);
+
+    return [...seedStores, ...newStores];
   }, [selectedMarket, sharedStores]);
   const marketInfo = MARKET_INFO[selectedMarket];
   const facilities = useMemo(() => {

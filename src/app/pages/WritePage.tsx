@@ -478,6 +478,13 @@ export function WritePage() {
             <X className="w-5 h-5 text-gray-700" />
           </button>
           <button
+            onClick={() => setShowMarketSheet(true)}
+            className="flex items-center gap-1"
+          >
+            <span className="text-[12px] text-gray-500">{MARKET_LABELS[market]}</span>
+            <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+          </button>
+          <button
             onClick={handleSubmit}
             disabled={!canSubmit}
             className={`text-[15px] font-medium transition-colors ${
@@ -487,35 +494,63 @@ export function WritePage() {
             완료
           </button>
         </div>
-
-        {/* 주제 / 시장 */}
-        <div className="flex items-center px-4 pb-3 gap-2">
-          <button
-            onClick={() => setShowCategorySheet(true)}
-            className="flex items-center gap-1"
-          >
-            {category ? (
-              <span className={`text-[11px] px-2 py-0.5 rounded-full ${CATEGORY_STYLE[category]}`}>
-                {category}
-              </span>
-            ) : (
-              <span className="text-[14px] text-gray-500">주제를 선택해주세요.</span>
-            )}
-            <ChevronDown className="w-4 h-4 text-gray-400" />
-          </button>
-
-          <button
-            onClick={() => setShowMarketSheet(true)}
-            className="flex items-center gap-1 ml-auto"
-          >
-            <span className="text-[12px] text-gray-500">{MARKET_LABELS[market]}</span>
-            <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
-          </button>
-        </div>
       </div>
 
       {/* ── 작성 영역 ── */}
-      <div className="flex-1 px-4 pt-5 pb-36">
+      <div className="flex-1 px-4 pt-4 pb-36">
+
+        {/* 주제 선택 인라인 드롭다운 */}
+        <div className="relative mb-3">
+          <button
+            onClick={() => setShowCategorySheet((v) => !v)}
+            className="flex items-center gap-1"
+          >
+            {category ? (
+              <span className={`text-[12px] px-2.5 py-1 rounded-full font-medium ${CATEGORY_STYLE[category]}`}>
+                {category}
+              </span>
+            ) : (
+              <span className="text-[14px] text-gray-400">주제를 선택해주세요.</span>
+            )}
+            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showCategorySheet ? "rotate-180" : ""}`} />
+          </button>
+
+          {showCategorySheet && (
+            <>
+              {/* 바깥 클릭 시 닫기 */}
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setShowCategorySheet(false)}
+              />
+              <div className="absolute left-0 top-full mt-1.5 z-20 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden min-w-[200px]">
+                {CATEGORIES.map((cat) => {
+                  const disabled = cat === "사장님" && !isSajangnim;
+                  return (
+                    <button
+                      key={cat}
+                      disabled={disabled}
+                      onClick={() => { setCategory(cat); setShowCategorySheet(false); }}
+                      className={`w-full flex items-center justify-between px-4 py-3 text-[14px] transition-colors border-b border-gray-50 last:border-0
+                        ${disabled
+                          ? "text-gray-300 cursor-not-allowed"
+                          : category === cat
+                            ? "text-gray-900 font-semibold bg-gray-50"
+                            : "text-gray-700 active:bg-gray-50"
+                        }`}
+                    >
+                      <span>
+                        {cat}
+                        {disabled && <span className="ml-1 text-[10px] text-gray-300">사장님 전용</span>}
+                      </span>
+                      {!disabled && category === cat && <Check className="w-3.5 h-3.5 text-gray-900" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+
         <input
           type="text"
           value={title}
@@ -757,48 +792,6 @@ export function WritePage() {
         onChange={handleImageAdd}
       />
 
-      {/* ── 주제 선택 바텀시트 ── */}
-      {showCategorySheet && (
-        <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto z-50">
-          <div className="bg-white rounded-t-2xl px-4 pt-5 pb-8 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
-            <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5" />
-            <p className="text-[16px] font-semibold text-gray-900 mb-4">주제 선택</p>
-            <div className="grid grid-cols-2 gap-2">
-              {CATEGORIES.map((cat) => {
-                const disabled = cat === "사장님" && !isSajangnim;
-                return (
-                  <button
-                    key={cat}
-                    disabled={disabled}
-                    onClick={() => { setCategory(cat); setShowCategorySheet(false); }}
-                    className={`py-3 rounded-xl text-[14px] font-medium border transition-all relative
-                      ${disabled
-                        ? "border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed"
-                        : category === cat
-                          ? "border-gray-900 bg-gray-50 text-gray-900"
-                          : "border-gray-100 bg-gray-50 text-gray-700 active:bg-gray-100"
-                      }`}
-                  >
-                    {cat}
-                    {disabled && (
-                      <span className="block text-[10px] text-gray-300 mt-0.5">사장님 전용</span>
-                    )}
-                    {!disabled && category === cat && (
-                      <Check className="w-3.5 h-3.5 absolute top-2 right-2 text-gray-900" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-            <button
-              onClick={() => setShowCategorySheet(false)}
-              className="mt-4 w-full py-3 text-[14px] text-gray-400 active:text-gray-600"
-            >
-              닫기
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* ── 시장 선택 바텀시트 ── */}
       {showMarketSheet && (

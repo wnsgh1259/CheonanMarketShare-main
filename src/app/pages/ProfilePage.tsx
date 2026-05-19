@@ -417,8 +417,8 @@ export function ProfilePage() {
       {/* ── 선물 교환소 바텀시트 ── */}
       {showGiftShop && (
         <>
-          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setShowGiftShop(false)} />
-          <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-3xl z-50 shadow-2xl">
+          <div className="fixed inset-0 bg-black/40 z-[145]" onClick={() => setShowGiftShop(false)} />
+          <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-3xl z-[150] shadow-2xl">
             <div className="px-5 pt-5 pb-8">
               <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
 
@@ -520,8 +520,8 @@ export function ProfilePage() {
       {/* ── 칭호 바텀시트 ── */}
       {showTitleSheet && (
         <>
-          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => { setShowTitleSheet(false); setSheetDetail(null); }} />
-          <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-3xl z-50 shadow-2xl">
+          <div className="fixed inset-0 bg-black/40 z-[145]" onClick={() => { setShowTitleSheet(false); setSheetDetail(null); }} />
+          <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-3xl z-[150] shadow-2xl">
             <div className="px-5 pt-5 pb-8">
               <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5" />
 
