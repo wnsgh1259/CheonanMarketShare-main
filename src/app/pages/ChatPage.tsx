@@ -61,10 +61,10 @@ const MARKET_LABELS = { jungang: "천안중앙시장", byeongcheon: "천안역�
 type MarketKey = keyof typeof MARKET_LABELS;
 
 const CATEGORY_STYLE: Record<PostItem["category"], string> = {
-  사장님: "bg-gray-900 text-white",
-  질문:   "bg-amber-100 text-amber-700",
-  정보:   "bg-emerald-100 text-emerald-700",
-  후기:   "bg-purple-100 text-purple-700",
+  사장님: "bg-[#1a1c20] text-white",
+  질문:   "bg-orange-50 text-[#ff6600]",
+  정보:   "bg-orange-50 text-[#ff6600]",
+  후기:   "bg-orange-50 text-[#ff6600]",
 };
 
 const HIDDEN_KEY  = "cheonan_hidden_posts";
@@ -482,8 +482,8 @@ export function ChatPage() {
       <div className="sticky top-0 bg-white z-20 border-b border-gray-100">
         <div className="flex items-center justify-between px-4 pt-3 pb-1">
           <div className="flex gap-4">
-            <button onClick={() => setMainTab("community")} className={`text-[16px] pb-1 transition-colors ${mainTab === "community" ? "text-gray-900 border-b-2 border-gray-900" : "text-gray-400"}`}>커뮤니티</button>
-            <button onClick={() => setMainTab("chat")} className={`text-[16px] pb-1 transition-colors relative ${mainTab === "chat" ? "text-gray-900 border-b-2 border-gray-900" : "text-gray-400"}`}>
+            <button onClick={() => setMainTab("community")} className={`text-[16px] pb-1 transition-colors ${mainTab === "community" ? "text-[#1a1c20] font-semibold border-b-2 border-[#ff6600]" : "text-[#868b94]"}`}>커뮤니티</button>
+            <button onClick={() => setMainTab("chat")} className={`text-[16px] pb-1 transition-colors relative ${mainTab === "chat" ? "text-[#1a1c20] font-semibold border-b-2 border-[#ff6600]" : "text-[#868b94]"}`}>
               채팅
               {chatRooms.some((r) => r.unread > 0) && <span className="absolute -top-0.5 -right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full" />}
             </button>
@@ -523,7 +523,7 @@ export function ChatPage() {
         {mainTab === "chat" && (
           <div className="flex gap-1.5 px-4 py-2">
             {(["전체", "읽음", "안읽음"] as const).map((f) => (
-              <button key={f} onClick={() => setChatFilter(f)} className={`px-3 py-1.5 rounded-lg text-[12px] transition-all ${chatFilter === f ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-500"}`}>{f}</button>
+              <button key={f} onClick={() => setChatFilter(f)} className={`px-3 py-1.5 rounded-[9999px] text-[12px] transition-all ${chatFilter === f ? "bg-[#ff6600] text-white" : "bg-gray-100 text-[#555d6d]"}`}>{f}</button>
             ))}
           </div>
         )}
@@ -535,7 +535,7 @@ export function ChatPage() {
           {!searchOpen && (
             <div className="flex gap-1.5 px-4 py-3 overflow-x-auto scrollbar-hide">
               {(["전체", "인기글", "사장님", "질문"] as const).map((f) => (
-                <button key={f} onClick={() => setCommunityFilter(f)} className={`px-3 py-1.5 rounded-lg text-[12px] whitespace-nowrap transition-all flex-shrink-0 ${communityFilter === f ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600"}`}>{f}</button>
+                <button key={f} onClick={() => setCommunityFilter(f)} className={`px-3 py-1.5 rounded-[9999px] text-[12px] whitespace-nowrap transition-all flex-shrink-0 ${communityFilter === f ? "bg-[#ff6600] text-white" : "bg-gray-100 text-[#555d6d]"}`}>{f}</button>
               ))}
             </div>
           )}
@@ -590,7 +590,7 @@ export function ChatPage() {
                               <>
                                 <span>·</span>
                                 {post.tags.slice(0, 3).map((t) => (
-                                  <span key={t} className="text-blue-400">#{t}</span>
+                                  <span key={t} className="text-[#ff6600]">#{t}</span>
                                 ))}
                                 {post.tags.length > 3 && (
                                   <span className="text-gray-300">+{post.tags.length - 3}</span>
@@ -638,7 +638,7 @@ export function ChatPage() {
 
           <Link
             to="/write"
-            className="fixed bottom-24 right-[max(16px,calc(50%-208px))] flex items-center gap-1.5 bg-gray-900 text-white px-4 py-3 rounded-full shadow-lg active:bg-gray-800 transition-colors z-10"
+            className="fixed bottom-24 right-[max(16px,calc(50%-208px))] flex items-center gap-1.5 bg-[#ff6600] text-white px-4 py-3 rounded-full shadow-lg active:bg-[#e14d00] transition-colors z-10"
           >
             <Plus className="w-4 h-4" /><span className="text-[13px]">글쓰기</span>
           </Link>
@@ -658,7 +658,7 @@ export function ChatPage() {
               <MessageCircle className="w-12 h-12 mb-4 text-gray-300" />
               <p className="text-[14px] mb-1">{chatFilter === "읽음" ? "읽은 채팅이 없어요" : chatFilter === "안읽음" ? "안읽은 채팅이 없어요" : "채팅방이 없어요"}</p>
               <p className="text-[12px] text-gray-300 mb-4">지도에서 상점의 채팅 버튼을 눌러보세요</p>
-              <Link to="/map" className="px-4 py-2 bg-gray-900 text-white rounded-lg text-[13px]">지도로 이동</Link>
+              <Link to="/map" className="px-4 py-2 bg-[#ff6600] text-white rounded-[9999px] text-[13px]">지도로 이동</Link>
             </div>
           ) : (
             <div className="bg-white">

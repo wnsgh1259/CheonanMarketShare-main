@@ -198,12 +198,12 @@ export function CartPage() {
               <div>
                 {directItems.length > 0 && (
                   <div className="border-t border-gray-100 pt-3 mt-1 mb-2">
-                    <span className="text-[11px] text-[#0EA5E9]">빠른 장보기로 담은 상품</span>
+                    <span className="text-[11px] text-[#ff6600]">빠른 장보기로 담은 상품</span>
                   </div>
                 )}
                 {quickItems.map((item) => (
                   <div key={item.id} className="flex items-center gap-3 py-3 border-b border-gray-50 last:border-0">
-                    <div className="w-11 h-11 rounded-lg overflow-hidden flex-shrink-0 bg-sky-50">
+                    <div className="w-11 h-11 rounded-lg overflow-hidden flex-shrink-0 bg-orange-50">
                       <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -239,7 +239,7 @@ export function CartPage() {
       {/* Quick Shopping */}
       <div className="bg-white mx-4 mt-2.5 rounded-xl p-4">
         <div className="flex items-center gap-2 mb-1">
-          <Zap className="w-4 h-4 text-[#0EA5E9]" />
+          <Zap className="w-4 h-4 text-[#ff6600]" />
           <h2 className="text-[14px] text-gray-900">빠른 장보기</h2>
         </div>
         <p className="text-[12px] text-gray-400 mb-3">요리명을 검색하면 재료를 자동 추가해요</p>
@@ -249,11 +249,11 @@ export function CartPage() {
             onChange={(e) => setRecipeQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleRecipeSearch()}
             placeholder="요리명을 입력하세요"
-            className="flex-1 px-3 py-2.5 bg-gray-100 rounded-lg text-[14px] focus:outline-none focus:ring-1 focus:ring-gray-300 placeholder:text-gray-400"
+            className="flex-1 px-3 py-2.5 bg-[#f7f8f9] border border-[#dcdee3] rounded-xl text-[14px] focus:outline-none focus:ring-1 focus:ring-[#ff6600]/30 placeholder:text-[#b0b3ba]"
           />
           <button
             onClick={handleRecipeSearch}
-            className="px-4 py-2.5 bg-gray-900 text-white rounded-lg text-[13px] active:bg-gray-800 transition-colors flex items-center gap-1"
+            className="px-4 py-2.5 bg-[#ff6600] text-white rounded-xl text-[13px] active:bg-[#e14d00] transition-colors flex items-center gap-1"
           >
             <Search className="w-3.5 h-3.5" />검색
           </button>
@@ -289,13 +289,13 @@ export function CartPage() {
               <div className="flex items-center justify-between px-3 py-2.5 bg-gray-50 border-b border-gray-100">
                 <div className="flex items-center gap-2">
                   <span className="text-[13px] text-gray-800">{recipeTitle} 재료</span>
-                  <span className="text-[11px] text-[#0EA5E9]">{addedIds.size}/{recipeResults.length}</span>
+                  <span className="text-[11px] text-[#ff6600]">{addedIds.size}/{recipeResults.length}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   {!resultsCollapsed && (
                     <button
                       onClick={handleAddAll}
-                      className="text-[11px] px-2.5 py-1 bg-gray-900 text-white rounded-md active:bg-gray-800 transition-colors"
+                      className="text-[11px] px-2.5 py-1 bg-[#ff6600] text-white rounded-md active:bg-[#e14d00] transition-colors"
                     >
                       전체 담기
                     </button>
@@ -322,7 +322,7 @@ export function CartPage() {
                       <span
                         key={ing.id}
                         className={`text-[11px] px-2 py-0.5 rounded ${
-                          addedIds.has(ing.id) ? "bg-sky-50 text-[#0EA5E9]" : "bg-gray-100 text-gray-500"
+                          addedIds.has(ing.id) ? "bg-orange-50 text-[#ff6600]" : "bg-gray-100 text-gray-500"
                         }`}
                       >
                         {ing.name}
@@ -342,7 +342,7 @@ export function CartPage() {
                           key={ing.id}
                           onClick={() => handleToggleIngredient(ing)}
                           className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left ${
-                            isAdded ? "bg-sky-50" : "bg-gray-50 active:bg-gray-100"
+                            isAdded ? "bg-orange-50" : "bg-gray-50 active:bg-gray-100"
                           }`}
                         >
                           <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center text-[18px] flex-shrink-0">
@@ -358,7 +358,7 @@ export function CartPage() {
                           <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
                             <span className="text-[13px] text-gray-900">{ing.price.toLocaleString()}원</span>
                             {isAdded ? (
-                              <span className="flex items-center gap-0.5 text-[10px] text-[#0EA5E9]">
+                              <span className="flex items-center gap-0.5 text-[10px] text-[#ff6600]">
                                 <CheckCircle2 className="w-3 h-3" />담김
                               </span>
                             ) : (
@@ -388,7 +388,7 @@ export function CartPage() {
       {/* Route Recommendation */}
       <div className="bg-white mx-4 mt-2.5 rounded-xl p-4">
         <div className="flex items-center gap-2 mb-1">
-          <Route className="w-4 h-4 text-[#0EA5E9]" />
+          <Route className="w-4 h-4 text-[#ff6600]" />
           <h2 className="text-[14px] text-gray-900">맞춤형 경로 추천</h2>
         </div>
         <p className="text-[12px] text-gray-400 mb-4">

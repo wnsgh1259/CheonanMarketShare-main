@@ -14,14 +14,14 @@ import {
 
 type TabType = "stamps" | "events" | "coupons";
 
-const PROGRESS_COLORS = ["bg-rose-400", "bg-amber-400", "bg-emerald-400", "bg-sky-400", "bg-violet-400"];
+const PROGRESS_COLORS = ["bg-[#ff6600]", "bg-[#ff6600]", "bg-[#ff6600]", "bg-[#ff6600]", "bg-[#ff6600]"];
 
 const GIFT_ITEMS = [
-  { id: 1, emoji: "🎫", name: "500원 할인권", desc: "전 시장 공통", cost: 500,  color: "from-rose-50 to-pink-50",    border: "border-rose-100",   badge: "bg-rose-100 text-rose-600" },
-  { id: 2, emoji: "🎟", name: "1,000원 할인권", desc: "전 시장 공통", cost: 900,  color: "from-amber-50 to-yellow-50", border: "border-amber-100",  badge: "bg-amber-100 text-amber-600" },
-  { id: 3, emoji: "🏷", name: "2,000원 할인권", desc: "전 시장 공통", cost: 1700, color: "from-emerald-50 to-teal-50",  border: "border-emerald-100", badge: "bg-emerald-100 text-emerald-600" },
-  { id: 4, emoji: "💝", name: "5,000원 할인권", desc: "전 시장 공통", cost: 4000, color: "from-sky-50 to-blue-50",      border: "border-sky-100",    badge: "bg-sky-100 text-sky-600" },
-  { id: 5, emoji: "👑", name: "10,000원 할인권", desc: "전 시장 공통", cost: 7500, color: "from-violet-50 to-purple-50", border: "border-violet-100", badge: "bg-violet-100 text-violet-600", rare: true },
+  { id: 1, emoji: "🎫", name: "500원 할인권",   desc: "전 시장 공통", cost: 500,  color: "from-orange-50 to-amber-50",  border: "border-orange-100", badge: "bg-orange-100 text-[#ff6600]" },
+  { id: 2, emoji: "🎟", name: "1,000원 할인권", desc: "전 시장 공통", cost: 900,  color: "from-orange-50 to-amber-50",  border: "border-orange-100", badge: "bg-orange-100 text-[#ff6600]" },
+  { id: 3, emoji: "🏷", name: "2,000원 할인권", desc: "전 시장 공통", cost: 1700, color: "from-orange-50 to-amber-50",  border: "border-orange-100", badge: "bg-orange-100 text-[#ff6600]" },
+  { id: 4, emoji: "💝", name: "5,000원 할인권", desc: "전 시장 공통", cost: 4000, color: "from-orange-100 to-amber-100", border: "border-orange-200", badge: "bg-orange-200 text-[#e14d00]" },
+  { id: 5, emoji: "👑", name: "10,000원 할인권", desc: "전 시장 공통", cost: 7500, color: "from-[#ff6600] to-[#ff8533]", border: "border-[#ff6600]",   badge: "bg-white/30 text-white", rare: true },
 ];
 
 export function ProfilePage() {
@@ -83,11 +83,11 @@ export function ProfilePage() {
   };
 
   const coupons = [
-    { id: 1, title: "천안중앙시장 5,000원 할인", description: "2만원 이상 구매 시", discount: "5,000원", market: "천안중앙시장", expiry: "2026.04.30", color: "bg-gray-800" },
-    { id: 2, title: "성환전통시장 10% 할인", description: "1만원 이상 구매 시", discount: "10%", market: "성환전통시장", expiry: "2026.05.15", color: "bg-emerald-700" },
-    { id: 3, title: "천안역전시장 무료 시음권", description: "방문 시 1회 무료", discount: "무료", market: "천안역전시장", expiry: "2026.04.20", color: "bg-orange-600" },
-    { id: 4, title: "만보기 달성 특별 쿠폰", description: "5천원 이상 구매 시 3,000원", discount: "3,000원", market: "전 시장 공통", expiry: "2026.05.01", color: "bg-purple-700" },
-    { id: 5, title: "1시간 체류 달성 쿠폰", description: "시장 1시간 이상 체류", discount: "2,000원", market: "전 시장 공통", expiry: "2026.04.25", color: "bg-rose-700" },
+    { id: 1, title: "천안중앙시장 5,000원 할인", description: "2만원 이상 구매 시", discount: "5,000원", market: "천안중앙시장", expiry: "2026.04.30", color: "bg-[#ff6600]" },
+    { id: 2, title: "성환전통시장 10% 할인", description: "1만원 이상 구매 시", discount: "10%", market: "성환전통시장", expiry: "2026.05.15", color: "bg-[#ff6600]" },
+    { id: 3, title: "천안역전시장 무료 시음권", description: "방문 시 1회 무료", discount: "무료", market: "천안역전시장", expiry: "2026.04.20", color: "bg-[#ff8533]" },
+    { id: 4, title: "만보기 달성 특별 쿠폰", description: "5천원 이상 구매 시 3,000원", discount: "3,000원", market: "전 시장 공통", expiry: "2026.05.01", color: "bg-[#1a1c20]" },
+    { id: 5, title: "1시간 체류 달성 쿠폰", description: "시장 1시간 이상 체류", discount: "2,000원", market: "전 시장 공통", expiry: "2026.04.25", color: "bg-[#1a1c20]" },
   ];
 
   return (
@@ -145,7 +145,7 @@ export function ProfilePage() {
             </div>
             <button
               onClick={() => { setExchangeResult(null); setShowGiftShop(true); }}
-              className="flex items-center gap-1 bg-[#C9813A] rounded-xl px-2.5 py-1.5 active:bg-[#B57030] transition-colors shadow-sm"
+              className="flex items-center gap-1 bg-[#ff6600] rounded-xl px-2.5 py-1.5 active:bg-[#e14d00] transition-colors shadow-sm"
             >
               <Gift className="w-3.5 h-3.5 text-white" />
               <span className="text-white text-[11px] font-semibold">교환소</span>
@@ -183,7 +183,7 @@ export function ProfilePage() {
             onClick={() => setActiveTab(key)}
             className={`flex-1 py-3 text-center text-[13px] transition-colors border-b-2 ${
               activeTab === key
-                ? "text-gray-800 border-[#C9813A] font-semibold"
+                ? "text-gray-800 border-[#ff6600] font-semibold"
                 : "text-gray-400 border-transparent"
             }`}
           >
@@ -198,7 +198,7 @@ export function ProfilePage() {
 
           {/* 만보기 */}
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
-            <div className="bg-gradient-to-r from-emerald-400 to-teal-400 px-4 py-3 flex items-center justify-between">
+            <div className="bg-gradient-to-r from-[#ff6600] to-[#ff8533] px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-[20px]">👟</span>
                 <div>
@@ -211,10 +211,10 @@ export function ProfilePage() {
             <div className="px-4 py-3">
               <div className="flex items-center justify-between text-[12px] mb-2">
                 <span className="text-gray-400">오늘 걸음 수</span>
-                <span className="text-emerald-600 font-semibold">8,500 / 10,000보</span>
+                <span className="text-[#ff6600] font-semibold">8,500 / 10,000보</span>
               </div>
               <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
-                <div className="h-2.5 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full" style={{ width: "85%" }} />
+                <div className="h-2.5 bg-gradient-to-r from-[#ff6600] to-[#ff8533] rounded-full" style={{ width: "85%" }} />
               </div>
               <p className="text-[11px] text-gray-400 mt-1.5">🏃 1,500보만 더!</p>
             </div>
@@ -254,7 +254,7 @@ export function ProfilePage() {
           {/* 칭호 배너 */}
           <button
             onClick={() => { setSheetDetail(null); setShowTitleSheet(true); }}
-            className="w-full bg-gradient-to-r from-[#C9813A] to-[#E8A855] rounded-2xl px-4 py-3.5 flex items-center gap-3 active:opacity-90 transition-opacity shadow-sm"
+            className="w-full bg-gradient-to-r from-[#ff6600] to-[#E8A855] rounded-2xl px-4 py-3.5 flex items-center gap-3 active:opacity-90 transition-opacity shadow-sm"
           >
             <div className="w-10 h-10 bg-white/25 rounded-xl flex items-center justify-center text-[20px]">{currentTitle.emoji}</div>
             <div className="flex-1 text-left">
@@ -369,7 +369,7 @@ export function ProfilePage() {
               </div>
               <button
                 onClick={() => { setExchangeResult(null); setShowGiftShop(true); }}
-                className="flex flex-col items-center gap-1 bg-[#C9813A] rounded-2xl px-4 py-3 active:bg-[#B57030] transition-colors shadow-sm"
+                className="flex flex-col items-center gap-1 bg-[#ff6600] rounded-2xl px-4 py-3 active:bg-[#e14d00] transition-colors shadow-sm"
               >
                 <Gift className="w-5 h-5 text-white" />
                 <span className="text-white text-[11px] font-bold">교환소</span>
@@ -440,7 +440,7 @@ export function ProfilePage() {
                   </div>
                   <button
                     onClick={() => setExchangeResult(null)}
-                    className="w-full py-3 bg-[#C9813A] text-white rounded-2xl text-[14px] font-semibold active:bg-[#B57030] transition-colors"
+                    className="w-full py-3 bg-[#ff6600] text-white rounded-2xl text-[14px] font-semibold active:bg-[#e14d00] transition-colors"
                   >
                     계속 교환하기
                   </button>
@@ -449,7 +449,7 @@ export function ProfilePage() {
                 <>
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
-                      <Gift className="w-5 h-5 text-[#C9813A]" />
+                      <Gift className="w-5 h-5 text-[#ff6600]" />
                       <p className="text-[16px] font-bold text-gray-800">선물 교환소</p>
                     </div>
                     <button onClick={() => setShowGiftShop(false)} className="p-1 text-gray-400">
@@ -552,7 +552,7 @@ export function ProfilePage() {
                         <Check className="w-4 h-4" />현재 적용 중
                       </div>
                     ) : (
-                      <button onClick={() => handleApplyTitle(sheetDetail.id)} className="w-full py-3.5 rounded-2xl bg-[#C9813A] text-white text-[15px] font-semibold active:bg-[#B57030] transition-colors">
+                      <button onClick={() => handleApplyTitle(sheetDetail.id)} className="w-full py-3.5 rounded-2xl bg-[#ff6600] text-white text-[15px] font-semibold active:bg-[#e14d00] transition-colors">
                         이 칭호 사용하기
                       </button>
                     )
@@ -580,13 +580,13 @@ export function ProfilePage() {
                           key={title.id}
                           onClick={() => setSheetDetail(title)}
                           className={`flex flex-col items-center py-3.5 px-2 rounded-2xl border-2 transition-all relative ${
-                            isActive ? "border-[#C9813A] bg-orange-50"
+                            isActive ? "border-[#ff6600] bg-orange-50"
                             : title.unlocked ? "border-gray-100 bg-white active:bg-gray-50"
                             : "border-gray-100 bg-gray-50 opacity-50"
                           }`}
                         >
                           {isActive && (
-                            <span className="absolute -top-1.5 -left-1.5 w-5 h-5 bg-[#C9813A] rounded-full flex items-center justify-center shadow-sm">
+                            <span className="absolute -top-1.5 -left-1.5 w-5 h-5 bg-[#ff6600] rounded-full flex items-center justify-center shadow-sm">
                               <Check className="w-3 h-3 text-white" />
                             </span>
                           )}
@@ -596,7 +596,7 @@ export function ProfilePage() {
                           <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-[24px] mb-2 ${title.unlocked ? "bg-gray-100" : "bg-gray-100"}`}>
                             {title.unlocked ? title.emoji : <Lock className="w-5 h-5 text-gray-300" />}
                           </div>
-                          <p className={`text-[10px] font-semibold text-center leading-tight mb-0.5 ${isActive ? "text-[#C9813A]" : title.unlocked ? "text-gray-700" : "text-gray-400"}`}>
+                          <p className={`text-[10px] font-semibold text-center leading-tight mb-0.5 ${isActive ? "text-[#ff6600]" : title.unlocked ? "text-gray-700" : "text-gray-400"}`}>
                             {title.name}
                           </p>
                           <p className="text-[9px] text-gray-400 text-center leading-tight">
