@@ -13,6 +13,8 @@ import { FacilityRegistrationPage } from "./pages/FacilityRegistrationPage";
 import { AdminPage } from "./pages/AdminPage";
 import { WritePage } from "./pages/WritePage";
 import { PostDetailPage } from "./pages/PostDetailPage";
+import { CommunityPage } from "./pages/CommunityPage";
+import { FavoritesPage } from "./pages/FavoritesPage";
 
 export const router = createBrowserRouter([
   {
@@ -27,6 +29,8 @@ export const router = createBrowserRouter([
       { path: "chat", Component: ChatPage },
       { path: "profile", Component: ProfilePage },
       { path: "settings", Component: SettingsPage },
+      { path: "community", Component: CommunityPage },
+      { path: "favorites", Component: FavoritesPage },
       { path: "owner/store-registration", Component: StoreRegistrationPage },
       { path: "owner/facility-registration", Component: FacilityRegistrationPage },
       { path: "admin", Component: AdminPage },
