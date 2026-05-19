@@ -138,10 +138,11 @@ export function ProfilePage() {
           </div>
 
           <div className="flex-shrink-0 flex flex-col items-end gap-1.5">
-            <div className="bg-white/70 border border-gray-200 rounded-xl px-3 py-2 text-center">
+            <div className="bg-white/70 border border-gray-200 rounded-xl px-3 pt-2 pb-3 text-center">
               <p className="text-gray-400 text-[10px]">마일리지</p>
-              <p className="text-gray-800 text-[16px] font-bold">{mileage.toLocaleString()}</p>
-              <p className="text-gray-400 text-[10px]">P</p>
+              <p className="text-gray-800 text-[16px] font-bold leading-none">
+                {mileage.toLocaleString()}<span className="text-[10px] text-gray-400 font-normal ml-0.5">P</span>
+              </p>
             </div>
             <button
               onClick={() => { setExchangeResult(null); setShowGiftShop(true); }}
