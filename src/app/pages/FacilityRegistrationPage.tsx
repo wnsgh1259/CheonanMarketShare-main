@@ -4,12 +4,14 @@ import { useNavigate } from "react-router";
 import type { MarketId } from "../components/CartContext";
 import { MARKET_VIEW_CONFIG } from "../map/storeMapPlacement";
 import {
-  OWNER_DASHBOARD_STORAGE_KEY,
   OWNER_EDIT_FACILITY_KEY,
-  loadSharedOwnerDraft,
-  saveSharedOwnerDraft,
-  type SharedOwnerDashboardDraft,
 } from "../data/ownerSharedStore";
+import {
+  loadOwnerCatalog,
+  loadOwnerCatalogRemote,
+  migrateLegacyOwnerDraftIfNeeded,
+  saveOwnerCatalog,
+} from "../data/ownerStoreData";
 
 type DraftFacility = {
   id: number;
@@ -111,43 +113,27 @@ export function FacilityRegistrationPage() {
     anchor: new naver.maps.Point(FIXED_FACILITY_MARKER_SIZE / 2, FIXED_FACILITY_MARKER_SIZE / 2),
   });
 
-  const readStorageDraftRecord = (): Record<string, unknown> => {
-    try {
-      const raw = window.localStorage.getItem(OWNER_DASHBOARD_STORAGE_KEY);
-      if (!raw) return {};
-      const v = JSON.parse(raw) as unknown;
-      return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
-    } catch {
-      return {};
-    }
-  };
-
   const persistDraftFacilities = (facilities: DraftFacility[]) => {
-    const base = readStorageDraftRecord();
-    const payload = { ...base, facilities };
-    window.localStorage.setItem(OWNER_DASHBOARD_STORAGE_KEY, JSON.stringify(payload));
-    void saveSharedOwnerDraft(payload as SharedOwnerDashboardDraft);
+    const catalog = loadOwnerCatalog();
+    saveOwnerCatalog({ ...catalog, facilities });
   };
 
   useEffect(() => {
+    migrateLegacyOwnerDraftIfNeeded();
     let cancelled = false;
     const load = async () => {
       try {
-        const remote = await loadSharedOwnerDraft();
-        const localRaw = window.localStorage.getItem(OWNER_DASHBOARD_STORAGE_KEY);
-        let raw: string | null = null;
-        if (localRaw) {
-          try {
-            JSON.parse(localRaw);
-            raw = localRaw;
-          } catch {
-            raw = null;
-          }
+        const remoteCatalog = await loadOwnerCatalogRemote();
+        const localCatalog = loadOwnerCatalog();
+        const catalog =
+          remoteCatalog && localCatalog.stores.length === 0 && (localCatalog.facilities?.length ?? 0) === 0
+            ? remoteCatalog
+            : localCatalog;
+        if (remoteCatalog && catalog === remoteCatalog) {
+          saveOwnerCatalog(remoteCatalog);
         }
-        if (!raw && remote) raw = JSON.stringify(remote);
-        if (!raw || cancelled) return;
-        const parsed = JSON.parse(raw) as { facilities?: DraftFacility[] };
-        const facilities = parsed.facilities ?? [];
+        if (cancelled) return;
+        const facilities = catalog.facilities ?? [];
 
         if (initialEditFacilityId !== null) {
           const direct = facilities.find((f) => f.id === initialEditFacilityId);

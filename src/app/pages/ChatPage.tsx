@@ -6,7 +6,7 @@ import {
   Eye, ThumbsUp, MessageSquare, MoreHorizontal, Plus, Phone, X, Trash2,
   EyeOff, Image, Camera, AlignLeft, CalendarClock,
 } from "lucide-react";
-import { BottomNav } from "../components/BottomNav";
+import { BottomNav, OWNER_MODE_KEY, OwnerBackToStoreButton } from "../components/BottomNav";
 import { INITIAL_POSTS, postStore, savePostStore } from "../data/postStore";
 import type { PostItem } from "../data/postStore";
 
@@ -95,10 +95,16 @@ export function ChatPage() {
   const [deletedPostIds, setDeletedPostIds] = useState<Set<number>>(() => loadIds(DELETED_KEY));
 
   const [, setTick] = useState(0);
+  const [ownerMode, setOwnerModeState] = useState(() => localStorage.getItem(OWNER_MODE_KEY) === "true");
   useEffect(() => {
     const h = () => setTick((t) => t + 1);
     window.addEventListener("user_title_changed", h);
     return () => window.removeEventListener("user_title_changed", h);
+  }, []);
+  useEffect(() => {
+    const handler = () => setOwnerModeState(localStorage.getItem(OWNER_MODE_KEY) === "true");
+    window.addEventListener("owner_mode_changed", handler);
+    return () => window.removeEventListener("owner_mode_changed", handler);
   }, []);
 
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>(() => {
@@ -489,6 +495,7 @@ export function ChatPage() {
             </button>
           </div>
           <div className="flex items-center gap-2 text-gray-400">
+            {ownerMode && <OwnerBackToStoreButton />}
             {mainTab === "community" ? (
               <>
                 <button onClick={() => { setSearchOpen((v) => !v); setSearchQuery(""); }}><Search className="w-5 h-5" /></button>

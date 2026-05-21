@@ -13,6 +13,12 @@ import {
 } from "../data/userStore";
 
 type TabType = "stamps" | "events" | "coupons";
+type CouponViewMode = "qr" | "number";
+
+function generateCouponCode() {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  return Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+}
 
 const PROGRESS_COLORS = ["bg-rose-400", "bg-amber-400", "bg-emerald-400", "bg-sky-400", "bg-violet-400"];
 
@@ -36,6 +42,10 @@ export function ProfilePage() {
     try { return Number(localStorage.getItem("user_mileage")) || 3250; } catch { return 3250; }
   });
   const [exchangeResult, setExchangeResult] = useState<{ name: string; emoji: string } | null>(null);
+
+  const [selectedCoupon, setSelectedCoupon] = useState<{ id: number; title: string; market: string; discount: string; expiry: string; color: string } | null>(null);
+  const [couponViewMode, setCouponViewMode] = useState<CouponViewMode>("qr");
+  const [couponCode, setCouponCode] = useState("");
 
   const savedName = localStorage.getItem("user_name") || "홍길동";
   const user = { name: savedName, visitedStores: 12, totalDistance: 8500 };
@@ -80,6 +90,12 @@ export function ProfilePage() {
     setMileage(newMileage);
     try { localStorage.setItem("user_mileage", String(newMileage)); } catch {}
     setExchangeResult({ name: item.name, emoji: item.emoji });
+  };
+
+  const handleUseCoupon = (coupon: typeof coupons[0]) => {
+    setCouponCode(generateCouponCode());
+    setCouponViewMode("qr");
+    setSelectedCoupon(coupon);
   };
 
   const coupons = [
@@ -403,7 +419,10 @@ export function ProfilePage() {
                     <p className="text-[11px] text-gray-400 mb-2">{coupon.description}</p>
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] text-gray-400">~ {coupon.expiry}</span>
-                      <button className="text-[12px] font-medium text-gray-800 bg-gray-100 px-3 py-1.5 rounded-xl active:bg-gray-200 transition-colors">
+                      <button
+                        onClick={() => handleUseCoupon(coupon)}
+                        className="text-[12px] font-medium text-gray-800 bg-gray-100 px-3 py-1.5 rounded-xl active:bg-gray-200 transition-colors"
+                      >
                         사용하기
                       </button>
                     </div>
@@ -613,6 +632,84 @@ export function ProfilePage() {
                   </button>
                 </>
               )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── 쿠폰 사용하기 바텀시트 ── */}
+      {selectedCoupon && (
+        <>
+          <div className="fixed inset-0 bg-black/50 z-[145]" onClick={() => setSelectedCoupon(null)} />
+          <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-3xl z-[150] shadow-2xl">
+            <div className="px-5 pt-5 pb-10">
+              <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
+
+              {/* 헤더 */}
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="text-[11px] text-gray-400">{selectedCoupon.market}</p>
+                  <p className="text-[16px] font-bold text-gray-800">{selectedCoupon.title}</p>
+                </div>
+                <button onClick={() => setSelectedCoupon(null)} className="p-1 text-gray-400">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* QR / 번호 토글 */}
+              <div className="flex bg-gray-100 rounded-xl p-1 mb-5">
+                <button
+                  onClick={() => setCouponViewMode("qr")}
+                  className={`flex-1 py-2 rounded-lg text-[13px] font-semibold transition-colors ${
+                    couponViewMode === "qr" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400"
+                  }`}
+                >
+                  QR 코드
+                </button>
+                <button
+                  onClick={() => setCouponViewMode("number")}
+                  className={`flex-1 py-2 rounded-lg text-[13px] font-semibold transition-colors ${
+                    couponViewMode === "number" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400"
+                  }`}
+                >
+                  쿠폰 번호
+                </button>
+              </div>
+
+              {couponViewMode === "qr" ? (
+                <div className="flex flex-col items-center gap-3">
+                  <div className="bg-white border-2 border-gray-100 rounded-2xl p-4 shadow-sm">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(couponCode)}&bgcolor=FFFFFF&color=111111&margin=10`}
+                      alt="쿠폰 QR코드"
+                      width={180}
+                      height={180}
+                      className="rounded-lg"
+                    />
+                  </div>
+                  <p className="text-[11px] text-gray-400 text-center">점원에게 이 QR을 스캔해 달라고 하세요</p>
+                  <div className="bg-gray-50 rounded-xl px-4 py-2 w-full text-center">
+                    <span className="text-[11px] text-gray-400 tracking-widest font-mono">{couponCode}</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-4">
+                  <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center text-[32px]">
+                    🎟
+                  </div>
+                  <div className="bg-gray-50 border border-dashed border-gray-300 rounded-2xl px-6 py-5 w-full text-center">
+                    <p className="text-[11px] text-gray-400 mb-2">쿠폰 번호</p>
+                    <p className="text-[22px] font-bold text-gray-800 tracking-widest font-mono">{couponCode}</p>
+                  </div>
+                  <p className="text-[11px] text-gray-400 text-center">이 번호를 점원에게 보여주세요</p>
+                </div>
+              )}
+
+              {/* 만료일 */}
+              <div className="mt-5 flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
+                <span className="text-[12px] text-gray-400">사용 가능 기한</span>
+                <span className="text-[12px] font-semibold text-gray-700">~ {selectedCoupon.expiry}</span>
+              </div>
             </div>
           </div>
         </>

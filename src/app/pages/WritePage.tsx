@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
+import { loadOwnerCatalog } from "../data/ownerStoreData";
 import {
   X, ChevronDown, Image, MapPin, BarChart2, Hash, Check, Plus, Trash2, Star, UserX, User,
 } from "lucide-react";
@@ -375,11 +376,31 @@ function LocationPickerModal({
 // ─── WritePage ───────────────────────────────────────
 export function WritePage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [isSajangnim] = useState(IS_SAJANGNIM);
+  // URL에 ?sajangnim=true 이거나 상점 모드(owner_mode)로 진입하면 사장님 모드 활성화
+  const isSajangnim = IS_SAJANGNIM
+    || searchParams.get("sajangnim") === "true"
+    || localStorage.getItem("owner_mode") === "true";
 
-  const [category, setCategory]                     = useState<Category | null>(null);
+  // 사장님 모드일 때 상점명 읽기 (dedicated key → dashboard stores 순서로 시도)
+  const ownerStoreInfo = isSajangnim ? (() => {
+    try {
+      const dedicated = localStorage.getItem("owner_current_store_name");
+      if (dedicated) return { name: dedicated, category: "" };
+      const storeIdRaw = localStorage.getItem("owner_store_id");
+      const storeId = storeIdRaw ? Number(storeIdRaw) : Number.NaN;
+      const catalog = loadOwnerCatalog();
+      const store = Number.isFinite(storeId)
+        ? catalog.stores.find((item) => item.id === storeId)
+        : catalog.stores[0];
+      if (store?.name) return { name: store.name, category: store.category ?? "" };
+    } catch {}
+    return null;
+  })() : null;
+
+  const [category, setCategory]                     = useState<Category | null>(isSajangnim ? "사장님" : null);
   const [showCategorySheet, setShowCategorySheet]   = useState(false);
   const [market, setMarket]                         = useState<MarketKey>("jungang");
   const [showMarketSheet, setShowMarketSheet]       = useState(false);
@@ -395,18 +416,25 @@ export function WritePage() {
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [isAnonymous, setIsAnonymous]               = useState(false);
 
-  const savedName = localStorage.getItem("user_name") || "익명";
-  // localStorage에 저장된 칭호 우선, 없으면 ProfilePage와 동일하게 스탬프 4개 기준 자동 결정
-  const titleEmoji = (() => {
-    try {
-      const savedId = localStorage.getItem("user_active_title");
-      if (savedId) {
-        const found = TITLE_LIST.find((t) => t.id === savedId);
-        if (found) return found.emoji;
-      }
-    } catch {}
-    return getActiveTitle(4).emoji;
-  })();
+  // 사장님 모드: 상점명 / 일반 모드: 닉네임
+  const savedName = isSajangnim
+    ? (ownerStoreInfo?.name || localStorage.getItem("user_name") || "익명")
+    : localStorage.getItem("user_name") || "익명";
+
+  // 사장님 모드: 🏪 / 일반 모드: 칭호 이모지
+  const titleEmoji = isSajangnim
+    ? "🏪"
+    : (() => {
+        try {
+          const savedId = localStorage.getItem("user_active_title");
+          if (savedId) {
+            const found = TITLE_LIST.find((t) => t.id === savedId);
+            if (found) return found.emoji;
+          }
+        } catch {}
+        return getActiveTitle(4).emoji;
+      })();
+
   const canSubmit = title.trim().length > 0 && category !== null;
 
   const handleImageAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -467,8 +495,8 @@ export function WritePage() {
       title: title.trim(),
       preview: body.trim().slice(0, 60) + (body.length > 60 ? "..." : ""),
       body: body.trim(),
-      author: isSajangnim ? "사장님" : isAnonymous ? "익명" : savedName,
-      authorTitleEmoji: isSajangnim || isAnonymous ? undefined : titleEmoji,
+      author: isAnonymous ? "익명" : savedName,
+      authorTitleEmoji: isAnonymous ? undefined : titleEmoji,
       time: "방금",
       views: 0,
       likes: 0,

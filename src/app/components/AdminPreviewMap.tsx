@@ -17,6 +17,15 @@ type NaverMapRef = {
 type NaverMarkerRef = { setMap: (map: unknown) => void };
 type NaverPolygonRef = { setMap: (map: unknown) => void };
 
+function clampNaverLogoLayer(container: HTMLElement | null) {
+  if (!container) return;
+  container.querySelectorAll('a[href*="naver.com"], [class*="logo"], [class*="Logo"]').forEach((node) => {
+    if (!(node instanceof HTMLElement)) return;
+    node.style.zIndex = "1";
+    node.style.position = "absolute";
+  });
+}
+
 function clearMarkers(markers: NaverMarkerRef[]) {
   markers.forEach((m) => m.setMap(null));
 }
@@ -97,6 +106,8 @@ export function AdminPreviewMap({
           }),
       );
       setMapEpoch((n) => n + 1);
+      window.setTimeout(() => clampNaverLogoLayer(containerRef.current), 0);
+      window.setTimeout(() => clampNaverLogoLayer(containerRef.current), 300);
     };
 
     if (window.naver?.maps) {
@@ -220,6 +231,10 @@ export function AdminPreviewMap({
     }
   }, [tab, stores, facilities, mapEpoch]);
 
+  useEffect(() => {
+    clampNaverLogoLayer(containerRef.current);
+  }, [mapEpoch, tab]);
+
   if (isPlaceholder || !clientId) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-gray-100 text-[12px] text-gray-500">
@@ -228,5 +243,5 @@ export function AdminPreviewMap({
     );
   }
 
-  return <div ref={containerRef} className="h-full w-full min-h-[208px]" />;
+  return <div ref={containerRef} className="naver-map-wrap h-full w-full min-h-[208px]" />;
 }

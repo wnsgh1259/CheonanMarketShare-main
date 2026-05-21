@@ -64,13 +64,17 @@ function getSupabaseClient() {
 }
 
 export async function loadSharedOwnerDraft(): Promise<SharedOwnerDashboardDraft | null> {
+  return loadSharedOwnerDraftById(OWNER_SHARED_ROW_ID);
+}
+
+export async function loadSharedOwnerDraftById(rowId: string): Promise<SharedOwnerDashboardDraft | null> {
   const client = getSupabaseClient();
   if (!client) return null;
   try {
     const { data, error } = await client
       .from(OWNER_SHARED_TABLE)
       .select("payload")
-      .eq("id", OWNER_SHARED_ROW_ID)
+      .eq("id", rowId)
       .maybeSingle();
     if (error || !data?.payload) return null;
     return data.payload as SharedOwnerDashboardDraft;
@@ -80,12 +84,16 @@ export async function loadSharedOwnerDraft(): Promise<SharedOwnerDashboardDraft 
 }
 
 export async function saveSharedOwnerDraft(payload: SharedOwnerDashboardDraft) {
+  return saveSharedOwnerDraftById(OWNER_SHARED_ROW_ID, payload);
+}
+
+export async function saveSharedOwnerDraftById(rowId: string, payload: unknown) {
   const client = getSupabaseClient();
   if (!client) return;
   try {
     await client.from(OWNER_SHARED_TABLE).upsert(
       {
-        id: OWNER_SHARED_ROW_ID,
+        id: rowId,
         payload,
         updated_at: new Date().toISOString(),
       },

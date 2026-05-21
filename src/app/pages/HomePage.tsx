@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { Bell, MapPin, Store, ChevronRight, Clock, Tag, ShoppingCart } from "lucide-react";
+import { Bell, MapPin, Store, ChevronRight, Clock, Tag, ShoppingCart, Settings } from "lucide-react";
 import { useCart } from "../components/CartContext";
-import { BottomNav } from "../components/BottomNav";
+import { BottomNav, OWNER_MODE_KEY, OwnerBackToStoreButton } from "../components/BottomNav";
 
 type MarketId = "jungang" | "byeongcheon" | "seonghwan";
 
@@ -89,6 +89,7 @@ const coursesByMarket: Record<MarketId, { id: number; title: string; image: stri
 export function HomePage() {
   const [selectedMarketId, setSelectedMarketId] = useState<MarketId>("jungang");
   const { totalCount } = useCart();
+  const ownerMode = localStorage.getItem(OWNER_MODE_KEY) === "true";
 
   const selectedMarket = markets.find((m) => m.id === selectedMarketId)!;
   const spots = spotsByMarket[selectedMarketId];
@@ -104,18 +105,33 @@ export function HomePage() {
             <h1 className="text-[17px] text-gray-900 tracking-tight">{selectedMarket.name}</h1>
           </div>
           <div className="flex items-center gap-1">
-            <Link to="/cart" className="w-10 h-10 flex items-center justify-center relative">
-              <ShoppingCart className="w-[20px] h-[20px] text-gray-600" />
-              {totalCount > 0 && (
-                <span className="absolute top-1 right-0.5 bg-[#0EA5E9] text-white text-[10px] min-w-[16px] h-4 rounded-full flex items-center justify-center px-1">
-                  {totalCount}
-                </span>
-              )}
-            </Link>
-            <button className="w-10 h-10 flex items-center justify-center relative">
-              <Bell className="w-[20px] h-[20px] text-gray-600" />
-              <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-red-500 rounded-full" />
-            </button>
+            {ownerMode ? (
+              <>
+                <OwnerBackToStoreButton />
+                <button className="w-10 h-10 flex items-center justify-center relative">
+                  <Bell className="w-[20px] h-[20px] text-gray-600" />
+                  <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-red-500 rounded-full" />
+                </button>
+                <Link to="/settings" className="w-10 h-10 flex items-center justify-center">
+                  <Settings className="w-[20px] h-[20px] text-gray-600" />
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link to="/cart" className="w-10 h-10 flex items-center justify-center relative">
+                  <ShoppingCart className="w-[20px] h-[20px] text-gray-600" />
+                  {totalCount > 0 && (
+                    <span className="absolute top-1 right-0.5 bg-[#0EA5E9] text-white text-[10px] min-w-[16px] h-4 rounded-full flex items-center justify-center px-1">
+                      {totalCount}
+                    </span>
+                  )}
+                </Link>
+                <button className="w-10 h-10 flex items-center justify-center relative">
+                  <Bell className="w-[20px] h-[20px] text-gray-600" />
+                  <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-red-500 rounded-full" />
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>

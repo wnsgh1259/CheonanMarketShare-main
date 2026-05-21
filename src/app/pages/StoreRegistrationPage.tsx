@@ -1,14 +1,28 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ChevronLeft, MapPin, Plus, ImagePlus } from "lucide-react";
+import { ChevronLeft, MapPin, Plus, ImagePlus, Settings, Lock, Phone, Mail, LogOut } from "lucide-react";
+import {
+  generateUniqueStoreCredentials,
+  upsertStoreAccount,
+  formatPhoneDisplay as formatAdminPhoneDisplay,
+} from "../data/adminAccount";
 import { useNavigate } from "react-router";
+import { setOwnerMode, OWNER_STORE_MGMT_RETURN_KEY } from "../components/BottomNav";
+import { useAuth } from "../context/AuthContext";
+import { saveUserEmail, isValidEmail } from "../data/userAccounts";
 import { STORES_BY_MARKET } from "../data/storeData";
 import {
-  OWNER_DASHBOARD_STORAGE_KEY,
   OWNER_EDIT_STORE_KEY,
-  loadSharedOwnerDraft,
-  saveSharedOwnerDraft,
-  type SharedOwnerDashboardDraft,
 } from "../data/ownerSharedStore";
+import {
+  loadOwnerCatalog,
+  loadOwnerCatalogRemote,
+  loadOwnerStoreWorkspace,
+  loadOwnerStoreWorkspaceRemote,
+  migrateLegacyOwnerDraftIfNeeded,
+  saveOwnerCatalog,
+  saveOwnerStoreWorkspace,
+  upsertCatalogStore,
+} from "../data/ownerStoreData";
 
 type NaverMapRef = {
   setCenter: (latLng: unknown) => void;
@@ -40,7 +54,7 @@ type DraftStore = {
   menus?: OwnerMenu[];
 };
 
-type OwnerSection = "store" | "product" | "communication" | "promotion";
+type OwnerSection = "store" | "product" | "communication" | "customerMode" | "community" | "promotion" | "settings";
 
 type OwnerMenu = {
   id: number;
@@ -59,7 +73,15 @@ type OwnerDashboardDraft = {
   inquiryReply: string;
 };
 
-type MarketId = "jungang" | "byeongcheon" | "seonghwan";
+const OWNER_CHANGE_REQUESTS_KEY = "owner_change_requests";
+const OWNER_APPROVED_STORE_NAME_KEY = "owner_approved_store_name";
+
+function formatPhoneDisplay(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+  if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  return phone;
+}
 
 const MARKET_VIEW_CONFIG: Record<MarketId, {
   label: string;
@@ -129,17 +151,28 @@ declare global {
 
 export function StoreRegistrationPage() {
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const query = new URLSearchParams(window.location.search);
   const queryMarket = query.get("market");
   const editStoreIdParam = query.get("editStoreId");
   const queryEditStoreId =
     editStoreIdParam != null && editStoreIdParam !== "" ? Number(editStoreIdParam) : Number.NaN;
+  const sessionStoreIdRaw = localStorage.getItem("owner_store_id");
+  const sessionStoreId = sessionStoreIdRaw ? Number(sessionStoreIdRaw) : Number.NaN;
+  const isAdminNewStore =
+    query.get("returnTo") === "admin" &&
+    query.get("adminNew") === "1" &&
+    !Number.isFinite(queryEditStoreId);
+  const initialEditStoreId = Number.isFinite(queryEditStoreId)
+    ? queryEditStoreId
+    : !isAdminNewStore && Number.isFinite(sessionStoreId)
+      ? sessionStoreId
+      : null;
   const initialMarket: MarketId =
     queryMarket === "jungang" || queryMarket === "byeongcheon" || queryMarket === "seonghwan"
       ? queryMarket
       : "byeongcheon";
-  const initialEditStoreId = Number.isFinite(queryEditStoreId) ? queryEditStoreId : null;
-  const returnToAdmin = query.get("returnTo") === "admin" || initialEditStoreId !== null;
+  const returnToAdmin = query.get("returnTo") === "admin";
   const adminReturnHint =
     query.get("adminReturn") === "map" || query.get("adminReturn") === "list" ? query.get("adminReturn") : null;
 
@@ -154,6 +187,26 @@ export function StoreRegistrationPage() {
     }
     navigate(`/admin?${q.toString()}`, { replace: opts?.replace === true });
   };
+
+  const saveStoreMgmtReturnPath = () => {
+    sessionStorage.setItem(OWNER_STORE_MGMT_RETURN_KEY, window.location.pathname + window.location.search);
+  };
+
+  const enterOwnerPreview = (path: string) => {
+    const storeName = pageTitle !== "~~사장님" ? pageTitle : (form.name.trim() || "");
+    if (storeName) localStorage.setItem("owner_current_store_name", storeName);
+    saveStoreMgmtReturnPath();
+    setOwnerMode(true);
+    navigate(path);
+  };
+
+  useEffect(() => {
+    if (query.get("returnTo") === "admin") {
+      saveStoreMgmtReturnPath();
+    }
+  }, []);
+
+  const resolvedStoreId = initialEditStoreId ?? (Number.isFinite(sessionStoreId) ? sessionStoreId : null);
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<NaverMapRef | null>(null);
@@ -186,7 +239,25 @@ export function StoreRegistrationPage() {
   const [reviewReply, setReviewReply] = useState("");
   const [inquiryReply, setInquiryReply] = useState("");
   const [saveNotice, setSaveNotice] = useState("");
-  const [pageTitle, setPageTitle] = useState("~~사장님");
+  const [pageTitle, setPageTitle] = useState(isAdminNewStore ? "새 상점 등록" : "~~사장님");
+  const [approvedStoreName, setApprovedStoreName] = useState(() =>
+    isAdminNewStore
+      ? ""
+      : localStorage.getItem(OWNER_APPROVED_STORE_NAME_KEY)
+      || localStorage.getItem("owner_current_store_name")
+      || localStorage.getItem("user_name")
+      || "",
+  );
+  const [adminNewCredentials, setAdminNewCredentials] = useState<{ phone: string; pin: string } | null>(() =>
+    isAdminNewStore ? generateUniqueStoreCredentials() : null,
+  );
+  const [ownerPhone, setOwnerPhone] = useState(() => localStorage.getItem("user_phone") || "");
+  const [ownerEmail, setOwnerEmail] = useState(() => localStorage.getItem("user_email") || "");
+  const [settingsModal, setSettingsModal] = useState<"storeName" | "phone" | "pin" | "email" | null>(null);
+  const [settingsInput, setSettingsInput] = useState("");
+  const [settingsPinConfirm, setSettingsPinConfirm] = useState("");
+  const [settingsSubmitted, setSettingsSubmitted] = useState<"storeName" | "phone" | null>(null);
+  const [settingsNotice, setSettingsNotice] = useState("");
   const saveNoticeRef = useRef<HTMLDivElement | null>(null);
 
   useLayoutEffect(() => {
@@ -205,59 +276,77 @@ export function StoreRegistrationPage() {
     return Math.max(8, Math.min(30, Math.round(scaled)));
   };
 
-  const readStorageDraftRecord = (): Record<string, unknown> => {
-    try {
-      const raw = window.localStorage.getItem(OWNER_DASHBOARD_STORAGE_KEY);
-      if (!raw) return {};
-      const v = JSON.parse(raw) as unknown;
-      return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
-    } catch {
-      return {};
-    }
+  const persistOwnerCatalog = (storesList: DraftStore[]) => {
+    const catalog = loadOwnerCatalog();
+    saveOwnerCatalog({ ...catalog, stores: storesList });
   };
 
-  const persistOwnerDraftToStorage = (patch: Record<string, unknown>) => {
-    const base = readStorageDraftRecord();
-    const payload = { ...base, ...patch };
-    window.localStorage.setItem(OWNER_DASHBOARD_STORAGE_KEY, JSON.stringify(payload));
-    void saveSharedOwnerDraft(payload as SharedOwnerDashboardDraft);
+  const persistOwnerWorkspace = (storeId: number) => {
+    saveOwnerStoreWorkspace(storeId, {
+      menus,
+      todayDeal,
+      news,
+      couponEvent,
+      reviewReply,
+      inquiryReply,
+    });
   };
 
   useEffect(() => {
+    migrateLegacyOwnerDraftIfNeeded();
     let cancelled = false;
     const load = async () => {
       try {
-        const remote = await loadSharedOwnerDraft();
-        const localRaw = window.localStorage.getItem(OWNER_DASHBOARD_STORAGE_KEY);
-        let raw: string | null = null;
-        if (localRaw) {
-          try {
-            JSON.parse(localRaw);
-            raw = localRaw;
-          } catch {
-            raw = null;
+        const remoteCatalog = await loadOwnerCatalogRemote();
+        const localCatalog = loadOwnerCatalog();
+        const catalog =
+          remoteCatalog && localCatalog.stores.length === 0 && (localCatalog.facilities?.length ?? 0) === 0
+            ? remoteCatalog
+            : localCatalog;
+        if (remoteCatalog && catalog === remoteCatalog) {
+          saveOwnerCatalog(remoteCatalog);
+        }
+        if (cancelled) return;
+
+        setStores(catalog.stores ?? []);
+
+        const workspaceStoreId = resolvedStoreId;
+        let workspace = workspaceStoreId ? loadOwnerStoreWorkspace(workspaceStoreId) : null;
+        if (workspaceStoreId) {
+          const remoteWorkspace = await loadOwnerStoreWorkspaceRemote(workspaceStoreId);
+          if (remoteWorkspace && !cancelled) {
+            const localRaw = localStorage.getItem(`owner-store-workspace-v1-${workspaceStoreId}`);
+            if (!localRaw) {
+              workspace = remoteWorkspace;
+              saveOwnerStoreWorkspace(workspaceStoreId, remoteWorkspace);
+            }
           }
         }
-        if (!raw && remote) raw = JSON.stringify(remote);
-        if (!raw || cancelled) return;
-        const parsed = JSON.parse(raw) as OwnerDashboardDraft;
-        setStores(parsed.stores ?? []);
-        setMenus(parsed.menus?.length ? parsed.menus : [{ id: Date.now(), name: "", price: "", photoName: "" }]);
-        setTodayDeal(parsed.todayDeal ?? "");
-        setNews(parsed.news ?? "");
-        setCouponEvent(parsed.couponEvent ?? "");
-        setReviewReply(parsed.reviewReply ?? "");
-        setInquiryReply(parsed.inquiryReply ?? "");
+
+        if (workspace && !cancelled) {
+          setMenus(workspace.menus?.length ? workspace.menus : [{ id: Date.now(), name: "", price: "", photoName: "" }]);
+          setTodayDeal(workspace.todayDeal ?? "");
+          setNews(workspace.news ?? "");
+          setCouponEvent(workspace.couponEvent ?? "");
+          setReviewReply(workspace.reviewReply ?? "");
+          setInquiryReply(workspace.inquiryReply ?? "");
+        }
 
         if (initialEditStoreId !== null) {
-          const directTarget = (parsed.stores ?? []).find((store) => store.id === initialEditStoreId);
+          const directTarget = (catalog.stores ?? []).find((store) => store.id === initialEditStoreId);
           const rawEdit = window.localStorage.getItem(OWNER_EDIT_STORE_KEY);
           const editTarget = rawEdit ? (JSON.parse(rawEdit) as DraftStore) : null;
           const target =
             directTarget ??
             (editTarget && editTarget.id === initialEditStoreId ? editTarget : null);
           if (target) {
-            setPageTitle(target.name || "~~사장님");
+            const fixedName = target.name || localStorage.getItem(OWNER_APPROVED_STORE_NAME_KEY) || "";
+            if (fixedName) {
+              setApprovedStoreName(fixedName);
+              localStorage.setItem(OWNER_APPROVED_STORE_NAME_KEY, fixedName);
+              localStorage.setItem("owner_current_store_name", fixedName);
+            }
+            setPageTitle(fixedName || "~~사장님");
             if (target.marketId) setSelectedMarket(target.marketId);
             const dummyMatch = target.marketId
               ? STORES_BY_MARKET[target.marketId].find((store) => store.name === target.name)
@@ -294,7 +383,6 @@ export function StoreRegistrationPage() {
             setEditingStoreId(target.id);
           }
         }
-        window.localStorage.setItem(OWNER_DASHBOARD_STORAGE_KEY, JSON.stringify(parsed));
       } catch {
         // Ignore corrupted local draft.
       }
@@ -303,7 +391,113 @@ export function StoreRegistrationPage() {
     return () => {
       cancelled = true;
     };
-  }, [initialEditStoreId]);
+  }, [initialEditStoreId, resolvedStoreId]);
+
+  useEffect(() => {
+    if (!isAdminNewStore) return;
+    window.localStorage.removeItem(OWNER_EDIT_STORE_KEY);
+    setEditingStoreId(null);
+    setActiveSection("store");
+    setPageTitle("새 상점 등록");
+    setApprovedStoreName("");
+    setForm({
+      name: "",
+      location: "",
+      hours: "",
+      phone: "",
+      description: "",
+      representativePhotoName: "",
+      representativePhotoUrl: "",
+    });
+    setSelectedCategories([]);
+    setSelectedPayments([]);
+    setPin(null);
+    pinMarkerRef.current?.setMap(null);
+    setAdminNewCredentials(generateUniqueStoreCredentials());
+  }, [isAdminNewStore]);
+
+  useEffect(() => {
+    if (isAdminNewStore) return;
+    if (approvedStoreName) {
+      setPageTitle(approvedStoreName);
+      localStorage.setItem(OWNER_APPROVED_STORE_NAME_KEY, approvedStoreName);
+    }
+  }, [approvedStoreName, isAdminNewStore]);
+
+  const submitChangeRequest = (type: "storeName" | "phone", newValue: string) => {
+    const trimmed = newValue.trim();
+    if (!trimmed) return;
+    if (type === "phone" && !/^[0-9]{10,11}$/.test(trimmed.replace(/-/g, ""))) {
+      setSettingsNotice("올바른 휴대폰 번호 형식으로 입력해주세요.");
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(OWNER_CHANGE_REQUESTS_KEY);
+      const requests = raw ? JSON.parse(raw) as unknown[] : [];
+      requests.push({
+        id: Date.now(),
+        type,
+        storeName: approvedStoreName,
+        currentValue: type === "storeName" ? approvedStoreName : ownerPhone,
+        newValue: type === "phone" ? trimmed.replace(/-/g, "") : trimmed,
+        status: "pending",
+        createdAt: new Date().toISOString(),
+        source: "store",
+      });
+      localStorage.setItem(OWNER_CHANGE_REQUESTS_KEY, JSON.stringify(requests));
+    } catch {
+      /* ignore */
+    }
+    setSettingsSubmitted(type);
+    setSettingsModal(null);
+    setSettingsInput("");
+    setSettingsNotice("");
+  };
+
+  const handleEmailChange = () => {
+    const trimmed = settingsInput.trim();
+    if (!trimmed) {
+      setSettingsNotice("이메일을 입력해주세요.");
+      return;
+    }
+    if (!isValidEmail(trimmed)) {
+      setSettingsNotice("올바른 이메일 형식으로 입력해주세요.");
+      return;
+    }
+    if (trimmed === ownerEmail) {
+      setSettingsNotice("현재 이메일과 동일합니다.");
+      return;
+    }
+    saveUserEmail(trimmed, ownerPhone.replace(/\D/g, ""));
+    setOwnerEmail(trimmed);
+    setSettingsModal(null);
+    setSettingsInput("");
+    setSettingsNotice("이메일이 변경되었습니다.");
+    window.setTimeout(() => setSettingsNotice(""), 2200);
+  };
+
+  const handlePinChange = () => {
+    if (!/^[0-9]{4,6}$/.test(settingsInput)) {
+      setSettingsNotice("PIN 번호는 4~6자리 숫자로 입력해주세요.");
+      return;
+    }
+    if (settingsInput !== settingsPinConfirm) {
+      setSettingsNotice("PIN 번호가 일치하지 않습니다.");
+      return;
+    }
+    localStorage.setItem("user_pin", settingsInput);
+    setSettingsModal(null);
+    setSettingsInput("");
+    setSettingsPinConfirm("");
+    setSettingsNotice("PIN 번호가 변경되었습니다.");
+    window.setTimeout(() => setSettingsNotice(""), 2200);
+  };
+
+  const handleLogout = () => {
+    setOwnerMode(false);
+    logout();
+    navigate("/");
+  };
 
   useEffect(() => {
     if (activeSection !== "store") return;
@@ -505,7 +699,9 @@ export function StoreRegistrationPage() {
         ? { lat: existing.lat, lng: existing.lng }
         : null);
 
-    const nameStr = (form.name.trim() || (isEditing ? (existing?.name ?? "").trim() : "")).trim();
+    const nameStr = isAdminNewStore
+      ? form.name.trim()
+      : (approvedStoreName.trim() || form.name.trim() || (isEditing ? (existing?.name ?? "").trim() : "")).trim();
     const locationStr = (form.location.trim() || (isEditing ? (existing?.location ?? "").trim() : "")).trim();
     const categoryStr =
       selectedCategories.length > 0
@@ -550,15 +746,18 @@ export function StoreRegistrationPage() {
         : [next, ...stores]
       : [next, ...stores];
     setStores(updatedStores);
-    persistOwnerDraftToStorage({
-      stores: updatedStores,
-      menus,
-      todayDeal,
-      news,
-      couponEvent,
-      reviewReply,
-      inquiryReply,
-    });
+    persistOwnerCatalog(updatedStores);
+    if (resolvedStoreId) {
+      persistOwnerWorkspace(resolvedStoreId);
+    }
+    if (isAdminNewStore && adminNewCredentials) {
+      upsertStoreAccount({
+        storeId: next.id,
+        storeName: nameStr,
+        phone: adminNewCredentials.phone,
+        pin: adminNewCredentials.pin,
+      });
+    }
     if (returnToAdmin) {
       goBackToAdmin({ replace: true });
       return;
@@ -591,10 +790,11 @@ export function StoreRegistrationPage() {
   };
 
   const saveOwnerDraft = (notice?: string) => {
+    const targetStoreId = editingStoreId ?? resolvedStoreId;
     const patchedStores =
-      editingStoreId !== null
+      targetStoreId !== null
         ? stores.map((store) =>
-            store.id === editingStoreId
+            store.id === targetStoreId
               ? {
                   ...store,
                   menus: menus.filter((menu) => menu.name.trim()).map((menu) => ({
@@ -605,17 +805,25 @@ export function StoreRegistrationPage() {
               : store,
           )
         : stores;
-    const payload: OwnerDashboardDraft = {
-      stores: patchedStores,
-      menus,
-      todayDeal,
-      news,
-      couponEvent,
-      reviewReply,
-      inquiryReply,
-    };
+    if (targetStoreId !== null) {
+      saveOwnerStoreWorkspace(targetStoreId, {
+        menus,
+        todayDeal,
+        news,
+        couponEvent,
+        reviewReply,
+        inquiryReply,
+      });
+      const targetStore = patchedStores.find((store) => store.id === targetStoreId);
+      if (targetStore) {
+        upsertCatalogStore({
+          ...targetStore,
+          menus: targetStore.menus,
+        });
+      }
+    }
     setStores(patchedStores);
-    persistOwnerDraftToStorage(payload as Record<string, unknown>);
+    persistOwnerCatalog(patchedStores);
     if (notice) {
       setSaveNotice(notice);
       window.setTimeout(() => setSaveNotice(""), 1800);
@@ -623,7 +831,6 @@ export function StoreRegistrationPage() {
   };
 
   const hasUnsavedStoreChanges = Boolean(
-    form.name.trim() ||
     form.location.trim() ||
     form.hours.trim() ||
     form.phone.trim() ||
@@ -693,7 +900,19 @@ export function StoreRegistrationPage() {
             <ChevronLeft className="w-5 h-5 text-gray-700" />
           </button>
           <h1 className="text-[15px] text-gray-900">{pageTitle}</h1>
-          <div className="w-7" />
+          <button
+            type="button"
+            onClick={() => {
+              if (activeSection === "settings") return;
+              closeOrMoveSection("settings");
+            }}
+            className={`p-1 rounded-lg transition-colors ${
+              activeSection === "settings" ? "bg-gray-900 text-white" : "text-gray-700"
+            }`}
+            aria-label="설정"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
         </div>
       </div>
 
@@ -703,6 +922,8 @@ export function StoreRegistrationPage() {
             { key: "store" as OwnerSection, label: "상점 관리" },
             { key: "product" as OwnerSection, label: "상품 관리" },
             { key: "communication" as OwnerSection, label: "고객 소통" },
+            { key: "customerMode" as OwnerSection, label: "상점 모드" },
+            { key: "community" as OwnerSection, label: "커뮤니티" },
             { key: "promotion" as OwnerSection, label: "SNS 홍보" },
           ].map((section) => (
             <button
@@ -792,14 +1013,36 @@ export function StoreRegistrationPage() {
             >
               <div>
                 <label className="block text-[12px] text-gray-500 mb-1">상점명</label>
-                <input
-                  value={form.name}
-                  onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-                  type="text"
-                  placeholder="예: 천안순대국밥"
-                  className="w-full h-10 rounded-lg bg-gray-100 px-3 text-[14px] focus:outline-none focus:ring-1 focus:ring-gray-300"
-                />
+                {isAdminNewStore ? (
+                  <input
+                    value={form.name}
+                    onChange={(e) => {
+                      setForm((prev) => ({ ...prev, name: e.target.value }));
+                      setPageTitle(e.target.value.trim() || "새 상점 등록");
+                    }}
+                    type="text"
+                    placeholder="새 상점명 입력"
+                    className="w-full h-10 rounded-lg bg-gray-100 px-3 text-[14px] focus:outline-none focus:ring-1 focus:ring-gray-300"
+                  />
+                ) : (
+                  <>
+                    <div className="w-full h-10 rounded-lg bg-gray-100 px-3 text-[14px] flex items-center text-gray-800 font-medium">
+                      {approvedStoreName || form.name || "승인된 상점명"}
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-1">상점명 변경은 설정에서 수정신청해주세요.</p>
+                  </>
+                )}
               </div>
+
+              {isAdminNewStore && adminNewCredentials && (
+                <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2.5">
+                  <p className="text-[12px] text-blue-800 font-medium">로그인 계정 (자동 생성)</p>
+                  <p className="text-[13px] text-blue-700 mt-1">
+                    {formatAdminPhoneDisplay(adminNewCredentials.phone)} · PIN {adminNewCredentials.pin}
+                  </p>
+                  <p className="text-[11px] text-blue-600 mt-0.5">저장 시 상점 로그인 계정으로 등록됩니다.</p>
+                </div>
+              )}
 
               <div>
                 <label className="block text-[12px] text-gray-500 mb-1">위치</label>
@@ -1110,6 +1353,62 @@ export function StoreRegistrationPage() {
           </div>
         )}
 
+        {activeSection === "customerMode" && (
+          <div className="bg-white rounded-xl p-4 space-y-3">
+            <div className="rounded-lg bg-blue-50 p-3">
+              <h2 className="text-[14px] text-gray-900 mb-1">상점 모드</h2>
+              <p className="text-[12px] text-gray-500">상점모드로 앱을 둘러보세요.</p>
+            </div>
+            <button
+              onClick={() => enterOwnerPreview("/home")}
+              className="w-full flex items-center justify-between px-4 py-3.5 bg-gray-900 rounded-xl active:bg-gray-800 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-[22px]">🏪</span>
+                <div className="text-left">
+                  <p className="text-[14px] font-medium text-white">상점모드로 앱 보기</p>
+                </div>
+              </div>
+              <span className="text-white text-[13px]">→</span>
+            </button>
+          </div>
+        )}
+
+        {activeSection === "community" && (
+          <div className="bg-white rounded-xl p-4 space-y-3">
+            <div className="rounded-lg bg-gray-50 p-3">
+              <h2 className="text-[14px] text-gray-900 mb-1">커뮤니티</h2>
+              <p className="text-[12px] text-gray-500">시장 이웃과 소통하고 가게 소식을 게시판에 알려보세요.</p>
+            </div>
+            <button
+              onClick={() => enterOwnerPreview("/chat?sajangnim=true")}
+              className="w-full flex items-center justify-between px-4 py-3.5 bg-gray-50 rounded-xl border border-gray-100 active:bg-gray-100 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-[22px]">💬</span>
+                <div className="text-left">
+                  <p className="text-[14px] font-medium text-gray-800">커뮤니티 보기</p>
+                  <p className="text-[11px] text-gray-400">시장 게시판 둘러보기</p>
+                </div>
+              </div>
+              <span className="text-gray-400 text-[13px]">→</span>
+            </button>
+            <button
+              onClick={() => enterOwnerPreview("/write?sajangnim=true")}
+              className="w-full flex items-center justify-between px-4 py-3.5 bg-gray-900 rounded-xl active:bg-gray-800 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-[22px]">✏️</span>
+                <div className="text-left">
+                  <p className="text-[14px] font-medium text-white">글쓰기</p>
+                  <p className="text-[11px] text-gray-400">사장님 공지·홍보 글 작성</p>
+                </div>
+              </div>
+              <span className="text-white text-[13px]">→</span>
+            </button>
+          </div>
+        )}
+
         {activeSection === "promotion" && (
           <div className="bg-white rounded-xl p-4 space-y-3">
             <div>
@@ -1137,6 +1436,258 @@ export function StoreRegistrationPage() {
               >
                 저장
               </button>
+            </div>
+          </div>
+        )}
+
+        {activeSection === "settings" && (
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="w-full bg-white rounded-xl px-4 py-3.5 flex items-center justify-center gap-2 text-red-500 active:bg-red-50 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="text-[14px]">로그아웃</span>
+            </button>
+
+            {settingsNotice && (
+              <div className="rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-100 text-[13px] px-3 py-2">
+                {settingsNotice}
+              </div>
+            )}
+
+            {/* 상점명 */}
+            <div className="bg-white rounded-xl p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Settings className="w-4 h-4 text-gray-400" />
+                <h2 className="text-[14px] font-medium text-gray-900">상점명</h2>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[15px] font-semibold text-gray-900">{approvedStoreName || "승인된 상점명 없음"}</p>
+                {settingsSubmitted !== "storeName" && settingsModal !== "storeName" && (
+                  <button
+                    type="button"
+                    onClick={() => { setSettingsModal("storeName"); setSettingsInput(""); setSettingsNotice(""); }}
+                    className="h-8 px-3 rounded-lg bg-gray-100 text-[12px] text-gray-700 whitespace-nowrap"
+                  >
+                    수정신청
+                  </button>
+                )}
+              </div>
+              {settingsSubmitted === "storeName" && (
+                <div className="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2.5">
+                  <p className="text-[13px] text-amber-800 font-medium">수정 신청이 접수되었습니다.</p>
+                  <p className="text-[12px] text-amber-700 mt-0.5">영업일 1일 이내 처리됩니다.</p>
+                </div>
+              )}
+              {settingsModal === "storeName" && (
+                <div className="space-y-2 pt-1 border-t border-gray-100">
+                  <p className="text-[12px] text-gray-500">변경하실 상점명으로 입력해주세요.</p>
+                  <input
+                    value={settingsInput}
+                    onChange={(e) => setSettingsInput(e.target.value)}
+                    maxLength={20}
+                    placeholder="새 상점명"
+                    className="w-full h-10 rounded-lg bg-gray-100 px-3 text-[14px] focus:outline-none focus:ring-1 focus:ring-gray-300"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setSettingsModal(null); setSettingsInput(""); }}
+                      className="h-9 rounded-lg bg-gray-100 text-[12px] text-gray-600"
+                    >
+                      취소
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => submitChangeRequest("storeName", settingsInput)}
+                      className="h-9 rounded-lg bg-gray-900 text-[12px] text-white"
+                    >
+                      신청하기
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 휴대폰 번호 */}
+            <div className="bg-white rounded-xl p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Phone className="w-4 h-4 text-gray-400" />
+                <h2 className="text-[14px] font-medium text-gray-900">휴대폰 번호</h2>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[15px] font-semibold text-gray-900">
+                  {ownerPhone ? formatPhoneDisplay(ownerPhone) : "등록된 번호 없음"}
+                </p>
+                {settingsSubmitted !== "phone" && settingsModal !== "phone" && (
+                  <button
+                    type="button"
+                    onClick={() => { setSettingsModal("phone"); setSettingsInput(""); setSettingsNotice(""); }}
+                    className="h-8 px-3 rounded-lg bg-gray-100 text-[12px] text-gray-700 whitespace-nowrap"
+                  >
+                    변경 신청
+                  </button>
+                )}
+              </div>
+              {settingsSubmitted === "phone" && (
+                <div className="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2.5">
+                  <p className="text-[13px] text-amber-800 font-medium">변경 신청이 접수되었습니다.</p>
+                  <p className="text-[12px] text-amber-700 mt-0.5">영업일 1일 이내 처리됩니다.</p>
+                </div>
+              )}
+              {settingsModal === "phone" && (
+                <div className="space-y-2 pt-1 border-t border-gray-100">
+                  <p className="text-[12px] text-gray-500">변경하실 휴대폰 번호로 입력해주세요.</p>
+                  <input
+                    type="tel"
+                    value={settingsInput}
+                    onChange={(e) => setSettingsInput(e.target.value.replace(/[^\d-]/g, ""))}
+                    maxLength={13}
+                    placeholder="010-0000-0000"
+                    className="w-full h-10 rounded-lg bg-gray-100 px-3 text-[14px] focus:outline-none focus:ring-1 focus:ring-gray-300"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setSettingsModal(null); setSettingsInput(""); }}
+                      className="h-9 rounded-lg bg-gray-100 text-[12px] text-gray-600"
+                    >
+                      취소
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => submitChangeRequest("phone", settingsInput)}
+                      className="h-9 rounded-lg bg-gray-900 text-[12px] text-white"
+                    >
+                      신청하기
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 이메일 */}
+            <div className="bg-white rounded-xl p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Mail className="w-4 h-4 text-gray-400" />
+                <h2 className="text-[14px] font-medium text-gray-900">이메일</h2>
+              </div>
+              <p className="text-[13px] text-gray-500">PIN 찾기 등에 사용하는 이메일입니다.</p>
+              {settingsModal !== "email" ? (
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[14px] text-gray-800 truncate">{ownerEmail || "등록된 이메일 없음"}</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSettingsModal("email");
+                      setSettingsInput(ownerEmail);
+                      setSettingsNotice("");
+                    }}
+                    className="h-8 px-3 rounded-lg bg-gray-100 text-[12px] text-gray-700 whitespace-nowrap flex-shrink-0"
+                  >
+                    변경
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2 pt-1 border-t border-gray-100">
+                  <input
+                    type="email"
+                    value={settingsInput}
+                    onChange={(e) => setSettingsInput(e.target.value)}
+                    placeholder="example@email.com"
+                    className="w-full h-10 rounded-lg bg-gray-100 px-3 text-[14px] focus:outline-none focus:ring-1 focus:ring-gray-300"
+                  />
+                  {settingsNotice && settingsModal === "email" && (
+                    <p className="text-[11px] text-red-400">{settingsNotice}</p>
+                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setSettingsModal(null); setSettingsInput(""); setSettingsNotice(""); }}
+                      className="h-9 rounded-lg bg-gray-100 text-[12px] text-gray-600"
+                    >
+                      취소
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleEmailChange}
+                      className="h-9 rounded-lg bg-gray-900 text-[12px] text-white"
+                    >
+                      변경하기
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* PIN 번호 */}
+            <div className="bg-white rounded-xl p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Lock className="w-4 h-4 text-gray-400" />
+                <h2 className="text-[14px] font-medium text-gray-900">PIN 번호</h2>
+              </div>
+              <p className="text-[13px] text-gray-500">로그인에 사용하는 PIN 번호입니다.</p>
+              {settingsModal !== "pin" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSettingsModal("pin");
+                    setSettingsInput("");
+                    setSettingsPinConfirm("");
+                    setSettingsNotice("");
+                  }}
+                  className="h-10 w-full rounded-lg bg-gray-900 text-[13px] text-white"
+                >
+                  핀번호 변경
+                </button>
+              ) : (
+                <div className="space-y-2 pt-1 border-t border-gray-100">
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    value={settingsInput}
+                    onChange={(e) => setSettingsInput(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    maxLength={6}
+                    placeholder="새 PIN (4~6자리)"
+                    className="w-full h-10 rounded-lg bg-gray-100 px-3 text-[14px] tracking-widest focus:outline-none focus:ring-1 focus:ring-gray-300"
+                  />
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    value={settingsPinConfirm}
+                    onChange={(e) => setSettingsPinConfirm(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    maxLength={6}
+                    placeholder="새 PIN 확인"
+                    className="w-full h-10 rounded-lg bg-gray-100 px-3 text-[14px] tracking-widest focus:outline-none focus:ring-1 focus:ring-gray-300"
+                  />
+                  {settingsNotice && settingsModal === "pin" && (
+                    <p className="text-[11px] text-red-400">{settingsNotice}</p>
+                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSettingsModal(null);
+                        setSettingsInput("");
+                        setSettingsPinConfirm("");
+                        setSettingsNotice("");
+                      }}
+                      className="h-9 rounded-lg bg-gray-100 text-[12px] text-gray-600"
+                    >
+                      취소
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handlePinChange}
+                      className="h-9 rounded-lg bg-gray-900 text-[12px] text-white"
+                    >
+                      변경하기
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

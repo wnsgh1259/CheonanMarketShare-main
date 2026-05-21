@@ -73,7 +73,8 @@ const RECIPES: Record<string, RecipeIngredient[]> = {
 };
 
 export function CartPage() {
-  const { items, removeItem, totalCount, currentMarketId, addItem } = useCart();
+  const { items, removeItem, clearCart, totalCount, currentMarketId, addItem } = useCart();
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const [recipeQuery, setRecipeQuery]     = useState("");
   const [recipeResults, setRecipeResults] = useState<RecipeIngredient[] | null>(null);
@@ -163,7 +164,17 @@ export function CartPage() {
 
       {/* Cart Items */}
       <div className="bg-white mx-4 mt-3 rounded-xl p-4">
-        <h2 className="text-[14px] text-gray-900 mb-3">담은 상품 ({totalCount})</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-[14px] text-gray-900">담은 상품 ({totalCount})</h2>
+          {items.length > 0 && (
+            <button
+              onClick={() => setShowClearConfirm(true)}
+              className="flex items-center gap-1 text-[12px] text-gray-400 active:text-red-500 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />초기화
+            </button>
+          )}
+        </div>
         {items.length === 0 ? (
           <div className="flex flex-col items-center py-8 text-gray-400">
             <ShoppingCart className="w-10 h-10 mb-2 text-gray-300" />
@@ -396,6 +407,34 @@ export function CartPage() {
         </p>
         <RouteRecommendation items={items} marketId={currentMarketId as MarketId | null} />
       </div>
+
+      {/* 초기화 확인 팝업 */}
+      {showClearConfirm && (
+        <>
+          <div className="fixed inset-0 bg-black/40 z-[200]" onClick={() => setShowClearConfirm(false)} />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[210] w-[280px] bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <div className="px-6 pt-6 pb-5 text-center">
+              <p className="text-[28px] mb-2">🗑️</p>
+              <p className="text-[16px] font-bold text-gray-800 mb-1">장바구니 초기화</p>
+              <p className="text-[13px] text-gray-400">담은 상품을 모두 삭제할까요?</p>
+            </div>
+            <div className="flex border-t border-gray-100">
+              <button
+                onClick={() => setShowClearConfirm(false)}
+                className="flex-1 py-3.5 text-[14px] text-gray-500 active:bg-gray-50 transition-colors border-r border-gray-100"
+              >
+                취소
+              </button>
+              <button
+                onClick={() => { clearCart(); setShowClearConfirm(false); }}
+                className="flex-1 py-3.5 text-[14px] font-semibold text-red-500 active:bg-red-50 transition-colors"
+              >
+                초기화
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       <BottomNav />
     </div>

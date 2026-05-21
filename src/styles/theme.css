@@ -179,3 +179,38 @@
     line-height: 1.5;
   }
 }
+
+/* Naver Map: keep attribution inside map layer */
+.naver-map-wrap {
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.naver-map-wrap > div {
+  position: relative !important;
+  z-index: 0 !important;
+}
+
+.naver-map-wrap a[href*="naver.com"],
+.naver-map-wrap .map_naver_logo,
+.naver-map-wrap [class*="logo"] {
+  z-index: 1 !important;
+}
+
+/* Hide Naver logo while app modals are open */
+body.app-modal-open a[href*="map.naver.com"],
+body.app-modal-open a[href*="naver.com/maps"],
+body.app-modal-open .map_naver_logo {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.app-modal-overlay {
+  z-index: 10000 !important;
+}
+
+.app-modal-content {
+  z-index: 10001 !important;
+}

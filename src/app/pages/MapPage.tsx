@@ -14,7 +14,12 @@ import {
   STORES_BY_MARKET, MARKET_INFO,
   type CategoryKey, type StoreData, type MenuItem,
 } from "../data/storeData";
-import { OWNER_DASHBOARD_STORAGE_KEY, loadSharedOwnerDraft } from "../data/ownerSharedStore";
+import {
+  loadOwnerCatalog,
+  loadOwnerCatalogRemote,
+  migrateLegacyOwnerDraftIfNeeded,
+  saveOwnerCatalog,
+} from "../data/ownerStoreData";
 import { syntheticSeedStoreId } from "../data/seedStoreIds";
 import { buildFacilityMarkerIcon, buildStoreMarkerIcon } from "../map/naverMarkerIcons";
 import { MARKET_VIEW_CONFIG, pickStoreDisplayLatLng, toStoreLatLng } from "../map/storeMapPlacement";
@@ -147,9 +152,7 @@ function buildDraftOverridesForMarket(stores: DraftStorePin[], marketId: MarketI
 
 function readStoredDraftOverrides(marketId: MarketId): DraftOverrides {
   try {
-    const raw = window.localStorage.getItem(OWNER_DASHBOARD_STORAGE_KEY);
-    if (!raw) return emptyDraftOverrides();
-    const parsed = JSON.parse(raw) as { stores?: DraftStorePin[] };
+    const parsed = loadOwnerCatalog();
     return buildDraftOverridesForMarket(parsed.stores ?? [], marketId);
   } catch {
     return emptyDraftOverrides();
@@ -159,9 +162,7 @@ function readStoredDraftOverrides(marketId: MarketId): DraftOverrides {
 /** localStorage에서 특정 시장의 모든 draft 상점을 반환 (신규 포함) */
 function readAllRawDraftStores(marketId: MarketId): DraftStorePin[] {
   try {
-    const raw = window.localStorage.getItem(OWNER_DASHBOARD_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as { stores?: DraftStorePin[] };
+    const parsed = loadOwnerCatalog();
     return (parsed.stores ?? []).filter(
       (s) => s.marketId === marketId && typeof s.lat === "number" && typeof s.lng === "number" && s.name,
     );
@@ -727,13 +728,14 @@ export function MapPage() {
   }, [selectedMarket, searchQuery, showFavoritesOnly, selectedCategory]);
 
   useEffect(() => {
+    migrateLegacyOwnerDraftIfNeeded();
     let cancelled = false;
     const load = async () => {
-      const remote = await loadSharedOwnerDraft();
+      const remote = await loadOwnerCatalogRemote();
       if (!remote || cancelled) return;
       setSharedStores((remote.stores ?? []) as DraftStorePin[]);
       setSharedFacilities((remote.facilities ?? []) as DraftFacilityPin[]);
-      window.localStorage.setItem(OWNER_DASHBOARD_STORAGE_KEY, JSON.stringify(remote));
+      saveOwnerCatalog(remote);
     };
     void load();
     return () => {
@@ -788,16 +790,7 @@ export function MapPage() {
   }, [selectedMarket, sharedStores]);
   const marketInfo = MARKET_INFO[selectedMarket];
   const facilities = useMemo(() => {
-    const source = sharedFacilities ?? (() => {
-      try {
-        const raw = window.localStorage.getItem(OWNER_DASHBOARD_STORAGE_KEY);
-        if (!raw) return [];
-        const parsed = JSON.parse(raw) as { facilities?: DraftFacilityPin[] };
-        return parsed.facilities ?? [];
-      } catch {
-        return [];
-      }
-    })();
+    const source = sharedFacilities ?? loadOwnerCatalog().facilities ?? [];
     return source.filter((facility) => facility.marketId === selectedMarket);
   }, [selectedMarket, sharedFacilities]);
 
