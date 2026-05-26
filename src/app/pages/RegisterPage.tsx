@@ -5,6 +5,7 @@ import { setOwnerMode } from "../components/BottomNav";
 import { findRegisteredUserByPhoneDigits, upsertRegisteredUser } from "../data/userAccounts";
 import { findPendingSignupByPhone, submitOwnerSignupApplication, type OwnerSignupMarketId, OWNER_SIGNUP_MARKET_LABELS } from "../data/ownerSignupApplications";
 import { refreshOwnerSignupApplicationsFromRemote } from "../data/ownerSignupApplicationsSync";
+import { formatPhoneInput } from "../utils/phoneFormat";
 
 type Field = "nickname" | "email" | "phone" | "pin" | "pinConfirm" | "storeImage" | "address" | "market";
 
@@ -13,13 +14,6 @@ const OWNER_MARKET_OPTIONS: Array<{ id: OwnerSignupMarketId; label: string }> = 
   { id: "byeongcheon", label: OWNER_SIGNUP_MARKET_LABELS.byeongcheon },
   { id: "seonghwan", label: OWNER_SIGNUP_MARKET_LABELS.seonghwan },
 ];
-
-function formatPhoneInput(value: string) {
-  const digits = value.replace(/\D/g, "").slice(0, 11);
-  if (digits.length <= 3) return digits;
-  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
-  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
-}
 
 function FieldError({ msg }: { msg: string }) {
   return msg ? <p className="text-[11px] text-red-400 mt-1">{msg}</p> : null;
@@ -89,6 +83,16 @@ export function RegisterPage() {
     if (existingUser?.status === "active") {
       setErrors((prev) => ({ ...prev, phone: "이미 가입된 전화번호입니다." }));
       return;
+    }
+    if (existingUser?.status === "rejected") {
+      upsertRegisteredUser({
+        ...existingUser,
+        name: form.nickname.trim(),
+        email: form.email.trim(),
+        pin: form.pin,
+        role: "owner",
+        status: "pending",
+      });
     }
     const hasPendingSignup =
       existingUser?.status === "pending" ||
@@ -284,6 +288,7 @@ export function RegisterPage() {
               <ImagePlus className="w-3.5 h-3.5 text-gray-400" />
               상점 이미지 <span className="text-red-400">*</span>
             </label>
+            <p className="text-[11px] text-gray-400 mb-2">정면에서 상점 간판이 보이도록 사진을 첨부해주세요.</p>
             <input
               ref={fileInputRef}
               type="file"

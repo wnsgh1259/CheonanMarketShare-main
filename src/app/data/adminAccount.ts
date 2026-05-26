@@ -1,3 +1,5 @@
+import { formatPhoneDisplay as formatPhoneDisplayFromUtils } from "../utils/phoneFormat";
+
 export const ADMIN_PHONE = "01000000000";
 export const ADMIN_PIN = "0000";
 export const ADMIN_STORE_ACCOUNTS_KEY = "admin_store_accounts";
@@ -94,6 +96,50 @@ export function assignRandomStoreAccounts(stores: { id: number; name: string }[]
   });
 }
 
+export function ensureStoreAccounts(
+  stores: { id: number; name: string }[],
+  existing: Record<number, StoreAccountRecord>,
+): StoreAccountRecord[] {
+  const nextMap = { ...existing };
+  const used = collectReservedPhones(Object.values(existing).map((item) => item.phone));
+
+  const storeIds = new Set(stores.map((store) => store.id));
+
+  for (const store of stores) {
+    const account = nextMap[store.id];
+    if (account?.phone && account?.pin) {
+      if (account.storeName !== store.name) {
+        nextMap[store.id] = { ...account, storeName: store.name };
+      }
+      continue;
+    }
+    const creds = generateFromUsed(used);
+    nextMap[store.id] = {
+      storeId: store.id,
+      storeName: store.name,
+      phone: creds.phone,
+      pin: creds.pin,
+    };
+  }
+
+  return Object.values(nextMap).filter((account) => storeIds.has(account.storeId));
+}
+
+export function findDuplicateStoreAccountPhone(
+  phone: string,
+  excludeStoreId?: number,
+  accounts: Record<number, StoreAccountRecord> = loadStoreAccountsMap(),
+): StoreAccountRecord | null {
+  const phoneDigits = phone.replace(/\D/g, "");
+  if (!phoneDigits) return null;
+  return (
+    Object.values(accounts).find(
+      (item) =>
+        item.storeId !== excludeStoreId && item.phone.replace(/\D/g, "") === phoneDigits,
+    ) ?? null
+  );
+}
+
 export function needsStoreAccountBootstrap(
   stores: { id: number; name: string }[],
   accounts: Record<number, StoreAccountRecord>,
@@ -111,9 +157,22 @@ export function needsStoreAccountBootstrap(
 
 export function upsertStoreAccount(account: StoreAccountRecord) {
   try {
-    const accounts = Object.values(loadStoreAccountsMap());
-    const next = accounts.filter((item) => item.storeId !== account.storeId);
-    next.push(account);
+    const phoneDigits = account.phone.replace(/\D/g, "");
+    const accounts = Object.values(loadStoreAccountsMap()).filter(
+      (item) =>
+        item.storeId !== account.storeId &&
+        item.phone.replace(/\D/g, "") !== phoneDigits,
+    );
+    accounts.push(account);
+    saveAllStoreAccounts(accounts);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function deleteStoreAccount(storeId: number) {
+  try {
+    const next = Object.values(loadStoreAccountsMap()).filter((item) => item.storeId !== storeId);
     saveAllStoreAccounts(next);
   } catch {
     /* ignore */
@@ -121,8 +180,17 @@ export function upsertStoreAccount(account: StoreAccountRecord) {
 }
 
 export function formatPhoneDisplay(phone: string) {
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
-  if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
-  return phone;
+  return formatPhoneDisplayFromUtils(phone);
+}
+
+export function resolveStoreLoginPhone(storeId?: number | null): string {
+  if (storeId != null && Number.isFinite(storeId)) {
+    const account = loadStoreAccountsMap()[storeId];
+    const accountPhone = account?.phone?.replace(/\D/g, "");
+    if (accountPhone) return accountPhone;
+  }
+
+  const sessionPhone = (localStorage.getItem("user_phone") || "").replace(/\D/g, "");
+  if (sessionPhone && sessionPhone !== ADMIN_PHONE) return sessionPhone;
+  return sessionPhone;
 }

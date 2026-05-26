@@ -47,6 +47,34 @@ export function findPendingSignupByPhone(phone: string): OwnerSignupApplication 
   );
 }
 
+export function findRejectedSignupByPhone(phone: string): OwnerSignupApplication | null {
+  const phoneDigits = phone.replace(/\D/g, "");
+  return (
+    loadOwnerSignupApplications()
+      .filter((item) => item.phone.replace(/\D/g, "") === phoneDigits && item.status === "rejected")
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] ?? null
+  );
+}
+
+export function getSignupRejectReason(phone: string): string {
+  const rejected = findRejectedSignupByPhone(phone);
+  return rejected?.rejectReason?.trim() || "관리자에 의해 거절되었습니다.";
+}
+
+export function findApprovedSignupByPhone(phone: string): OwnerSignupApplication | null {
+  const phoneDigits = phone.replace(/\D/g, "");
+  return (
+    loadOwnerSignupApplications()
+      .filter(
+        (item) =>
+          item.phone.replace(/\D/g, "") === phoneDigits &&
+          item.status === "approved" &&
+          item.approvedStoreId != null,
+      )
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] ?? null
+  );
+}
+
 export function submitOwnerSignupApplication(input: {
   storeName: string;
   email: string;
@@ -70,7 +98,10 @@ export function submitOwnerSignupApplication(input: {
     status: "pending",
     createdAt: new Date().toISOString(),
   };
-  const next = applications.filter((item) => item.phone.replace(/\D/g, "") !== phoneDigits);
+  const next = applications.filter(
+    (item) =>
+      item.phone.replace(/\D/g, "") !== phoneDigits || item.status === "approved",
+  );
   next.push(application);
   persistOwnerSignupApplications(next);
   void import("./ownerSignupApplicationsSync").then(({ upsertOwnerSignupApplicationRemote }) =>
@@ -94,6 +125,45 @@ export function updateOwnerSignupApplication(
     );
   }
   return next;
+}
+
+export function findSignupApplicationById(id: number): OwnerSignupApplication | null {
+  return loadOwnerSignupApplications().find((item) => item.id === id) ?? null;
+}
+
+export function approveOwnerSignupApplication(
+  application: OwnerSignupApplication,
+  approvedStoreId: number,
+): OwnerSignupApplication[] {
+  const phoneDigits = application.phone.replace(/\D/g, "");
+  const next = loadOwnerSignupApplications().map((item) => {
+    if (item.id === application.id) {
+      return { ...item, status: "approved" as const, approvedStoreId, rejectReason: undefined };
+    }
+    if (item.phone.replace(/\D/g, "") === phoneDigits && item.status === "pending") {
+      return { ...item, status: "approved" as const, approvedStoreId, rejectReason: undefined };
+    }
+    return item;
+  });
+  persistOwnerSignupApplications(next);
+  const updated =
+    next.find((item) => item.id === application.id)
+    ?? next.find((item) => item.phone.replace(/\D/g, "") === phoneDigits && item.status === "approved");
+  if (updated) {
+    void import("./ownerSignupApplicationsSync").then(({ upsertOwnerSignupApplicationRemote }) =>
+      upsertOwnerSignupApplicationRemote(updated),
+    );
+  }
+  return next;
+}
+
+export function deleteOwnerSignupApplicationsByPhone(phone: string) {
+  const phoneDigits = phone.replace(/\D/g, "");
+  persistOwnerSignupApplications(
+    loadOwnerSignupApplications().filter(
+      (item) => item.phone.replace(/\D/g, "") !== phoneDigits,
+    ),
+  );
 }
 
 export const OWNER_SIGNUP_MARKET_LABELS: Record<OwnerSignupMarketId, string> = {

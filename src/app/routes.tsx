@@ -44,7 +44,7 @@ function OwnerFacilityRoute() {
 
 function OwnerSettlementRoute() {
   return (
-    <RequireRole roles={["owner"]}>
+    <RequireRole roles={["owner", "admin"]} ownerModeFallback="/home">
       <SettlementPage />
     </RequireRole>
   );

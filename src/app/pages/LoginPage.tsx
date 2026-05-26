@@ -3,13 +3,8 @@ import { useNavigate } from "react-router";
 import { X, Store, ShoppingCart } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { findRegisteredUserByPhone } from "../data/userAccounts";
-
-function formatPhoneInput(value: string) {
-  const digits = value.replace(/\D/g, "").slice(0, 11);
-  if (digits.length <= 3) return digits;
-  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
-  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
-}
+import { refreshOwnerSignupApplicationsFromRemote } from "../data/ownerSignupApplicationsSync";
+import { formatPhoneInput } from "../utils/phoneFormat";
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -23,13 +18,15 @@ export function LoginPage() {
   const [findPhone, setFindPhone] = useState("");
   const [findError, setFindError] = useState("");
   const [pinSent, setPinSent] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
 
   const goHome = () => {
     const result = enterGuest();
     if (result.ok) navigate(result.redirect);
   };
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     const phoneDigits = phone.replace(/\D/g, "");
     const pinValue = pin.trim();
 
@@ -42,8 +39,15 @@ export function LoginPage() {
       return;
     }
 
+    await refreshOwnerSignupApplicationsFromRemote();
     const result = login(phoneDigits, pinValue);
     if (!result.ok) {
+      if (result.rejectReason) {
+        setRejectReason(result.rejectReason);
+        setShowRejectModal(true);
+        setLoginError("");
+        return;
+      }
       setLoginError(result.error);
       return;
     }
@@ -352,6 +356,30 @@ export function LoginPage() {
                 </button>
               </div>
             </div>
+          </div>
+        </>
+      )}
+
+      {/* 가입 거절 팝업 */}
+      {showRejectModal && (
+        <>
+          <div className="fixed inset-0 bg-black/40 z-[200]" onClick={() => setShowRejectModal(false)} />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[210] w-[300px] max-w-[calc(100vw-48px)] bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <div className="px-6 pt-6 pb-5 text-center">
+              <p className="text-[28px] mb-2">❌</p>
+              <p className="text-[16px] font-bold text-gray-800 mb-2">가입 신청이 거절되었습니다</p>
+              <p className="text-[12px] text-gray-400 mb-3">거절 사유</p>
+              <p className="text-[13px] text-gray-600 leading-relaxed whitespace-pre-wrap bg-gray-50 rounded-xl px-4 py-3 text-left">
+                {rejectReason}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowRejectModal(false)}
+              className="w-full py-3.5 bg-gray-900 text-white text-[14px] font-semibold active:bg-gray-700 transition-colors"
+            >
+              확인
+            </button>
           </div>
         </>
       )}

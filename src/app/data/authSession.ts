@@ -1,4 +1,5 @@
 import { ADMIN_PHONE, matchesAdminCredentials, loadStoreAccountsMap, type StoreAccountRecord } from "./adminAccount";
+import { getSignupRejectReason } from "./ownerSignupApplications";
 import { findRegisteredUserByPhone, type RegisteredUser } from "./userAccounts";
 
 export type UserRole = "guest" | "customer" | "owner" | "admin";
@@ -80,7 +81,15 @@ export function clearAuthSession() {
 
 export type LoginResult =
   | { ok: true; redirect: string }
-  | { ok: false; error: string };
+  | { ok: false; error: string; rejectReason?: string };
+
+function buildRejectionResult(phoneDigits: string): LoginResult {
+  return {
+    ok: false,
+    error: "가입 신청이 거절되었습니다.",
+    rejectReason: getSignupRejectReason(phoneDigits),
+  };
+}
 
 function findStoreAccount(phoneDigits: string, pin: string): StoreAccountRecord | null {
   const accounts = Object.values(loadStoreAccountsMap());
@@ -122,7 +131,7 @@ export function loginWithCredentials(phoneDigits: string, pin: string): LoginRes
         return { ok: false, error: "가입 승인 대기중입니다. 영업일 기준 1일 이내 처리됩니다." };
       }
       if (registeredUser.status === "rejected") {
-        return { ok: false, error: "가입 신청이 거절되었습니다. 고객센터에 문의해주세요." };
+        return buildRejectionResult(phoneDigits);
       }
       writeAuthSession({
         role: "owner",
@@ -149,6 +158,53 @@ export function loginWithCredentials(phoneDigits: string, pin: string): LoginRes
   }
 
   return { ok: false, error: "휴대폰 번호 또는 PIN이 올바르지 않습니다." };
+}
+
+export function loginAsRegisteredUser(user: RegisteredUser): LoginResult {
+  const phoneDigits = user.phone.replace(/\D/g, "");
+  if (!user.pin) {
+    return { ok: false, error: "PIN이 설정되지 않은 계정입니다." };
+  }
+
+  if (user.role === "owner") {
+    if (user.status === "pending") {
+      return { ok: false, error: "가입 승인 대기중입니다. 영업일 기준 1일 이내 처리됩니다." };
+    }
+    if (user.status === "rejected") {
+      return buildRejectionResult(phoneDigits);
+    }
+    writeAuthSession(
+      {
+        role: "owner",
+        phone: phoneDigits,
+        name: user.name,
+        email: user.email,
+        status: user.status,
+        storeId: null,
+        storeName: user.name,
+      },
+      user.pin,
+    );
+    return { ok: true, redirect: "/owner/store-registration" };
+  }
+
+  if (user.role === "customer") {
+    writeAuthSession(
+      {
+        role: "customer",
+        phone: phoneDigits,
+        name: user.name,
+        email: user.email,
+        status: user.status === "pending" || user.status === "rejected" ? user.status : "active",
+        storeId: null,
+        storeName: "",
+      },
+      user.pin,
+    );
+    return { ok: true, redirect: "/home" };
+  }
+
+  return { ok: false, error: "지원하지 않는 계정 유형입니다." };
 }
 
 export function loginAsAdminShortcut(): LoginResult {

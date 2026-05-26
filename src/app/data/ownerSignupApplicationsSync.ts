@@ -116,6 +116,31 @@ export function saveOwnerSignupApplicationsLocally(applications: OwnerSignupAppl
   localStorage.setItem(OWNER_SIGNUP_APPLICATIONS_KEY, JSON.stringify(applications));
 }
 
+const SIGNUP_STATUS_PRIORITY: Record<OwnerSignupApplication["status"], number> = {
+  approved: 3,
+  pending: 2,
+  rejected: 1,
+};
+
+function shouldPreferSignupApplication(
+  existing: OwnerSignupApplication,
+  incoming: OwnerSignupApplication,
+): boolean {
+  const existingPriority = SIGNUP_STATUS_PRIORITY[existing.status];
+  const incomingPriority = SIGNUP_STATUS_PRIORITY[incoming.status];
+  if (incomingPriority !== existingPriority) {
+    return incomingPriority > existingPriority;
+  }
+  if (existing.status === "approved" && incoming.status === "approved") {
+    const existingApprovedAt = existing.approvedStoreId ?? 0;
+    const incomingApprovedAt = incoming.approvedStoreId ?? 0;
+    if (incomingApprovedAt !== existingApprovedAt) {
+      return incomingApprovedAt > existingApprovedAt;
+    }
+  }
+  return new Date(incoming.createdAt).getTime() >= new Date(existing.createdAt).getTime();
+}
+
 export function mergeOwnerSignupApplications(
   local: OwnerSignupApplication[],
   remote: OwnerSignupApplication[],
@@ -127,13 +152,7 @@ export function mergeOwnerSignupApplications(
   for (const item of local) {
     const phone = item.phone.replace(/\D/g, "");
     const existing = byPhone.get(phone);
-    if (!existing) {
-      byPhone.set(phone, item);
-      continue;
-    }
-    const existingTime = new Date(existing.createdAt).getTime();
-    const itemTime = new Date(item.createdAt).getTime();
-    if (itemTime >= existingTime) {
+    if (!existing || shouldPreferSignupApplication(existing, item)) {
       byPhone.set(phone, item);
     }
   }
@@ -143,8 +162,8 @@ export function mergeOwnerSignupApplications(
 }
 
 export async function refreshOwnerSignupApplicationsFromRemote(): Promise<OwnerSignupApplication[]> {
-  const local = loadOwnerSignupApplicationsLocally();
   const remote = await loadOwnerSignupApplicationsFromRemote();
+  const local = loadOwnerSignupApplicationsLocally();
   if (!remote) return local;
   const merged = mergeOwnerSignupApplications(local, remote);
   saveOwnerSignupApplicationsLocally(merged);

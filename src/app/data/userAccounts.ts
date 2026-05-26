@@ -22,7 +22,16 @@ export function loadRegisteredUsers(): RegisteredUser[] {
 export function upsertRegisteredUser(user: RegisteredUser) {
   const users = loadRegisteredUsers().filter((item) => item.phone !== user.phone);
   users.push(user);
+  persistRegisteredUsers(users);
+}
+
+export function persistRegisteredUsers(users: RegisteredUser[]) {
   localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(users));
+}
+
+export function deleteRegisteredUser(phone: string) {
+  const phoneDigits = phone.replace(/\D/g, "");
+  persistRegisteredUsers(loadRegisteredUsers().filter((item) => item.phone !== phoneDigits));
 }
 
 export function updateRegisteredUserStatus(phone: string, status: RegisteredUser["status"]) {
@@ -35,6 +44,17 @@ export function updateRegisteredUserStatus(phone: string, status: RegisteredUser
 
 export function findRegisteredUserByPhoneDigits(phone: string): RegisteredUser | null {
   return loadRegisteredUsers().find((item) => item.phone === phone.replace(/\D/g, "")) ?? null;
+}
+
+export function updateRegisteredUserPhone(oldPhone: string, newPhone: string) {
+  const oldDigits = oldPhone.replace(/\D/g, "");
+  const newDigits = newPhone.replace(/\D/g, "");
+  const users = loadRegisteredUsers().filter((item) => item.phone !== oldDigits);
+  const existing = loadRegisteredUsers().find((item) => item.phone === oldDigits);
+  if (existing) {
+    users.push({ ...existing, phone: newDigits });
+  }
+  persistRegisteredUsers(users);
 }
 
 export function saveUserEmail(email: string, phoneDigits: string) {

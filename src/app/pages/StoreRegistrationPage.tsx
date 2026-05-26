@@ -4,11 +4,12 @@ import {
   generateUniqueStoreCredentials,
   upsertStoreAccount,
   formatPhoneDisplay as formatAdminPhoneDisplay,
+  resolveStoreLoginPhone,
 } from "../data/adminAccount";
 import { useNavigate } from "react-router";
 import { setOwnerMode, OWNER_STORE_MGMT_RETURN_KEY } from "../components/BottomNav";
 import { useAuth } from "../context/AuthContext";
-import { saveUserEmail, isValidEmail } from "../data/userAccounts";
+import { saveUserEmail, isValidEmail, findRegisteredUserByPhone } from "../data/userAccounts";
 import { STORES_BY_MARKET } from "../data/storeData";
 import {
   OWNER_EDIT_STORE_KEY,
@@ -23,6 +24,13 @@ import {
   saveOwnerStoreWorkspace,
   upsertCatalogStore,
 } from "../data/ownerStoreData";
+import {
+  matchesOwnerChangeRequest,
+  submitOwnerChangeRequest,
+  type OwnerChangeRequest,
+} from "../data/ownerChangeRequests";
+import { refreshOwnerChangeRequestsFromRemote } from "../data/ownerChangeRequestsSync";
+import { formatPhoneDisplay, formatPhoneInput } from "../utils/phoneFormat";
 
 type NaverMapRef = {
   setCenter: (latLng: unknown) => void;
@@ -73,15 +81,7 @@ type OwnerDashboardDraft = {
   inquiryReply: string;
 };
 
-const OWNER_CHANGE_REQUESTS_KEY = "owner_change_requests";
 const OWNER_APPROVED_STORE_NAME_KEY = "owner_approved_store_name";
-
-function formatPhoneDisplay(phone: string) {
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
-  if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
-  return phone;
-}
 
 const MARKET_VIEW_CONFIG: Record<MarketId, {
   label: string;
@@ -251,12 +251,12 @@ export function StoreRegistrationPage() {
   const [adminNewCredentials, setAdminNewCredentials] = useState<{ phone: string; pin: string } | null>(() =>
     isAdminNewStore ? generateUniqueStoreCredentials() : null,
   );
-  const [ownerPhone, setOwnerPhone] = useState(() => localStorage.getItem("user_phone") || "");
+  const [ownerPhone, setOwnerPhone] = useState(() => resolveStoreLoginPhone(initialEditStoreId));
   const [ownerEmail, setOwnerEmail] = useState(() => localStorage.getItem("user_email") || "");
   const [settingsModal, setSettingsModal] = useState<"storeName" | "phone" | "pin" | "email" | null>(null);
   const [settingsInput, setSettingsInput] = useState("");
   const [settingsPinConfirm, setSettingsPinConfirm] = useState("");
-  const [settingsSubmitted, setSettingsSubmitted] = useState<"storeName" | "phone" | null>(null);
+  const [changeRequests, setChangeRequests] = useState<OwnerChangeRequest[]>([]);
   const [settingsNotice, setSettingsNotice] = useState("");
   const saveNoticeRef = useRef<HTMLDivElement | null>(null);
 
@@ -291,6 +291,44 @@ export function StoreRegistrationPage() {
       inquiryReply,
     });
   };
+
+  useEffect(() => {
+    if (isAdminNewStore || activeSection !== "settings") return;
+    let cancelled = false;
+    void refreshOwnerChangeRequestsFromRemote().then((requests) => {
+      if (!cancelled) setChangeRequests(requests);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSection, isAdminNewStore]);
+
+  const pendingStoreNameRequest =
+    changeRequests.find(
+      (item) =>
+        item.status === "pending" &&
+        item.type === "storeName" &&
+        matchesOwnerChangeRequest(item, {
+          storeId: resolvedStoreId,
+          storeName: approvedStoreName,
+          phone: ownerPhone,
+          source: "store",
+        }),
+    ) ?? null;
+  const pendingPhoneRequest =
+    changeRequests.find(
+      (item) =>
+        item.status === "pending" &&
+        item.type === "phone" &&
+        matchesOwnerChangeRequest(item, {
+          storeId: resolvedStoreId,
+          storeName: approvedStoreName,
+          phone: ownerPhone,
+          source: "store",
+        }),
+    ) ?? null;
+  const isStoreNamePending = Boolean(pendingStoreNameRequest);
+  const isPhonePending = Boolean(pendingPhoneRequest);
 
   useEffect(() => {
     migrateLegacyOwnerDraftIfNeeded();
@@ -418,6 +456,27 @@ export function StoreRegistrationPage() {
 
   useEffect(() => {
     if (isAdminNewStore) return;
+    const loginPhone = resolveStoreLoginPhone(resolvedStoreId);
+    if (!loginPhone) return;
+    setOwnerPhone(loginPhone);
+
+    const role = localStorage.getItem("user_role");
+    if (role === "owner") {
+      const currentPhone = (localStorage.getItem("user_phone") || "").replace(/\D/g, "");
+      if (currentPhone !== loginPhone) {
+        localStorage.setItem("user_phone", loginPhone);
+      }
+    }
+
+    const registered = findRegisteredUserByPhone(loginPhone);
+    if (registered?.email) {
+      setOwnerEmail(registered.email);
+      localStorage.setItem("user_email", registered.email);
+    }
+  }, [resolvedStoreId, isAdminNewStore]);
+
+  useEffect(() => {
+    if (isAdminNewStore) return;
     if (approvedStoreName) {
       setPageTitle(approvedStoreName);
       localStorage.setItem(OWNER_APPROVED_STORE_NAME_KEY, approvedStoreName);
@@ -431,24 +490,33 @@ export function StoreRegistrationPage() {
       setSettingsNotice("올바른 휴대폰 번호 형식으로 입력해주세요.");
       return;
     }
-    try {
-      const raw = localStorage.getItem(OWNER_CHANGE_REQUESTS_KEY);
-      const requests = raw ? JSON.parse(raw) as unknown[] : [];
-      requests.push({
-        id: Date.now(),
-        type,
-        storeName: approvedStoreName,
-        currentValue: type === "storeName" ? approvedStoreName : ownerPhone,
-        newValue: type === "phone" ? trimmed.replace(/-/g, "") : trimmed,
-        status: "pending",
-        createdAt: new Date().toISOString(),
-        source: "store",
-      });
-      localStorage.setItem(OWNER_CHANGE_REQUESTS_KEY, JSON.stringify(requests));
-    } catch {
-      /* ignore */
-    }
-    setSettingsSubmitted(type);
+    if (type === "storeName" && isStoreNamePending) return;
+    if (type === "phone" && isPhonePending) return;
+
+    const request = submitOwnerChangeRequest({
+      type,
+      storeName: approvedStoreName,
+      storeId: resolvedStoreId ?? undefined,
+      currentValue: type === "storeName" ? approvedStoreName : ownerPhone,
+      newValue: type === "phone" ? trimmed.replace(/-/g, "") : trimmed,
+      source: "store",
+    });
+    setChangeRequests((prev) => {
+      const withoutDuplicate = prev.filter(
+        (item) =>
+          !(
+            item.status === "pending" &&
+            item.type === type &&
+            matchesOwnerChangeRequest(item, {
+              storeId: resolvedStoreId,
+              storeName: approvedStoreName,
+              phone: ownerPhone,
+              source: "store",
+            })
+          ),
+      );
+      return [request, ...withoutDuplicate];
+    });
     setSettingsModal(null);
     setSettingsInput("");
     setSettingsNotice("");
@@ -1070,7 +1138,7 @@ export function StoreRegistrationPage() {
                 <label className="block text-[12px] text-gray-500 mb-1">연락처</label>
                 <input
                   value={form.phone}
-                  onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
+                  onChange={(e) => setForm((prev) => ({ ...prev, phone: formatPhoneInput(e.target.value) }))}
                   type="tel"
                   placeholder="예: 041-555-1234"
                   className="w-full h-10 rounded-lg bg-gray-100 px-3 text-[14px] focus:outline-none focus:ring-1 focus:ring-gray-300"
@@ -1465,22 +1533,26 @@ export function StoreRegistrationPage() {
               </div>
               <div className="flex items-center justify-between gap-3">
                 <p className="text-[15px] font-semibold text-gray-900">{approvedStoreName || "승인된 상점명 없음"}</p>
-                {settingsSubmitted !== "storeName" && settingsModal !== "storeName" && (
+                {settingsModal !== "storeName" && (
                   <button
                     type="button"
-                    onClick={() => { setSettingsModal("storeName"); setSettingsInput(""); setSettingsNotice(""); }}
-                    className="h-8 px-3 rounded-lg bg-gray-100 text-[12px] text-gray-700 whitespace-nowrap"
+                    disabled={isStoreNamePending}
+                    onClick={() => {
+                      if (isStoreNamePending) return;
+                      setSettingsModal("storeName");
+                      setSettingsInput("");
+                      setSettingsNotice("");
+                    }}
+                    className={`h-8 px-3 rounded-lg text-[12px] whitespace-nowrap ${
+                      isStoreNamePending
+                        ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                        : "bg-gray-100 text-gray-700"
+                    }`}
                   >
-                    수정신청
+                    {isStoreNamePending ? "수정 신청중" : "수정 신청"}
                   </button>
                 )}
               </div>
-              {settingsSubmitted === "storeName" && (
-                <div className="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2.5">
-                  <p className="text-[13px] text-amber-800 font-medium">수정 신청이 접수되었습니다.</p>
-                  <p className="text-[12px] text-amber-700 mt-0.5">영업일 1일 이내 처리됩니다.</p>
-                </div>
-              )}
               {settingsModal === "storeName" && (
                 <div className="space-y-2 pt-1 border-t border-gray-100">
                   <p className="text-[12px] text-gray-500">변경하실 상점명으로 입력해주세요.</p>
@@ -1521,29 +1593,33 @@ export function StoreRegistrationPage() {
                 <p className="text-[15px] font-semibold text-gray-900">
                   {ownerPhone ? formatPhoneDisplay(ownerPhone) : "등록된 번호 없음"}
                 </p>
-                {settingsSubmitted !== "phone" && settingsModal !== "phone" && (
+                {settingsModal !== "phone" && (
                   <button
                     type="button"
-                    onClick={() => { setSettingsModal("phone"); setSettingsInput(""); setSettingsNotice(""); }}
-                    className="h-8 px-3 rounded-lg bg-gray-100 text-[12px] text-gray-700 whitespace-nowrap"
+                    disabled={isPhonePending}
+                    onClick={() => {
+                      if (isPhonePending) return;
+                      setSettingsModal("phone");
+                      setSettingsInput("");
+                      setSettingsNotice("");
+                    }}
+                    className={`h-8 px-3 rounded-lg text-[12px] whitespace-nowrap ${
+                      isPhonePending
+                        ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                        : "bg-gray-100 text-gray-700"
+                    }`}
                   >
-                    변경 신청
+                    {isPhonePending ? "수정 신청중" : "수정 신청"}
                   </button>
                 )}
               </div>
-              {settingsSubmitted === "phone" && (
-                <div className="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2.5">
-                  <p className="text-[13px] text-amber-800 font-medium">변경 신청이 접수되었습니다.</p>
-                  <p className="text-[12px] text-amber-700 mt-0.5">영업일 1일 이내 처리됩니다.</p>
-                </div>
-              )}
               {settingsModal === "phone" && (
                 <div className="space-y-2 pt-1 border-t border-gray-100">
                   <p className="text-[12px] text-gray-500">변경하실 휴대폰 번호로 입력해주세요.</p>
                   <input
                     type="tel"
                     value={settingsInput}
-                    onChange={(e) => setSettingsInput(e.target.value.replace(/[^\d-]/g, ""))}
+                    onChange={(e) => setSettingsInput(formatPhoneInput(e.target.value))}
                     maxLength={13}
                     placeholder="010-0000-0000"
                     className="w-full h-10 rounded-lg bg-gray-100 px-3 text-[14px] focus:outline-none focus:ring-1 focus:ring-gray-300"

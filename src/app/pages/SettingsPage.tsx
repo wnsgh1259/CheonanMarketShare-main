@@ -1,18 +1,17 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, LogOut, User, Bell, Store, Phone, Lock, Mail } from "lucide-react";
 import { useNavigate } from "react-router";
 import { OWNER_MODE_KEY } from "../components/BottomNav";
 import { useAuth } from "../context/AuthContext";
-import { loadRegisteredUsers, upsertRegisteredUser, saveUserEmail, isValidEmail } from "../data/userAccounts";
-
-const OWNER_CHANGE_REQUESTS_KEY = "owner_change_requests";
-
-function formatPhoneDisplay(phone: string) {
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
-  if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
-  return phone;
-}
+import { loadRegisteredUsers, upsertRegisteredUser, saveUserEmail, isValidEmail, findRegisteredUserByPhone } from "../data/userAccounts";
+import { resolveStoreLoginPhone } from "../data/adminAccount";
+import {
+  matchesOwnerChangeRequest,
+  submitOwnerChangeRequest,
+  type OwnerChangeRequest,
+} from "../data/ownerChangeRequests";
+import { refreshOwnerChangeRequestsFromRemote } from "../data/ownerChangeRequestsSync";
+import { formatPhoneDisplay, formatPhoneInput } from "../utils/phoneFormat";
 
 type SettingsModal = "phone" | "pin" | "email" | null;
 
@@ -26,9 +25,15 @@ export function SettingsPage() {
   const [nickname, setNickname] = useState(
     () => localStorage.getItem("user_name") || "홍길동"
   );
-  const [userPhone, setUserPhone] = useState(
-    () => localStorage.getItem("user_phone") || ""
-  );
+  const [userPhone, setUserPhone] = useState(() => {
+    const storeIdRaw = localStorage.getItem("owner_store_id");
+    const storeId = storeIdRaw ? Number(storeIdRaw) : null;
+    const ownerModeActive = localStorage.getItem(OWNER_MODE_KEY) === "true";
+    if (ownerModeActive || localStorage.getItem("user_role") === "owner") {
+      return resolveStoreLoginPhone(Number.isFinite(storeId) ? storeId : null);
+    }
+    return localStorage.getItem("user_phone") || "";
+  });
   const [userEmail, setUserEmail] = useState(
     () => localStorage.getItem("user_email") || ""
   );
@@ -38,11 +43,59 @@ export function SettingsPage() {
   const [settingsModal, setSettingsModal] = useState<SettingsModal>(null);
   const [settingsInput, setSettingsInput] = useState("");
   const [settingsPinConfirm, setSettingsPinConfirm] = useState("");
-  const [phoneSubmitted, setPhoneSubmitted] = useState(false);
+  const [changeRequests, setChangeRequests] = useState<OwnerChangeRequest[]>([]);
   const [settingsNotice, setSettingsNotice] = useState("");
 
   const [eventAlarm, setEventAlarm] = useState(false);
   const [newAlarm, setNewAlarm] = useState(false);
+
+  const changeRequestSource = ownerMode ? "store" : "customer";
+  const changeRequestName = ownerMode ? ownerStoreName || nickname : nickname;
+
+  useEffect(() => {
+    let cancelled = false;
+    void refreshOwnerChangeRequestsFromRemote().then((requests) => {
+      if (!cancelled) setChangeRequests(requests);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!ownerMode && localStorage.getItem("user_role") !== "owner") return;
+    const storeIdRaw = localStorage.getItem("owner_store_id");
+    const storeId = storeIdRaw ? Number(storeIdRaw) : null;
+    const loginPhone = resolveStoreLoginPhone(Number.isFinite(storeId) ? storeId : null);
+    if (!loginPhone) return;
+    setUserPhone(loginPhone);
+
+    const role = localStorage.getItem("user_role");
+    if (role === "owner") {
+      const currentPhone = (localStorage.getItem("user_phone") || "").replace(/\D/g, "");
+      if (currentPhone !== loginPhone) {
+        localStorage.setItem("user_phone", loginPhone);
+      }
+    }
+
+    const registered = findRegisteredUserByPhone(loginPhone);
+    if (registered?.email) {
+      setUserEmail(registered.email);
+    }
+  }, [ownerMode]);
+
+  const pendingPhoneRequest =
+    changeRequests.find(
+      (item) =>
+        item.status === "pending" &&
+        item.type === "phone" &&
+        matchesOwnerChangeRequest(item, {
+          storeName: changeRequestName,
+          phone: userPhone,
+          source: changeRequestSource,
+        }),
+    ) ?? null;
+  const isPhonePending = Boolean(pendingPhoneRequest);
 
   const handleSaveNickname = () => {
     const trimmed = nicknameInput.trim();
@@ -62,24 +115,30 @@ export function SettingsPage() {
       setSettingsNotice("현재 번호와 동일합니다.");
       return;
     }
-    try {
-      const raw = localStorage.getItem(OWNER_CHANGE_REQUESTS_KEY);
-      const requests = raw ? JSON.parse(raw) as unknown[] : [];
-      requests.push({
-        id: Date.now(),
-        type: "phone",
-        storeName: ownerMode ? ownerStoreName || nickname : nickname,
-        currentValue: userPhone.replace(/\D/g, ""),
-        newValue: trimmed,
-        status: "pending",
-        createdAt: new Date().toISOString(),
-        source: ownerMode ? "store" : "customer",
-      });
-      localStorage.setItem(OWNER_CHANGE_REQUESTS_KEY, JSON.stringify(requests));
-    } catch {
-      /* ignore */
-    }
-    setPhoneSubmitted(true);
+    if (isPhonePending) return;
+
+    const request = submitOwnerChangeRequest({
+      type: "phone",
+      storeName: changeRequestName,
+      currentValue: userPhone.replace(/\D/g, ""),
+      newValue: trimmed,
+      source: changeRequestSource,
+    });
+    setChangeRequests((prev) => {
+      const withoutDuplicate = prev.filter(
+        (item) =>
+          !(
+            item.status === "pending" &&
+            item.type === "phone" &&
+            matchesOwnerChangeRequest(item, {
+              storeName: changeRequestName,
+              phone: userPhone,
+              source: changeRequestSource,
+            })
+          ),
+      );
+      return [request, ...withoutDuplicate];
+    });
     setSettingsModal(null);
     setSettingsInput("");
     setSettingsNotice("");
@@ -235,29 +294,37 @@ export function SettingsPage() {
                 <span className="text-[15px] text-gray-800">
                   {userPhone ? formatPhoneDisplay(userPhone) : "등록된 번호 없음"}
                 </span>
-                {!phoneSubmitted && settingsModal !== "phone" && (
+                {settingsModal !== "phone" && (
                   <button
-                    onClick={() => { setSettingsModal("phone"); setSettingsInput(""); setSettingsNotice(""); }}
-                    className="flex items-center gap-1 text-[13px] text-gray-500 active:text-gray-800 transition-colors"
+                    type="button"
+                    disabled={isPhonePending}
+                    onClick={() => {
+                      if (isPhonePending) return;
+                      setSettingsModal("phone");
+                      setSettingsInput("");
+                      setSettingsNotice("");
+                    }}
+                    className={`flex items-center gap-1 text-[13px] transition-colors ${
+                      isPhonePending
+                        ? "text-gray-400 cursor-not-allowed"
+                        : "text-gray-500 active:text-gray-800"
+                    }`}
                   >
-                    <span>✏️</span>
-                    <span>변경</span>
+                    {!isPhonePending && <span>✏️</span>}
+                    <span>{isPhonePending ? "수정 신청중" : "수정 신청"}</span>
                   </button>
                 )}
               </div>
-              {phoneSubmitted && (
-                <div className="mt-2 rounded-lg bg-amber-50 border border-amber-100 px-3 py-2.5">
-                  <p className="text-[13px] text-amber-800 font-medium">변경 신청이 접수되었습니다.</p>
-                  <p className="text-[12px] text-amber-700 mt-0.5">영업일 1일 이내 처리됩니다.</p>
-                </div>
-              )}
               {settingsModal === "phone" && (
                 <div className="mt-2 space-y-2 pt-2 border-t border-gray-100">
                   <p className="text-[12px] text-gray-500">변경하실 휴대폰 번호로 입력해주세요.</p>
                   <input
                     type="tel"
                     value={settingsInput}
-                    onChange={(e) => setSettingsInput(e.target.value.replace(/[^\d-]/g, ""))}
+                    onChange={(e) => {
+                      setSettingsInput(formatPhoneInput(e.target.value));
+                      setSettingsNotice("");
+                    }}
                     maxLength={13}
                     placeholder="010-0000-0000"
                     autoFocus

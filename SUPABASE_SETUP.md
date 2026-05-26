@@ -106,6 +106,45 @@ for update
 to anon, authenticated
 using (true)
 with check (true);
+
+-- 상점/손님 설정 변경 신청
+create table if not exists public.owner_change_requests (
+  id bigint primary key,
+  store_id bigint,
+  type text not null,
+  store_name text not null,
+  current_value text not null,
+  new_value text not null,
+  status text not null default 'pending',
+  created_at timestamptz not null default now(),
+  reject_reason text,
+  source text not null default 'store',
+  updated_at timestamptz not null default now()
+);
+
+alter table public.owner_change_requests enable row level security;
+
+drop policy if exists "public read owner change requests" on public.owner_change_requests;
+create policy "public read owner change requests"
+on public.owner_change_requests
+for select
+to anon, authenticated
+using (true);
+
+drop policy if exists "public upsert owner change requests" on public.owner_change_requests;
+create policy "public upsert owner change requests"
+on public.owner_change_requests
+for insert
+to anon, authenticated
+with check (true);
+
+drop policy if exists "public update owner change requests" on public.owner_change_requests;
+create policy "public update owner change requests"
+on public.owner_change_requests
+for update
+to anon, authenticated
+using (true)
+with check (true);
 ```
 
 Then create `.env` in project root:

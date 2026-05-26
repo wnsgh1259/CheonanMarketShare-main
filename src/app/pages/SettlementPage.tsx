@@ -11,6 +11,7 @@ const BUTTONS = [
 ];
 
 const MIN_POINTS = 1000;
+const SETTLEMENT_BANK_NAME_KEY = "settlement_bank_name";
 
 export function SettlementPage() {
   const navigate = useNavigate();
@@ -18,14 +19,28 @@ export function SettlementPage() {
     try { return Number(localStorage.getItem("user_mileage")) || 3250; } catch { return 3250; }
   });
   const [amount, setAmount] = useState(0);
+  const [bankName, setBankName] = useState(() => {
+    try { return localStorage.getItem(SETTLEMENT_BANK_NAME_KEY) || ""; } catch { return ""; }
+  });
   const [showDevPopup, setShowDevPopup] = useState(false);
 
-  const canSettle = amount >= MIN_POINTS && amount <= points;
+  const canSettle = amount >= MIN_POINTS && amount <= points && bankName.trim().length > 0;
+
+  const handleBankNameChange = (value: string) => {
+    setBankName(value);
+    localStorage.setItem(SETTLEMENT_BANK_NAME_KEY, value);
+  };
 
   const handleSettle = () => {
     if (!canSettle) return;
     setShowDevPopup(true);
   };
+
+  const settleButtonLabel = (() => {
+    if (amount < MIN_POINTS) return "금액을 선택해주세요";
+    if (!bankName.trim()) return "은행명을 입력해주세요";
+    return `${amount.toLocaleString()}원 정산하기`;
+  })();
 
   return (
     <div className="min-h-screen bg-[#F7F8FA] pb-28">
@@ -101,6 +116,22 @@ export function SettlementPage() {
           )}
         </div>
 
+        {/* 정산 계좌 */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+          <p className="text-[13px] font-semibold text-gray-800 mb-3">정산 계좌</p>
+          <label className="block">
+            <span className="text-[12px] text-gray-500 mb-1.5 block">은행명</span>
+            <input
+              type="text"
+              value={bankName}
+              onChange={(e) => handleBankNameChange(e.target.value)}
+              placeholder="예: 국민은행, 신한은행"
+              className="w-full h-11 rounded-xl border border-gray-200 bg-gray-50 px-4 text-[14px] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300"
+            />
+          </label>
+          <p className="text-[11px] text-gray-400 mt-2">정산받을 계좌의 은행명을 입력해주세요</p>
+        </div>
+
         {/* 정산하기 버튼 */}
         <button
           onClick={handleSettle}
@@ -111,7 +142,7 @@ export function SettlementPage() {
               : "bg-gray-100 text-gray-300 cursor-not-allowed"
           }`}
         >
-          {canSettle ? `${amount.toLocaleString()}원 정산하기` : "금액을 선택해주세요"}
+          {settleButtonLabel}
         </button>
       </div>
 

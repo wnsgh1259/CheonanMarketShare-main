@@ -1,15 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ParkingSquare, Armchair, Toilet, Info, Package, Music, Trash2, Settings } from "lucide-react";
-import { loadRegisteredUsers, REGISTERED_USERS_KEY, updateRegisteredUserStatus } from "../data/userAccounts";
-import { assignRandomStoreAccounts, loadStoreAccountsMap, needsStoreAccountBootstrap, saveAllStoreAccounts, upsertStoreAccount, type StoreAccountRecord } from "../data/adminAccount";
+import { loadRegisteredUsers, persistRegisteredUsers, deleteRegisteredUser, updateRegisteredUserPhone, updateRegisteredUserStatus, upsertRegisteredUser, isValidEmail, type RegisteredUser } from "../data/userAccounts";
+import { ensureStoreAccounts, findDuplicateStoreAccountPhone, loadStoreAccountsMap, saveAllStoreAccounts, upsertStoreAccount, deleteStoreAccount, type StoreAccountRecord } from "../data/adminAccount";
 import { loadStoreAccountsFromRemote, saveStoreAccountsLocally } from "../data/storeAccountsSync";
 import {
   loadOwnerSignupApplications,
   OWNER_SIGNUP_MARKET_LABELS,
   updateOwnerSignupApplication,
+  deleteOwnerSignupApplicationsByPhone,
+  approveOwnerSignupApplication,
+  findApprovedSignupByPhone,
   type OwnerSignupApplication,
 } from "../data/ownerSignupApplications";
+import {
+  loadOwnerChangeRequests,
+  updateOwnerChangeRequest,
+  type OwnerChangeRequest,
+} from "../data/ownerChangeRequests";
+import { refreshOwnerChangeRequestsFromRemote } from "../data/ownerChangeRequestsSync";
 import { refreshOwnerSignupApplicationsFromRemote } from "../data/ownerSignupApplicationsSync";
+import { formatPhoneDisplay, formatPhoneInput } from "../utils/phoneFormat";
 
 const FACILITY_COLOR_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
   "#448AFF": ParkingSquare,
@@ -20,6 +30,7 @@ const FACILITY_COLOR_ICON: Record<string, React.ComponentType<{ className?: stri
   "#FF9800": Music,
 };
 import { Link, useNavigate, useSearchParams } from "react-router";
+import { useAuth } from "../context/AuthContext";
 import { AdminPreviewMap, type AdminPreviewStorePin } from "../components/AdminPreviewMap";
 import { STORES_BY_MARKET, type StoreData } from "../data/storeData";
 import { SEED_MARKET_ORDER, syntheticSeedStoreId } from "../data/seedStoreIds";
@@ -30,7 +41,7 @@ import {
 } from "../data/ownerSharedStore";
 import {
   loadOwnerCatalog,
-  loadOwnerCatalogRemote,
+  refreshOwnerCatalogFromRemote,
   saveOwnerCatalog,
   upsertCatalogStore,
   migrateLegacyOwnerDraftIfNeeded,
@@ -92,6 +103,21 @@ const MARKET_BUTTONS: Array<{ id: MarketId; label: string }> = [
   { id: "seonghwan", label: "성환시장" },
 ];
 
+function inferMarketIdFromStoreId(storeId: number): MarketId | undefined {
+  const idx = Math.floor(storeId / 10000);
+  if (idx >= 0 && idx < SEED_MARKET_ORDER.length) {
+    return SEED_MARKET_ORDER[idx];
+  }
+  return undefined;
+}
+
+function resolveStoreMarketId(store: DraftStore | undefined, storeId: number): MarketId | undefined {
+  if (store?.marketId === "jungang" || store?.marketId === "byeongcheon" || store?.marketId === "seonghwan") {
+    return store.marketId;
+  }
+  return inferMarketIdFromStoreId(storeId);
+}
+
 const MAP_CATEGORY_OPTIONS = [
   "전체",
   "먹거리·분식",
@@ -104,117 +130,11 @@ const MAP_CATEGORY_OPTIONS = [
   "기타·생활",
 ];
 
-const OWNER_CHANGE_REQUESTS_KEY = "owner_change_requests";
 const OWNER_APPROVED_STORE_NAME_KEY = "owner_approved_store_name";
 const ADMIN_STORE_ACCOUNTS_KEY = "admin_store_accounts";
+const UNREGISTERED_AUTO_PURGE_KEY = "admin_unregistered_accounts_purged_v1";
 
 type StoreAccount = StoreAccountRecord;
-
-type ChangeRequest = {
-  id: number;
-  type: "storeName" | "phone";
-  storeName: string;
-  currentValue: string;
-  newValue: string;
-  status: "pending" | "approved" | "rejected";
-  createdAt: string;
-  rejectReason?: string;
-  source?: "store" | "customer";
-};
-
-const DEMO_STORE_CHANGE_REQUESTS: ChangeRequest[] = [
-  {
-    id: -1,
-    type: "storeName",
-    storeName: "천안순대국밥",
-    currentValue: "천안순대국밥",
-    newValue: "병천순대본점",
-    status: "pending",
-    createdAt: "2026-05-21T09:30:00.000Z",
-    source: "store",
-  },
-  {
-    id: -2,
-    type: "phone",
-    storeName: "어묵·튀김코너",
-    currentValue: "01012345678",
-    newValue: "01098765432",
-    status: "pending",
-    createdAt: "2026-05-20T15:20:00.000Z",
-    source: "store",
-  },
-  {
-    id: -3,
-    type: "storeName",
-    storeName: "호두과자 본점",
-    currentValue: "호두과자 본점",
-    newValue: "천안호두과자",
-    status: "pending",
-    createdAt: "2026-05-19T11:00:00.000Z",
-    source: "store",
-  },
-];
-
-const DEMO_CUSTOMER_CHANGE_REQUESTS: ChangeRequest[] = [
-  {
-    id: -101,
-    type: "phone",
-    storeName: "홍길동",
-    currentValue: "01011112222",
-    newValue: "01033334444",
-    status: "pending",
-    createdAt: "2026-05-21T10:15:00.000Z",
-    source: "customer",
-  },
-  {
-    id: -102,
-    type: "phone",
-    storeName: "김영희",
-    currentValue: "01055556666",
-    newValue: "01077778888",
-    status: "pending",
-    createdAt: "2026-05-20T14:40:00.000Z",
-    source: "customer",
-  },
-  {
-    id: -103,
-    type: "phone",
-    storeName: "이철수",
-    currentValue: "01099990000",
-    newValue: "01012123434",
-    status: "pending",
-    createdAt: "2026-05-19T16:05:00.000Z",
-    source: "customer",
-  },
-];
-
-function formatPhoneDisplay(phone: string) {
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
-  if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
-  return phone;
-}
-
-function formatPhoneInput(value: string) {
-  const digits = value.replace(/\D/g, "").slice(0, 11);
-  if (digits.length <= 3) return digits;
-  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
-  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
-}
-
-function loadChangeRequests(): ChangeRequest[] {
-  try {
-    const raw = localStorage.getItem(OWNER_CHANGE_REQUESTS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as ChangeRequest[];
-    return parsed.map((item) => ({
-      ...item,
-      status: item.status === "approved" || item.status === "rejected" ? item.status : "pending",
-    }));
-  } catch {
-    return [];
-  }
-}
 
 function loadStoreAccounts(): Record<number, StoreAccount> {
   return loadStoreAccountsMap();
@@ -249,8 +169,53 @@ declare global {
   }
 }
 
+type AdminPanelView = "market" | "applications" | "members";
+type MembersListTab = "customers" | "stores";
+
+type LoginableStoreItem = {
+  key: string;
+  storeId: number | null;
+  name: string;
+  phone: string;
+  pin: string;
+  subtitle: string;
+  marketId?: MarketId;
+};
+
+type CustomerForm = {
+  name: string;
+  phone: string;
+  email: string;
+  pin: string;
+};
+
+const EMPTY_CUSTOMER_FORM: CustomerForm = {
+  name: "",
+  phone: "",
+  email: "",
+  pin: "",
+};
+
+function signupApplicationToDraftStore(app: OwnerSignupApplication, storeId: number): DraftStore {
+  const phoneDigits = app.phone.replace(/\D/g, "");
+  return {
+    id: storeId,
+    name: app.storeName,
+    category: "기타·생활",
+    location: app.address,
+    hours: "",
+    phone: formatPhoneDisplay(phoneDigits),
+    description: "",
+    lat: 0,
+    lng: 0,
+    marketId: app.marketId,
+    image: app.storeImage,
+  };
+}
+
 export function AdminPage() {
   const navigate = useNavigate();
+  const { loginAsUser, login } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const marketParam = searchParams.get("market");
   const initialMarket: MarketId =
@@ -258,27 +223,48 @@ export function AdminPage() {
       ? marketParam
       : "jungang";
   const [selectedMarket, setSelectedMarket] = useState<MarketId>(initialMarket);
-  const [showApplications, setShowApplications] = useState(false);
+  const [adminPanelView, setAdminPanelView] = useState<AdminPanelView>("market");
+  const [membersListTab, setMembersListTab] = useState<MembersListTab>("customers");
+  const [storeListSearchQuery, setStoreListSearchQuery] = useState("");
+  const [storeListMarket, setStoreListMarket] = useState<MarketId>("jungang");
+  const [storeListSettingsModeActive, setStoreListSettingsModeActive] = useState(false);
+  const [storeListDeleteModeActive, setStoreListDeleteModeActive] = useState(false);
   const [applicationTab, setApplicationTab] = useState<"signup" | "storeSettings" | "customerSettings">("signup");
   const [signupApplications, setSignupApplications] = useState<OwnerSignupApplication[]>(() => loadOwnerSignupApplications());
   const [rejectingSignupId, setRejectingSignupId] = useState<number | null>(null);
+  const [approvingSignupId, setApprovingSignupId] = useState<number | null>(null);
   const [signupRejectReasons, setSignupRejectReasons] = useState<Record<number, string>>({});
   const [imageViewApp, setImageViewApp] = useState<OwnerSignupApplication | null>(null);
   const [signupApprovedModal, setSignupApprovedModal] = useState<string | null>(null);
+  const [storeSettingsSavedModal, setStoreSettingsSavedModal] = useState(false);
+  const [customerSettingsSavedModal, setCustomerSettingsSavedModal] = useState(false);
+  const [deleteSuccessModal, setDeleteSuccessModal] = useState(false);
   const [changeRejectingId, setChangeRejectingId] = useState<number | null>(null);
   const [changeRejectReasons, setChangeRejectReasons] = useState<Record<number, string>>({});
-  const [changeRequests, setChangeRequests] = useState<ChangeRequest[]>(() => loadChangeRequests());
-  const [demoChangeStatuses, setDemoChangeStatuses] = useState<Record<number, ChangeRequest["status"]>>({});
-  const [demoChangeRejectReasons, setDemoChangeRejectReasons] = useState<Record<number, string>>({});
+  const [changeRequests, setChangeRequests] = useState<OwnerChangeRequest[]>(() => loadOwnerChangeRequests());
+  const [registeredUsers, setRegisteredUsers] = useState<RegisteredUser[]>(() => loadRegisteredUsers());
+  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
+  const [customerAddOpen, setCustomerAddOpen] = useState(false);
+  const [customerSettingsTarget, setCustomerSettingsTarget] = useState<RegisteredUser | null>(null);
+  const [customerDeleteTarget, setCustomerDeleteTarget] = useState<RegisteredUser | null>(null);
+  const [customerDeleteInput, setCustomerDeleteInput] = useState("");
+  const [customerForm, setCustomerForm] = useState<CustomerForm>(EMPTY_CUSTOMER_FORM);
+  const [customerFormError, setCustomerFormError] = useState("");
 
-  const [deleteModeActive, setDeleteModeActive] = useState(false);
-  const [settingsModeActive, setSettingsModeActive] = useState(false);
+  const [storeDeleteModeActive, setStoreDeleteModeActive] = useState(false);
+  const [storeSettingsModeActive, setStoreSettingsModeActive] = useState(false);
+  const [customerDeleteModeActive, setCustomerDeleteModeActive] = useState(false);
+  const [customerSettingsModeActive, setCustomerSettingsModeActive] = useState(false);
   const [settingsTarget, setSettingsTarget] = useState<{ id: number; name: string } | null>(null);
   const [settingsForm, setSettingsForm] = useState({ storeName: "", phone: "", pin: "" });
   const [settingsError, setSettingsError] = useState("");
   const [storeAccounts, setStoreAccounts] = useState<Record<number, StoreAccount>>(() => loadStoreAccounts());
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
   const [deleteInput, setDeleteInput] = useState("");
+  const [unregisteredDeleteTarget, setUnregisteredDeleteTarget] = useState<LoginableStoreItem | null>(null);
+  const [unregisteredDeleteInput, setUnregisteredDeleteInput] = useState("");
+  const [unregisteredDeleteAllOpen, setUnregisteredDeleteAllOpen] = useState(false);
+  const [unregisteredDeleteAllInput, setUnregisteredDeleteAllInput] = useState("");
   const [deletedIds, setDeletedIds] = useState<Set<number>>(() => {
     try {
       const raw = localStorage.getItem("admin-deleted-store-ids");
@@ -329,37 +315,71 @@ export function AdminPage() {
   };
 
   useEffect(() => {
-    if (!showApplications) return;
-    setChangeRequests(loadChangeRequests());
+    if (adminPanelView !== "applications") return;
+    void refreshOwnerChangeRequestsFromRemote().then(setChangeRequests);
     void refreshOwnerSignupApplicationsFromRemote().then(setSignupApplications);
-  }, [showApplications]);
+  }, [adminPanelView]);
 
-  const persistChangeRequests = (next: ChangeRequest[]) => {
-    setChangeRequests(next);
-    localStorage.setItem(OWNER_CHANGE_REQUESTS_KEY, JSON.stringify(next));
+  useEffect(() => {
+    if (adminPanelView !== "members") return;
+    setRegisteredUsers(loadRegisteredUsers());
+    setStoreAccounts(Object.fromEntries(Object.values(loadStoreAccountsMap()).map((item) => [item.storeId, item])));
+  }, [adminPanelView, membersListTab]);
+
+  const resetListEditModes = () => {
+    setStoreSettingsModeActive(false);
+    setStoreDeleteModeActive(false);
+    setStoreListSettingsModeActive(false);
+    setStoreListDeleteModeActive(false);
+    setCustomerSettingsModeActive(false);
+    setCustomerDeleteModeActive(false);
+    setSettingsTarget(null);
+    setCustomerSettingsTarget(null);
+    setCustomerDeleteTarget(null);
+    setCustomerDeleteInput("");
+    setCustomerAddOpen(false);
+    setCustomerForm(EMPTY_CUSTOMER_FORM);
+    setCustomerFormError("");
   };
 
-  const handleApproveChangeRequest = (request: ChangeRequest) => {
-    const existsInStorage = changeRequests.some((item) => item.id === request.id);
-    if (!existsInStorage) {
-      setDemoChangeStatuses((prev) => ({ ...prev, [request.id]: "approved" }));
-      return;
-    }
+  const openAdminPanel = (view: AdminPanelView) => {
+    setAdminPanelView((current) => {
+      if (current === view) return "market";
+      return view;
+    });
+    resetListEditModes();
+  };
 
-    const next = changeRequests.map((item) =>
-      item.id === request.id ? { ...item, status: "approved" as const } : item,
-    );
-    persistChangeRequests(next);
+  const handleApproveChangeRequest = (request: OwnerChangeRequest) => {
+    updateOwnerChangeRequest(request.id, { status: "approved" });
+    setChangeRequests((prev) => prev.filter((item) => item.id !== request.id));
 
-    if (request.type === "storeName") {
+    if (request.type === "storeName" && request.source !== "customer") {
       localStorage.setItem(OWNER_APPROVED_STORE_NAME_KEY, request.newValue);
       localStorage.setItem("owner_current_store_name", request.newValue);
       const updatedStores = draft.stores.map((store) =>
-        store.name === request.storeName || store.name === request.currentValue
-          ? { ...store, name: request.newValue }
-          : store,
+        request.storeId != null
+          ? store.id === request.storeId
+            ? { ...store, name: request.newValue }
+            : store
+          : store.name === request.storeName || store.name === request.currentValue
+            ? { ...store, name: request.newValue }
+            : store,
       );
       saveDraft({ ...draft, stores: updatedStores });
+
+      const accounts = Object.values(loadStoreAccounts());
+      const account =
+        request.storeId != null
+          ? accounts.find((item) => item.storeId === request.storeId)
+          : accounts.find((item) => item.storeName === request.storeName || item.storeName === request.currentValue);
+      if (account) {
+        upsertStoreAccount({ ...account, storeName: request.newValue });
+        setStoreAccounts((prev) => ({
+          ...prev,
+          [account.storeId]: { ...account, storeName: request.newValue },
+        }));
+      }
     }
 
     if (request.type === "phone") {
@@ -369,73 +389,42 @@ export function AdminPage() {
       if (!savedPhone || savedPhone === currentPhone) {
         localStorage.setItem("user_phone", newPhone);
       }
-      const users = loadRegisteredUsers();
-      const userIdx = users.findIndex((item) => item.phone === currentPhone);
-      if (userIdx >= 0) {
-        users[userIdx] = { ...users[userIdx], phone: newPhone };
-        localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(users));
-      }
-      const accounts = Object.values(loadStoreAccounts());
-      const accountIdx = accounts.findIndex((item) => item.phone.replace(/\D/g, "") === currentPhone);
-      if (accountIdx >= 0) {
-        accounts[accountIdx] = { ...accounts[accountIdx], phone: newPhone };
-        localStorage.setItem(ADMIN_STORE_ACCOUNTS_KEY, JSON.stringify(accounts));
+      updateRegisteredUserPhone(currentPhone, newPhone);
+
+      if (request.source !== "customer") {
+        const accounts = Object.values(loadStoreAccounts());
+        const accountIdx = accounts.findIndex((item) =>
+          request.storeId != null
+            ? item.storeId === request.storeId
+            : item.phone.replace(/\D/g, "") === currentPhone,
+        );
+        if (accountIdx >= 0) {
+          const updated = { ...accounts[accountIdx], phone: newPhone };
+          accounts[accountIdx] = updated;
+          upsertStoreAccount(updated);
+          setStoreAccounts((prev) => ({ ...prev, [updated.storeId]: updated }));
+        }
       }
     }
   };
 
   const handleRejectChangeRequest = (requestId: number) => {
-    const existsInStorage = changeRequests.some((item) => item.id === requestId);
-    if (!existsInStorage) {
-      setDemoChangeStatuses((prev) => ({ ...prev, [requestId]: "rejected" }));
-      setDemoChangeRejectReasons((prev) => ({
-        ...prev,
-        [requestId]: changeRejectReasons[requestId] || "",
-      }));
-      setChangeRejectingId(null);
-      return;
-    }
-
-    const next = changeRequests.map((item) =>
-      item.id === requestId
-        ? { ...item, status: "rejected" as const, rejectReason: changeRejectReasons[requestId] || "" }
-        : item,
-    );
-    persistChangeRequests(next);
+    updateOwnerChangeRequest(requestId, {
+      status: "rejected",
+      rejectReason: changeRejectReasons[requestId] || "",
+    });
+    setChangeRequests((prev) => prev.filter((item) => item.id !== requestId));
     setChangeRejectingId(null);
   };
 
   const storeChangeRequests = useMemo(
-    () => changeRequests.filter((item) => item.source !== "customer"),
+    () => changeRequests.filter((item) => item.source !== "customer" && item.status === "pending"),
     [changeRequests],
   );
   const customerChangeRequests = useMemo(
-    () => changeRequests.filter((item) => item.source === "customer"),
+    () => changeRequests.filter((item) => item.source === "customer" && item.status === "pending"),
     [changeRequests],
   );
-
-  const isUsingDemoStoreRequests = storeChangeRequests.length === 0;
-  const isUsingDemoCustomerRequests = customerChangeRequests.length === 0;
-
-  const displayedStoreChangeRequests = useMemo(() => {
-    const base = isUsingDemoStoreRequests ? DEMO_STORE_CHANGE_REQUESTS : storeChangeRequests;
-    if (!isUsingDemoStoreRequests) return base;
-    return base.map((item) => ({
-      ...item,
-      status: demoChangeStatuses[item.id] ?? item.status,
-      rejectReason: demoChangeRejectReasons[item.id] ?? item.rejectReason,
-    }));
-  }, [storeChangeRequests, demoChangeStatuses, demoChangeRejectReasons, isUsingDemoStoreRequests]);
-
-  const displayedCustomerChangeRequests = useMemo(() => {
-    const base = isUsingDemoCustomerRequests ? DEMO_CUSTOMER_CHANGE_REQUESTS : customerChangeRequests;
-    if (!isUsingDemoCustomerRequests) return base;
-    return base.map((item) => ({
-      ...item,
-      status: demoChangeStatuses[item.id] ?? item.status,
-      rejectReason: demoChangeRejectReasons[item.id] ?? item.rejectReason,
-    }));
-  }, [customerChangeRequests, demoChangeStatuses, demoChangeRejectReasons, isUsingDemoCustomerRequests]);
 
   const sortedSignupApplications = useMemo(() => {
     return [...signupApplications].sort((a, b) => {
@@ -451,11 +440,23 @@ export function AdminPage() {
   );
 
   const signupPendingCount = pendingSignupApplications.length;
-  const storeSettingsPendingCount = displayedStoreChangeRequests.filter((item) => item.status === "pending").length;
-  const customerSettingsPendingCount = displayedCustomerChangeRequests.filter((item) => item.status === "pending").length;
+  const storeSettingsPendingCount = storeChangeRequests.length;
+  const customerSettingsPendingCount = customerChangeRequests.length;
   const settingsPendingCount = storeSettingsPendingCount + customerSettingsPendingCount;
   const totalPendingCount = signupPendingCount + settingsPendingCount;
-  const hasAdminModalOpen = deleteTarget !== null || settingsTarget !== null || imageViewApp !== null || signupApprovedModal !== null;
+  const hasAdminModalOpen =
+    deleteTarget !== null ||
+    settingsTarget !== null ||
+    customerSettingsTarget !== null ||
+    customerDeleteTarget !== null ||
+    unregisteredDeleteTarget !== null ||
+    unregisteredDeleteAllOpen ||
+    customerAddOpen ||
+    imageViewApp !== null ||
+    signupApprovedModal !== null ||
+    storeSettingsSavedModal ||
+    customerSettingsSavedModal ||
+    deleteSuccessModal;
 
   useEffect(() => {
     if (hasAdminModalOpen) {
@@ -466,43 +467,55 @@ export function AdminPage() {
     return () => document.body.classList.remove("app-modal-open");
   }, [hasAdminModalOpen]);
 
+  const normalizeCatalogDraft = (catalog: { stores?: DraftStore[]; facilities?: OwnerDashboardDraft["facilities"] }): OwnerDashboardDraft => ({
+    stores: (catalog.stores ?? []).map((store) => ({
+      ...store,
+      marketId:
+        store.marketId === "jungang" || store.marketId === "byeongcheon" || store.marketId === "seonghwan"
+          ? store.marketId
+          : undefined,
+    })),
+    facilities: (catalog.facilities ?? []).map((facility) => ({
+      ...facility,
+      marketId:
+        facility.marketId === "jungang" || facility.marketId === "byeongcheon" || facility.marketId === "seonghwan"
+          ? facility.marketId
+          : undefined,
+    })),
+  });
+
   useEffect(() => {
     migrateLegacyOwnerDraftIfNeeded();
     let cancelled = false;
     const load = async () => {
-      const remote = await loadOwnerCatalogRemote();
-      if (!remote || cancelled) return;
-      try {
-        const local = loadOwnerCatalog();
-        const hasLocalData = local.stores.length > 0 || (local.facilities?.length ?? 0) > 0;
-        if (hasLocalData) return;
-      } catch {
-        // If local is unreadable, fall through and bootstrap from remote.
-      }
-      const normalized: OwnerDashboardDraft = {
-        stores: (remote.stores ?? []).map((store) => ({
-          ...store,
-          marketId:
-            store.marketId === "jungang" || store.marketId === "byeongcheon" || store.marketId === "seonghwan"
-              ? store.marketId
-              : undefined,
-        })),
-        facilities: (remote.facilities ?? []).map((facility) => ({
-          ...facility,
-          marketId:
-            facility.marketId === "jungang" || facility.marketId === "byeongcheon" || facility.marketId === "seonghwan"
-              ? facility.marketId
-              : undefined,
-        })),
-      };
-      setDraft(normalized);
-      saveOwnerCatalog(normalized);
+      const merged = await refreshOwnerCatalogFromRemote();
+      if (cancelled) return;
+      setDraft(normalizeCatalogDraft(merged));
     };
     void load();
     return () => {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (adminPanelView !== "market") return;
+    let cancelled = false;
+    const refreshMarketData = async () => {
+      const [catalog, applications] = await Promise.all([
+        refreshOwnerCatalogFromRemote(),
+        refreshOwnerSignupApplicationsFromRemote(),
+      ]);
+      if (cancelled) return;
+      setDraft(normalizeCatalogDraft(catalog));
+      setSignupApplications(applications);
+      setStoreAccounts(Object.fromEntries(Object.values(loadStoreAccountsMap()).map((item) => [item.storeId, item])));
+    };
+    void refreshMarketData();
+    return () => {
+      cancelled = true;
+    };
+  }, [adminPanelView]);
 
   const dummyStores = useMemo<DraftStore[]>(() => {
     return SEED_MARKET_ORDER.flatMap((marketId, marketIndex) =>
@@ -550,11 +563,75 @@ export function AdminPage() {
         byId.set(store.id, store);
       }
     });
+
+    loadOwnerSignupApplications()
+      .filter((app) => app.status === "approved" && app.approvedStoreId != null)
+      .forEach((app) => {
+        const storeId = app.approvedStoreId!;
+        if (byId.has(storeId)) return;
+        byId.set(storeId, signupApplicationToDraftStore(app, storeId));
+      });
+
+    Object.values(storeAccounts).forEach((account) => {
+      if (byId.has(account.storeId)) return;
+      const app =
+        loadOwnerSignupApplications().find(
+          (item) =>
+            item.approvedStoreId === account.storeId ||
+            (item.phone.replace(/\D/g, "") === account.phone.replace(/\D/g, "") &&
+              item.status === "approved"),
+        ) ?? null;
+      if (app) {
+        byId.set(account.storeId, signupApplicationToDraftStore(app, account.storeId));
+        return;
+      }
+      byId.set(account.storeId, {
+        id: account.storeId,
+        name: account.storeName,
+        category: "기타·생활",
+        location: "",
+        hours: "",
+        phone: formatPhoneDisplay(account.phone),
+        description: "",
+        lat: 0,
+        lng: 0,
+        marketId: "jungang",
+      });
+    });
+
     return Array.from(byId.values());
-  }, [dummyStores, draft.stores]);
+  }, [dummyStores, draft.stores, signupApplications, storeAccounts]);
 
   const handleApproveSignup = (application: OwnerSignupApplication) => {
+    if (approvingSignupId === application.id) return;
+    if (application.status !== "pending") {
+      setSignupApplications(loadOwnerSignupApplications());
+      return;
+    }
+
+    setApprovingSignupId(application.id);
+
     const phoneDigits = application.phone.replace(/\D/g, "");
+    const existingApproved = findApprovedSignupByPhone(phoneDigits);
+    if (existingApproved?.approvedStoreId != null) {
+      setSignupApplications(approveOwnerSignupApplication(application, existingApproved.approvedStoreId));
+      setRejectingSignupId(null);
+      setSignupApprovedModal(application.storeName);
+      setApprovingSignupId(null);
+      return;
+    }
+
+    const existingAccount = Object.values(storeAccounts).find(
+      (item) => item.phone.replace(/\D/g, "") === phoneDigits,
+    );
+    if (existingAccount) {
+      setSignupApplications(approveOwnerSignupApplication(application, existingAccount.storeId));
+      setRejectingSignupId(null);
+      setSignupApprovedModal(application.storeName);
+      setApprovingSignupId(null);
+      return;
+    }
+
     const newStoreId = Math.max(0, ...mergedStores.map((store) => store.id)) + 1;
     const newStore: DraftStore = {
       id: newStoreId,
@@ -577,7 +654,16 @@ export function AdminPage() {
       pin: application.pin,
     };
     upsertStoreAccount(nextAccount);
-    setStoreAccounts((prev) => ({ ...prev, [newStoreId]: nextAccount }));
+    setStoreAccounts((prev) => {
+      const phoneDigits = application.phone.replace(/\D/g, "");
+      const next = Object.fromEntries(
+        Object.entries(prev).filter(
+          ([, item]) => item.phone.replace(/\D/g, "") !== phoneDigits || item.storeId === newStoreId,
+        ),
+      );
+      next[newStoreId] = nextAccount;
+      return next;
+    });
     upsertCatalogStore(newStore);
     saveOwnerStoreWorkspace(newStoreId, {
       menus: [],
@@ -587,16 +673,27 @@ export function AdminPage() {
       reviewReply: "",
       inquiryReply: "",
     });
-    setDraft((prev) => ({ ...prev, stores: [...prev.stores, newStore] }));
+    const cleanedStores = draft.stores.filter((store) => store.id !== newStoreId);
+    saveDraft({ ...draft, stores: [...cleanedStores, newStore] });
     updateRegisteredUserStatus(phoneDigits, "active");
-    setSignupApplications(
-      updateOwnerSignupApplication(application.id, {
-        status: "approved",
-        approvedStoreId: newStoreId,
-      }).filter((item) => item.status === "pending"),
-    );
+    upsertRegisteredUser({
+      phone: phoneDigits,
+      pin: application.pin,
+      email: application.email,
+      name: application.storeName,
+      role: "owner",
+      status: "active",
+    });
+    if (deletedIds.has(newStoreId)) {
+      const nextDeletedIds = new Set(deletedIds);
+      nextDeletedIds.delete(newStoreId);
+      setDeletedIds(nextDeletedIds);
+      localStorage.setItem("admin-deleted-store-ids", JSON.stringify(Array.from(nextDeletedIds)));
+    }
+    setSignupApplications(approveOwnerSignupApplication(application, newStoreId));
     setRejectingSignupId(null);
     setSignupApprovedModal(application.storeName);
+    setApprovingSignupId(null);
   };
 
   const handleRejectSignup = (application: OwnerSignupApplication) => {
@@ -606,7 +703,7 @@ export function AdminPage() {
       updateOwnerSignupApplication(application.id, {
         status: "rejected",
         rejectReason: reason,
-      }).filter((item) => item.status === "pending"),
+      }),
     );
     setRejectingSignupId(null);
   };
@@ -630,11 +727,17 @@ export function AdminPage() {
   useEffect(() => {
     if (mergedStores.length === 0) return;
     const current = loadStoreAccountsMap();
-    if (!needsStoreAccountBootstrap(mergedStores, current)) return;
-
-    const accounts = assignRandomStoreAccounts(
+    const accounts = ensureStoreAccounts(
       mergedStores.map((store) => ({ id: store.id, name: store.name })),
+      current,
     );
+    const changed =
+      accounts.length !== Object.keys(current).length ||
+      accounts.some((item) => {
+        const prev = current[item.storeId];
+        return !prev || prev.phone !== item.phone || prev.pin !== item.pin || prev.storeName !== item.storeName;
+      });
+    if (!changed) return;
     saveAllStoreAccounts(accounts);
     setStoreAccounts(Object.fromEntries(accounts.map((item) => [item.storeId, item])));
   }, [mergedStores]);
@@ -655,6 +758,18 @@ export function AdminPage() {
     next.add(id);
     setDeletedIds(next);
     localStorage.setItem("admin-deleted-store-ids", JSON.stringify(Array.from(next)));
+
+    const account = storeAccounts[id];
+    if (account?.phone) {
+      deleteRegisteredUser(account.phone);
+    }
+    deleteStoreAccount(id);
+    setStoreAccounts((prev) => {
+      const nextAccounts = { ...prev };
+      delete nextAccounts[id];
+      return nextAccounts;
+    });
+
     const newDraft = { ...draft, stores: draft.stores.filter((s) => s.id !== id) };
     saveDraft(newDraft);
     if (selectedStoreId === id) {
@@ -663,7 +778,331 @@ export function AdminPage() {
     }
     setDeleteTarget(null);
     setDeleteInput("");
-    setDeleteModeActive(false);
+    setDeleteSuccessModal(true);
+  };
+
+  const customerUsers = useMemo(
+    () => registeredUsers.filter((user) => user.role === "customer"),
+    [registeredUsers],
+  );
+
+  const filteredCustomers = useMemo(() => {
+    const q = customerSearchQuery.trim().toLowerCase();
+    return customerUsers.filter((user) => {
+      if (!q) return true;
+      return (
+        user.name.toLowerCase().includes(q) ||
+        user.phone.includes(q) ||
+        user.email.toLowerCase().includes(q)
+      );
+    });
+  }, [customerUsers, customerSearchQuery]);
+
+  const registeredCatalogStoreIds = useMemo(() => {
+    return new Set(
+      mergedStores.filter((store) => !deletedIds.has(store.id)).map((store) => store.id),
+    );
+  }, [mergedStores, deletedIds]);
+
+  const loginableStores = useMemo<LoginableStoreItem[]>(() => {
+    const items: LoginableStoreItem[] = [];
+
+    mergedStores.forEach((store) => {
+      if (deletedIds.has(store.id)) return;
+      const marketId = resolveStoreMarketId(store, store.id);
+      if (!marketId) return;
+
+      const account = storeAccounts[store.id];
+      const phoneDigits = (account?.phone ?? store.phone).replace(/\D/g, "");
+      const pin = account?.pin ?? "";
+      if (!phoneDigits || !pin) return;
+
+      const marketLabel = OWNER_SIGNUP_MARKET_LABELS[marketId];
+      items.push({
+        key: `store-${store.id}`,
+        storeId: store.id,
+        name: account?.storeName ?? store.name,
+        phone: phoneDigits,
+        pin,
+        subtitle: [marketLabel, store.location].filter(Boolean).join(" · "),
+        marketId,
+      });
+    });
+
+    return items.sort((a, b) => a.name.localeCompare(b.name, "ko"));
+  }, [storeAccounts, mergedStores, deletedIds]);
+
+  const unregisteredLoginAccounts = useMemo<LoginableStoreItem[]>(() => {
+    const items: LoginableStoreItem[] = [];
+    const seenPhones = new Set<string>();
+
+    Object.values(storeAccounts).forEach((account) => {
+      if (registeredCatalogStoreIds.has(account.storeId) || deletedIds.has(account.storeId)) return;
+      const phoneDigits = account.phone.replace(/\D/g, "");
+      if (!phoneDigits || !account.pin) return;
+      seenPhones.add(phoneDigits);
+      items.push({
+        key: `orphan-${account.storeId}`,
+        storeId: account.storeId,
+        name: account.storeName,
+        phone: phoneDigits,
+        pin: account.pin,
+        subtitle: "시장 카탈로그 미등록 · 로그인 계정만 존재",
+      });
+    });
+
+    registeredUsers
+      .filter((user) => user.role === "owner" && user.status === "active" && user.pin)
+      .forEach((user) => {
+        const phoneDigits = user.phone.replace(/\D/g, "");
+        if (seenPhones.has(phoneDigits)) return;
+        seenPhones.add(phoneDigits);
+        items.push({
+          key: `owner-${phoneDigits}`,
+          storeId: null,
+          name: user.name,
+          phone: phoneDigits,
+          pin: user.pin,
+          subtitle: user.email ? `${user.email} · 시장 미등록` : "시장 미등록 · 상점 정보 없음",
+        });
+      });
+
+    return items.sort((a, b) => a.name.localeCompare(b.name, "ko"));
+  }, [storeAccounts, registeredCatalogStoreIds, deletedIds, registeredUsers]);
+
+  const filteredLoginableStores = useMemo(() => {
+    const q = storeListSearchQuery.trim().toLowerCase();
+    return loginableStores.filter((store) => {
+      if (store.marketId !== storeListMarket) return false;
+      if (!q) return true;
+      return (
+        store.name.toLowerCase().includes(q) ||
+        store.phone.includes(q) ||
+        store.subtitle.toLowerCase().includes(q)
+      );
+    });
+  }, [loginableStores, storeListSearchQuery, storeListMarket]);
+
+  const filteredUnregisteredLoginAccounts = useMemo(() => {
+    const q = storeListSearchQuery.trim().toLowerCase();
+    return unregisteredLoginAccounts.filter((store) => {
+      if (!q) return true;
+      return (
+        store.name.toLowerCase().includes(q) ||
+        store.phone.includes(q) ||
+        store.subtitle.toLowerCase().includes(q)
+      );
+    });
+  }, [unregisteredLoginAccounts, storeListSearchQuery]);
+
+  const purgeUnregisteredLoginAccounts = (items: LoginableStoreItem[]) => {
+    if (items.length === 0) return;
+    items.forEach((item) => {
+      deleteRegisteredUser(item.phone);
+      deleteOwnerSignupApplicationsByPhone(item.phone);
+      if (item.storeId != null) {
+        deleteStoreAccount(item.storeId);
+      }
+    });
+    setStoreAccounts((prev) => {
+      const next = { ...prev };
+      items.forEach((item) => {
+        if (item.storeId != null) delete next[item.storeId];
+      });
+      return next;
+    });
+    setRegisteredUsers(loadRegisteredUsers());
+    setSignupApplications(loadOwnerSignupApplications());
+  };
+
+  useEffect(() => {
+    if (localStorage.getItem(UNREGISTERED_AUTO_PURGE_KEY)) return;
+    if (unregisteredLoginAccounts.length === 0) {
+      localStorage.setItem(UNREGISTERED_AUTO_PURGE_KEY, "1");
+      return;
+    }
+    purgeUnregisteredLoginAccounts(unregisteredLoginAccounts);
+    localStorage.setItem(UNREGISTERED_AUTO_PURGE_KEY, "1");
+  }, [unregisteredLoginAccounts]);
+
+  const handleDeleteUnregisteredAccount = () => {
+    if (!unregisteredDeleteTarget) return;
+    purgeUnregisteredLoginAccounts([unregisteredDeleteTarget]);
+    setUnregisteredDeleteTarget(null);
+    setUnregisteredDeleteInput("");
+    setDeleteSuccessModal(true);
+  };
+
+  const handleDeleteAllUnregisteredAccounts = () => {
+    purgeUnregisteredLoginAccounts(unregisteredLoginAccounts);
+    setUnregisteredDeleteAllOpen(false);
+    setUnregisteredDeleteAllInput("");
+    setStoreListDeleteModeActive(false);
+    setDeleteSuccessModal(true);
+  };
+
+  const openUnregisteredDeleteConfirm = (item: LoginableStoreItem) => {
+    setUnregisteredDeleteTarget(item);
+    setUnregisteredDeleteInput("");
+  };
+
+  const getStoreDraftForListItem = (item: LoginableStoreItem): DraftStore | null => {
+    if (item.storeId == null) return null;
+    const existing = mergedStores.find((store) => store.id === item.storeId);
+    if (existing) return existing;
+    return {
+      id: item.storeId,
+      name: item.name,
+      category: "기타·생활",
+      location: item.subtitle.split(" · ").slice(1).join(" · ") || "",
+      hours: "",
+      phone: formatPhoneDisplay(item.phone),
+      description: "",
+      lat: 0,
+      lng: 0,
+      marketId: item.marketId ?? storeListMarket,
+    };
+  };
+
+  const openStoreListAdd = () => {
+    window.localStorage.removeItem(OWNER_EDIT_STORE_KEY);
+    navigate(`/owner/store-registration?market=${storeListMarket}&returnTo=admin&adminNew=1&adminReturn=list`);
+  };
+
+  const openStoreListSettings = (item: LoginableStoreItem) => {
+    const store = getStoreDraftForListItem(item);
+    if (!store) return;
+    openStoreSettings(store);
+  };
+
+  const openStoreListDeleteConfirm = (item: LoginableStoreItem) => {
+    if (item.storeId == null) {
+      openUnregisteredDeleteConfirm(item);
+      return;
+    }
+    openDeleteConfirm({ id: item.storeId, name: item.name });
+  };
+
+  const validateCustomerForm = (form: CustomerForm, editingPhone?: string) => {
+    const name = form.name.trim();
+    const phoneDigits = form.phone.replace(/\D/g, "");
+    const email = form.email.trim();
+    const pin = form.pin.trim();
+    if (!name) return "닉네임을 입력해주세요.";
+    if (!/^[0-9]{10,11}$/.test(phoneDigits)) return "휴대폰 번호는 10~11자리 숫자로 입력해주세요.";
+    if (email && !isValidEmail(email)) return "올바른 이메일 형식으로 입력해주세요.";
+    if (!/^[0-9]{4,6}$/.test(pin)) return "PIN 번호는 4~6자리 숫자로 입력해주세요.";
+    const duplicate = registeredUsers.some(
+      (user) => user.phone === phoneDigits && user.phone !== editingPhone,
+    );
+    if (duplicate) return "이미 가입된 휴대폰 번호입니다.";
+    return "";
+  };
+
+  const refreshRegisteredUsers = () => {
+    setRegisteredUsers(loadRegisteredUsers());
+  };
+
+  const openCustomerAddModal = () => {
+    setCustomerForm(EMPTY_CUSTOMER_FORM);
+    setCustomerFormError("");
+    setCustomerAddOpen(true);
+  };
+
+  const openCustomerSettings = (user: RegisteredUser) => {
+    setCustomerSettingsTarget(user);
+    setCustomerForm({
+      name: user.name,
+      phone: formatPhoneDisplay(user.phone),
+      email: user.email,
+      pin: user.pin,
+    });
+    setCustomerFormError("");
+  };
+
+  const handleSaveCustomerSettings = () => {
+    if (!customerSettingsTarget) return;
+    const error = validateCustomerForm(customerForm, customerSettingsTarget.phone);
+    if (error) {
+      setCustomerFormError(error);
+      return;
+    }
+    const oldPhone = customerSettingsTarget.phone;
+    const phoneDigits = customerForm.phone.replace(/\D/g, "");
+    const updated: RegisteredUser = {
+      ...customerSettingsTarget,
+      name: customerForm.name.trim(),
+      phone: phoneDigits,
+      email: customerForm.email.trim(),
+      pin: customerForm.pin.trim(),
+    };
+    if (oldPhone !== phoneDigits) {
+      updateRegisteredUserPhone(oldPhone, phoneDigits);
+    }
+    upsertRegisteredUser(updated);
+    refreshRegisteredUsers();
+    setCustomerSettingsTarget(null);
+    setCustomerForm(EMPTY_CUSTOMER_FORM);
+    setCustomerFormError("");
+    setCustomerSettingsSavedModal(true);
+  };
+
+  const handleAddCustomer = () => {
+    const error = validateCustomerForm(customerForm);
+    if (error) {
+      setCustomerFormError(error);
+      return;
+    }
+    const user: RegisteredUser = {
+      name: customerForm.name.trim(),
+      phone: customerForm.phone.replace(/\D/g, ""),
+      email: customerForm.email.trim(),
+      pin: customerForm.pin.trim(),
+      role: "customer",
+      status: "active",
+    };
+    persistRegisteredUsers([...loadRegisteredUsers(), user]);
+    refreshRegisteredUsers();
+    setCustomerAddOpen(false);
+    setCustomerForm(EMPTY_CUSTOMER_FORM);
+    setCustomerFormError("");
+  };
+
+  const handleDeleteCustomer = () => {
+    if (!customerDeleteTarget) return;
+    deleteRegisteredUser(customerDeleteTarget.phone);
+    refreshRegisteredUsers();
+    setCustomerDeleteTarget(null);
+    setCustomerDeleteInput("");
+    setDeleteSuccessModal(true);
+  };
+
+  const openCustomerDeleteConfirm = (user: RegisteredUser) => {
+    setCustomerDeleteTarget(user);
+    setCustomerDeleteInput("");
+  };
+
+  const handleLoginAsStore = (item: LoginableStoreItem) => {
+    const result = login(item.phone, item.pin);
+    if (result.ok) {
+      navigate(result.redirect, { replace: true });
+      return;
+    }
+    window.alert(result.error);
+  };
+
+  const handleLoginAsCustomer = (user: RegisteredUser) => {
+    if (customerSettingsModeActive || customerDeleteModeActive) return;
+    if (!user.pin) {
+      window.alert("PIN이 설정되지 않은 계정입니다.");
+      return;
+    }
+    const result = loginAsUser(user);
+    if (result.ok) {
+      navigate(result.redirect, { replace: true });
+      return;
+    }
+    window.alert(result.error);
   };
 
   const filteredStores = storesBySelectedMarket.filter((store) => {
@@ -712,6 +1151,8 @@ export function AdminPage() {
 
   const selectedMarketLabel =
     MARKET_BUTTONS.find((market) => market.id === selectedMarket)?.label ?? "선택 시장";
+  const storeListMarketLabel =
+    MARKET_BUTTONS.find((market) => market.id === storeListMarket)?.label ?? "선택 시장";
 
   const selectedStore = storesBySelectedMarket.find((store) => store.id === selectedStoreId) ?? null;
 
@@ -791,17 +1232,27 @@ export function AdminPage() {
     const storeName = settingsForm.storeName.trim();
     const phoneDigits = settingsForm.phone.replace(/\D/g, "");
     const pin = settingsForm.pin.trim();
+    const previousAccount = storeAccounts[settingsTarget.id];
 
     if (!storeName) {
       setSettingsError("상점명을 입력해주세요.");
       return;
     }
-    if (phoneDigits && !/^[0-9]{10,11}$/.test(phoneDigits)) {
+    if (!phoneDigits) {
+      setSettingsError("휴대폰 번호를 입력해주세요.");
+      return;
+    }
+    if (!/^[0-9]{10,11}$/.test(phoneDigits)) {
       setSettingsError("휴대폰 번호는 10~11자리 숫자로 입력해주세요.");
       return;
     }
     if (!/^[0-9]{4,6}$/.test(pin)) {
       setSettingsError("PIN 번호는 4~6자리 숫자로 입력해주세요.");
+      return;
+    }
+    const duplicate = findDuplicateStoreAccountPhone(phoneDigits, settingsTarget.id, storeAccounts);
+    if (duplicate) {
+      setSettingsError("다른 상점에서 사용 중인 휴대폰 번호입니다.");
       return;
     }
 
@@ -811,9 +1262,9 @@ export function AdminPage() {
       phone: phoneDigits,
       pin,
     };
-    const nextAccounts = { ...storeAccounts, [settingsTarget.id]: nextAccount };
-    setStoreAccounts(nextAccounts);
-    localStorage.setItem(ADMIN_STORE_ACCOUNTS_KEY, JSON.stringify(Object.values(nextAccounts)));
+
+    upsertStoreAccount(nextAccount);
+    setStoreAccounts((prev) => ({ ...prev, [settingsTarget.id]: nextAccount }));
 
     const storeInDraft = draft.stores.find((s) => s.id === settingsTarget.id);
     const updatedStores = storeInDraft
@@ -831,10 +1282,31 @@ export function AdminPage() {
       localStorage.setItem("owner_current_store_name", storeName);
     }
 
+    const oldPhone = previousAccount?.phone.replace(/\D/g, "") ?? "";
+    const ownerUser =
+      (oldPhone ? loadRegisteredUsers().find((user) => user.role === "owner" && user.phone === oldPhone) : null)
+      ?? loadRegisteredUsers().find(
+        (user) => user.role === "owner" && user.name === settingsTarget.name,
+      );
+    if (ownerUser) {
+      if (oldPhone && oldPhone !== phoneDigits) {
+        updateRegisteredUserPhone(oldPhone, phoneDigits);
+      }
+      const syncedUser = loadRegisteredUsers().find((user) => user.phone === phoneDigits) ?? ownerUser;
+      upsertRegisteredUser({
+        ...syncedUser,
+        phone: phoneDigits,
+        pin,
+        name: storeName,
+        role: "owner",
+        status: syncedUser.status === "pending" || syncedUser.status === "rejected" ? syncedUser.status : "active",
+      });
+    }
+
     setSettingsTarget(null);
     setSettingsForm({ storeName: "", phone: "", pin: "" });
     setSettingsError("");
-    setSettingsModeActive(false);
+    setStoreSettingsSavedModal(true);
   };
 
   const openOwnerStoreEditor = (pin: AdminPreviewStorePin | DraftStore, source: "map" | "list") => {
@@ -910,10 +1382,6 @@ export function AdminPage() {
     if (adminReturnHandledKey.current === dedupeKey) return;
     adminReturnHandledKey.current = dedupeKey;
 
-    setManagementTab("store");
-    setSelectedStoreId(null);
-    setIsEditing(false);
-
     const clearReturnParams = () => {
       setSearchParams(
         (prev) => {
@@ -928,14 +1396,25 @@ export function AdminPage() {
 
     window.requestAnimationFrame(() => {
       if (adminReturn === "map") {
+        setAdminPanelView("market");
+        setManagementTab("store");
+        setSelectedStoreId(null);
+        setIsEditing(false);
         document.getElementById("admin-store-map-section")?.scrollIntoView({ block: "start", behavior: "smooth" });
         window.setTimeout(clearReturnParams, 350);
         return;
       }
-      if (adminReturn === "list" && focusStoreRaw) {
-        const id = Number(focusStoreRaw);
-        if (Number.isFinite(id)) {
-          document.getElementById(`admin-store-card-${id}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+      if (adminReturn === "list") {
+        setAdminPanelView("members");
+        setMembersListTab("stores");
+        setManagementTab("store");
+        setSelectedStoreId(null);
+        setIsEditing(false);
+        if (focusStoreRaw) {
+          const id = Number(focusStoreRaw);
+          if (Number.isFinite(id)) {
+            document.getElementById(`admin-store-card-${id}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+          }
         }
         window.setTimeout(clearReturnParams, 350);
       }
@@ -943,13 +1422,14 @@ export function AdminPage() {
   }, [searchParams, setSearchParams]);
 
   const renderChangeRequestList = (
-    requests: ChangeRequest[],
+    requests: OwnerChangeRequest[],
     options: {
       title: string;
       pendingCount: number;
       isDemo: boolean;
       demoMessage: string;
       nameLabel: string;
+      emptyMessage: string;
     },
   ) => (
     <>
@@ -962,7 +1442,12 @@ export function AdminPage() {
           {options.demoMessage}
         </p>
       )}
-      {requests.map((request) => {
+      {requests.length === 0 ? (
+        <div className="border border-dashed border-gray-200 rounded-xl px-4 py-8 text-center">
+          <p className="text-[13px] text-gray-500">{options.emptyMessage}</p>
+        </div>
+      ) : (
+        requests.map((request) => {
         const statusLabel = request.status === "approved" ? "승인" : request.status === "rejected" ? "거절" : "대기";
         const isRejecting = changeRejectingId === request.id;
         const typeLabel = request.type === "storeName" ? "상점명" : "휴대폰 번호";
@@ -1032,16 +1517,10 @@ export function AdminPage() {
                 </div>
               </div>
             )}
-
-            {request.status === "approved" && (
-              <p className="text-[11px] text-emerald-600 bg-emerald-50 rounded-lg px-3 py-2">✅ 변경 승인 완료됐습니다.</p>
-            )}
-            {request.status === "rejected" && request.rejectReason && (
-              <p className="text-[11px] text-red-500 bg-red-50 rounded-lg px-3 py-2">❌ 거절 사유: {request.rejectReason}</p>
-            )}
           </div>
         );
-      })}
+      })
+      )}
     </>
   );
 
@@ -1054,7 +1533,13 @@ export function AdminPage() {
             <ChevronLeft className="w-5 h-5 text-gray-700" />
           </Link>
           <h1 className="text-[15px] text-gray-900">
-            {showApplications ? "신청 · 설정" : selectedMarketLabel}
+            {adminPanelView === "applications"
+              ? "신청 · 설정"
+              : adminPanelView === "members"
+                ? membersListTab === "stores"
+                  ? "상점 목록"
+                  : "손님 목록"
+                : selectedMarketLabel}
           </h1>
           <div className="w-7" />
         </div>
@@ -1063,12 +1548,13 @@ export function AdminPage() {
       <div className="px-4 py-3 space-y-3">
         <div className="bg-white rounded-xl p-2 flex gap-2 overflow-x-auto">
           {MARKET_BUTTONS.map((market) => {
-            const isActive = selectedMarket === market.id && !showApplications;
+            const isActive = selectedMarket === market.id && adminPanelView === "market";
             return (
               <button
                 key={market.id}
                 onClick={() => {
-                  setShowApplications(false);
+                  setAdminPanelView("market");
+                  resetListEditModes();
                   setSelectedMarket(market.id);
                   setSearchParams((prev) => {
                     const next = new URLSearchParams(prev);
@@ -1091,9 +1577,9 @@ export function AdminPage() {
           })}
           <div className="w-px bg-gray-200 mx-1 self-stretch" />
           <button
-            onClick={() => setShowApplications((v) => !v)}
+            onClick={() => openAdminPanel("applications")}
             className={`h-9 px-3 rounded-lg text-[12px] whitespace-nowrap transition-colors flex items-center gap-1.5 ${
-              showApplications
+              adminPanelView === "applications"
                 ? "bg-amber-500 text-white"
                 : "bg-amber-50 text-amber-600 border border-amber-200"
             }`}
@@ -1101,14 +1587,53 @@ export function AdminPage() {
             신청 · 설정
             {totalPendingCount > 0 && (
               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                showApplications ? "bg-white text-amber-600" : "bg-amber-500 text-white"
+                adminPanelView === "applications" ? "bg-white text-amber-600" : "bg-amber-500 text-white"
               }`}>{totalPendingCount}</span>
             )}
           </button>
+          <button
+            onClick={() => openAdminPanel("members")}
+            className={`h-9 px-3 rounded-lg text-[12px] whitespace-nowrap transition-colors ${
+              adminPanelView === "members"
+                ? "bg-gray-900 text-white"
+                : "bg-gray-100 text-gray-700"
+            }`}
+          >
+            목록
+          </button>
         </div>
 
+        {adminPanelView === "members" && (
+          <div className="bg-white rounded-xl p-2 flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setMembersListTab("customers");
+                resetListEditModes();
+              }}
+              className={`flex-1 h-9 rounded-lg text-[12px] font-medium transition-colors ${
+                membersListTab === "customers" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"
+              }`}
+            >
+              손님 목록
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMembersListTab("stores");
+                resetListEditModes();
+              }}
+              className={`flex-1 h-9 rounded-lg text-[12px] font-medium transition-colors ${
+                membersListTab === "stores" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"
+              }`}
+            >
+              상점 목록
+            </button>
+          </div>
+        )}
+
         {/* 신청 · 설정 패널 */}
-        {showApplications && (
+        {adminPanelView === "applications" && (
           <div className="bg-white rounded-xl p-4 space-y-3">
             <div className="flex gap-1.5 overflow-x-auto">
               <button
@@ -1204,8 +1729,13 @@ export function AdminPage() {
                           <div className="flex gap-2">
                             <button
                               onClick={() => handleApproveSignup(app)}
-                              className="flex-1 py-1.5 rounded-lg bg-gray-900 text-white text-[12px] font-semibold active:bg-gray-700 transition-colors"
-                            >승인</button>
+                              disabled={approvingSignupId === app.id}
+                              className={`flex-1 py-1.5 rounded-lg text-[12px] font-semibold transition-colors ${
+                                approvingSignupId === app.id
+                                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                  : "bg-gray-900 text-white active:bg-gray-700"
+                              }`}
+                            >{approvingSignupId === app.id ? "승인 중..." : "승인"}</button>
                             <button
                               onClick={() => { setRejectingSignupId(app.id); setSignupRejectReasons((prev) => ({ ...prev, [app.id]: "" })); }}
                               className="flex-1 py-1.5 rounded-lg bg-gray-100 text-gray-500 text-[12px] font-semibold active:bg-gray-200 transition-colors"
@@ -1241,20 +1771,22 @@ export function AdminPage() {
                 )}
               </>
             ) : applicationTab === "storeSettings" ? (
-              renderChangeRequestList(displayedStoreChangeRequests, {
+              renderChangeRequestList(storeChangeRequests, {
                 title: "상점 설정 변경 신청 현황",
                 pendingCount: storeSettingsPendingCount,
-                isDemo: isUsingDemoStoreRequests,
-                demoMessage: "아래는 데모 예시입니다. 상점 설정에서 실제 신청하면 이 목록이 대체됩니다.",
+                isDemo: false,
+                demoMessage: "",
                 nameLabel: "상점",
+                emptyMessage: "상점 설정 변경 신청이 없습니다.",
               })
             ) : (
-              renderChangeRequestList(displayedCustomerChangeRequests, {
+              renderChangeRequestList(customerChangeRequests, {
                 title: "손님 설정 변경 신청 현황",
                 pendingCount: customerSettingsPendingCount,
-                isDemo: isUsingDemoCustomerRequests,
-                demoMessage: "아래는 데모 예시입니다. 손님 설정에서 실제 신청하면 이 목록이 대체됩니다.",
+                isDemo: false,
+                demoMessage: "",
                 nameLabel: "닉네임",
+                emptyMessage: "손님 설정 변경 신청이 없습니다.",
               })
             )}
           </div>
@@ -1296,7 +1828,392 @@ export function AdminPage() {
           </div>
         )}
 
-        {!showApplications && <div className="bg-white rounded-xl p-4">
+        {storeSettingsSavedModal && (
+          <div className="app-modal-overlay fixed inset-0 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setStoreSettingsSavedModal(false)} />
+            <div className="app-modal-content relative bg-white rounded-2xl shadow-xl p-6 mx-6 w-full max-w-sm text-center">
+              <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+                <span className="text-[24px]">✅</span>
+              </div>
+              <p className="text-[16px] font-bold text-gray-900 mb-2">저장되었습니다</p>
+              <p className="text-[13px] text-gray-500 mb-5">상점 계정 정보가 반영되었습니다.</p>
+              <button
+                type="button"
+                onClick={() => setStoreSettingsSavedModal(false)}
+                className="w-full h-11 rounded-xl bg-gray-900 text-white text-[14px] font-semibold active:bg-gray-800 transition-colors"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        )}
+
+        {customerSettingsSavedModal && (
+          <div className="app-modal-overlay fixed inset-0 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setCustomerSettingsSavedModal(false)} />
+            <div className="app-modal-content relative bg-white rounded-2xl shadow-xl p-6 mx-6 w-full max-w-sm text-center">
+              <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+                <span className="text-[24px]">✅</span>
+              </div>
+              <p className="text-[16px] font-bold text-gray-900 mb-2">저장되었습니다</p>
+              <p className="text-[13px] text-gray-500 mb-5">손님 계정 정보가 반영되었습니다.</p>
+              <button
+                type="button"
+                onClick={() => setCustomerSettingsSavedModal(false)}
+                className="w-full h-11 rounded-xl bg-gray-900 text-white text-[14px] font-semibold active:bg-gray-800 transition-colors"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        )}
+
+        {deleteSuccessModal && (
+          <div className="app-modal-overlay fixed inset-0 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setDeleteSuccessModal(false)} />
+            <div className="app-modal-content relative bg-white rounded-2xl shadow-xl p-6 mx-6 w-full max-w-sm text-center">
+              <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+                <span className="text-[24px]">✅</span>
+              </div>
+              <p className="text-[16px] font-bold text-gray-900 mb-2">삭제되었습니다</p>
+              <p className="text-[13px] text-gray-500 mb-5">목록에서 제거되었습니다.</p>
+              <button
+                type="button"
+                onClick={() => setDeleteSuccessModal(false)}
+                className="w-full h-11 rounded-xl bg-gray-900 text-white text-[14px] font-semibold active:bg-gray-800 transition-colors"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        )}
+
+        {adminPanelView === "members" && membersListTab === "customers" && (
+          <div className="bg-white rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-[14px] text-gray-900">가입 손님 목록</h2>
+              <div className="flex items-center gap-2">
+                <span className="text-[12px] text-gray-500">{filteredCustomers.length}명</span>
+                <button
+                  type="button"
+                  onClick={openCustomerAddModal}
+                  className="h-7 px-2.5 rounded-lg bg-gray-900 text-[12px] text-white"
+                >
+                  추가
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomerSettingsModeActive((active) => {
+                      if (active) setCustomerSettingsTarget(null);
+                      return !active;
+                    });
+                    setCustomerDeleteModeActive(false);
+                  }}
+                  className={`h-7 px-2.5 rounded-lg text-[12px] transition-colors ${
+                    customerSettingsModeActive ? "bg-blue-500 text-white" : "bg-blue-50 text-blue-600 border border-blue-200"
+                  }`}
+                >
+                  {customerSettingsModeActive ? "완료" : "설정"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomerDeleteModeActive((active) => {
+                      if (active) setCustomerDeleteTarget(null);
+                      return !active;
+                    });
+                    setCustomerSettingsModeActive(false);
+                    setCustomerSettingsTarget(null);
+                  }}
+                  className={`h-7 px-2.5 rounded-lg text-[12px] transition-colors ${
+                    customerDeleteModeActive ? "bg-red-500 text-white" : "bg-red-50 text-red-500 border border-red-200"
+                  }`}
+                >
+                  {customerDeleteModeActive ? "완료" : "삭제"}
+                </button>
+              </div>
+            </div>
+
+            <input
+              value={customerSearchQuery}
+              onChange={(e) => setCustomerSearchQuery(e.target.value)}
+              placeholder="닉네임 · 휴대폰 · 이메일"
+              className="w-full h-9 rounded-lg bg-gray-100 px-3 text-[12px] focus:outline-none focus:ring-1 focus:ring-gray-300"
+            />
+
+            {filteredCustomers.length === 0 ? (
+              <div className="border border-dashed border-gray-200 rounded-xl px-4 py-8 text-center">
+                <p className="text-[13px] text-gray-500">가입한 손님이 없습니다.</p>
+                <p className="text-[11px] text-gray-400 mt-1">추가 버튼으로 손님 계정을 등록할 수 있습니다.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {filteredCustomers.map((user) => {
+                  const canLoginAsCustomer = !customerSettingsModeActive && !customerDeleteModeActive;
+                  const customerInfo = (
+                    <>
+                      <p className="text-[13px] text-gray-900 font-medium">{user.name || "닉네임 없음"}</p>
+                      <p className="text-[12px] text-gray-500 mt-0.5">
+                        {formatPhoneDisplay(user.phone)} · {user.email || "이메일 없음"}
+                      </p>
+                      <p className="text-[10px] text-blue-500 mt-0.5">
+                        로그인 {formatPhoneDisplay(user.phone)}
+                        {user.pin && <span> · PIN {user.pin}</span>}
+                      </p>
+                    </>
+                  );
+
+                  return (
+                  <div key={user.phone} className="flex items-center gap-2 rounded-lg bg-gray-50 p-3">
+                    {canLoginAsCustomer ? (
+                      <button
+                        type="button"
+                        onClick={() => handleLoginAsCustomer(user)}
+                        className="flex-1 min-w-0 text-left rounded-lg active:bg-gray-100 transition-colors"
+                      >
+                        {customerInfo}
+                      </button>
+                    ) : (
+                      <div className="flex-1 min-w-0">{customerInfo}</div>
+                    )}
+                    {customerSettingsModeActive && (
+                      <button
+                        type="button"
+                        onClick={() => openCustomerSettings(user)}
+                        className="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 active:bg-blue-200 transition-colors"
+                        aria-label="손님 계정 설정"
+                      >
+                        <Settings className="w-4 h-4" />
+                      </button>
+                    )}
+                    {customerDeleteModeActive && (
+                      <button
+                        type="button"
+                        onClick={() => openCustomerDeleteConfirm(user)}
+                        className="flex-shrink-0 w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center text-red-500 active:bg-red-200 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {adminPanelView === "members" && membersListTab === "stores" && (
+          <div className="bg-white rounded-xl p-4 space-y-3">
+            <div className="flex gap-1.5 overflow-x-auto">
+              {MARKET_BUTTONS.map((market) => (
+                <button
+                  key={market.id}
+                  type="button"
+                  onClick={() => setStoreListMarket(market.id)}
+                  className={`h-8 px-3 rounded-lg whitespace-nowrap text-[12px] transition-colors ${
+                    storeListMarket === market.id ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"
+                  }`}
+                >
+                  {market.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-[14px] text-gray-900">{storeListMarketLabel} 등록 상점</h2>
+              <div className="flex items-center gap-2">
+                <span className="text-[12px] text-gray-500">{filteredLoginableStores.length}개</span>
+                <button
+                  type="button"
+                  onClick={openStoreListAdd}
+                  className="h-7 px-2.5 rounded-lg bg-gray-900 text-[12px] text-white"
+                >
+                  추가
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStoreListSettingsModeActive((active) => {
+                      if (active) setSettingsTarget(null);
+                      return !active;
+                    });
+                    setStoreListDeleteModeActive(false);
+                  }}
+                  className={`h-7 px-2.5 rounded-lg text-[12px] transition-colors ${
+                    storeListSettingsModeActive
+                      ? "bg-blue-500 text-white"
+                      : "bg-blue-50 text-blue-600 border border-blue-200"
+                  }`}
+                >
+                  {storeListSettingsModeActive ? "완료" : "설정"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStoreListDeleteModeActive((active) => {
+                      if (active) setDeleteTarget(null);
+                      return !active;
+                    });
+                    setStoreListSettingsModeActive(false);
+                    setSettingsTarget(null);
+                  }}
+                  className={`h-7 px-2.5 rounded-lg text-[12px] transition-colors ${
+                    storeListDeleteModeActive
+                      ? "bg-red-500 text-white"
+                      : "bg-red-50 text-red-500 border border-red-200"
+                  }`}
+                >
+                  {storeListDeleteModeActive ? "완료" : "삭제"}
+                </button>
+              </div>
+            </div>
+
+            <input
+              value={storeListSearchQuery}
+              onChange={(e) => setStoreListSearchQuery(e.target.value)}
+              placeholder="상점명 · 휴대폰 · 위치"
+              className="w-full h-9 rounded-lg bg-gray-100 px-3 text-[12px] focus:outline-none focus:ring-1 focus:ring-gray-300"
+            />
+
+            {filteredLoginableStores.length === 0 ? (
+              <div className="border border-dashed border-gray-200 rounded-xl px-4 py-8 text-center">
+                <p className="text-[13px] text-gray-500">선택한 시장에 등록된 상점이 없습니다.</p>
+                <p className="text-[11px] text-gray-400 mt-1">추가 버튼으로 상점을 등록할 수 있습니다.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {filteredLoginableStores.map((store) => {
+                  const canLoginAsStore = !storeListSettingsModeActive && !storeListDeleteModeActive;
+                  const storeInfo = (
+                    <>
+                      <p className="text-[13px] text-gray-900 font-medium">{store.name}</p>
+                      <p className="text-[12px] text-gray-500 mt-0.5">
+                        {formatPhoneDisplay(store.phone)} · {store.subtitle}
+                      </p>
+                      <p className="text-[10px] text-blue-500 mt-0.5">
+                        로그인 {formatPhoneDisplay(store.phone)}
+                        {store.pin && <span> · PIN {store.pin}</span>}
+                      </p>
+                    </>
+                  );
+
+                  return (
+                    <div key={store.key} className="flex items-center gap-2 rounded-lg bg-gray-50 p-3">
+                      {canLoginAsStore ? (
+                        <button
+                          type="button"
+                          onClick={() => handleLoginAsStore(store)}
+                          className="flex-1 min-w-0 text-left rounded-lg active:bg-gray-100 transition-colors"
+                        >
+                          {storeInfo}
+                        </button>
+                      ) : (
+                        <div className="flex-1 min-w-0">{storeInfo}</div>
+                      )}
+                      {storeListSettingsModeActive && store.storeId != null && (
+                        <button
+                          type="button"
+                          onClick={() => openStoreListSettings(store)}
+                          className="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 active:bg-blue-200 transition-colors"
+                          aria-label="상점 계정 설정"
+                        >
+                          <Settings className="w-4 h-4" />
+                        </button>
+                      )}
+                      {storeListDeleteModeActive && store.storeId != null && (
+                        <button
+                          type="button"
+                          onClick={() => openStoreListDeleteConfirm(store)}
+                          className="flex-shrink-0 w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center text-red-500 active:bg-red-200 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {filteredUnregisteredLoginAccounts.length > 0 && (
+              <div className="space-y-2 pt-3 border-t border-gray-100">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-[13px] text-gray-700">시장 미등록 계정</h3>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[12px] text-gray-500">{filteredUnregisteredLoginAccounts.length}개</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUnregisteredDeleteAllOpen(true);
+                        setUnregisteredDeleteAllInput("");
+                      }}
+                      className="h-7 px-2.5 rounded-lg bg-red-50 text-red-500 border border-red-200 text-[12px]"
+                    >
+                      전체 삭제
+                    </button>
+                  </div>
+                </div>
+                <p className="text-[11px] text-gray-400">
+                  로그인은 가능하지만 시장 지도·등록 목록에는 없는 계정입니다.
+                </p>
+                <div className="space-y-2">
+                  {filteredUnregisteredLoginAccounts.map((store) => {
+                    const canLoginAsStore = !storeListSettingsModeActive && !storeListDeleteModeActive;
+                    const storeInfo = (
+                      <>
+                        <p className="text-[13px] text-gray-900 font-medium">{store.name}</p>
+                        <p className="text-[12px] text-amber-600 mt-0.5">{store.subtitle}</p>
+                        <p className="text-[10px] text-blue-500 mt-0.5">
+                          로그인 {formatPhoneDisplay(store.phone)}
+                          {store.pin && <span> · PIN {store.pin}</span>}
+                        </p>
+                      </>
+                    );
+
+                    return (
+                      <div key={store.key} className="flex items-center gap-2 rounded-lg bg-amber-50 p-3 border border-amber-100">
+                        {canLoginAsStore ? (
+                          <button
+                            type="button"
+                            onClick={() => handleLoginAsStore(store)}
+                            className="flex-1 min-w-0 text-left rounded-lg active:bg-amber-100 transition-colors"
+                          >
+                            {storeInfo}
+                          </button>
+                        ) : (
+                          <div className="flex-1 min-w-0">{storeInfo}</div>
+                        )}
+                        {storeListSettingsModeActive && store.storeId != null && (
+                          <button
+                            type="button"
+                            onClick={() => openStoreListSettings(store)}
+                            className="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 active:bg-blue-200 transition-colors"
+                            aria-label="상점 계정 설정"
+                          >
+                            <Settings className="w-4 h-4" />
+                          </button>
+                        )}
+                        {storeListDeleteModeActive && (
+                          <button
+                            type="button"
+                            onClick={() => openStoreListDeleteConfirm(store)}
+                            className="flex-shrink-0 w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center text-red-500 active:bg-red-200 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {adminPanelView === "market" && <div className="bg-white rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-1.5 rounded-lg bg-gray-100 p-1">
               <button
@@ -1353,27 +2270,32 @@ export function AdminPage() {
                   </button>
                   <button
                     onClick={() => {
-                      setSettingsModeActive((v) => !v);
-                      setDeleteModeActive(false);
-                      setSettingsTarget(null);
+                      setStoreSettingsModeActive((active) => {
+                        if (active) setSettingsTarget(null);
+                        return !active;
+                      });
+                      setStoreDeleteModeActive(false);
                     }}
                     className={`h-7 px-2.5 rounded-lg text-[12px] transition-colors ${
-                      settingsModeActive ? "bg-blue-500 text-white" : "bg-blue-50 text-blue-600 border border-blue-200"
+                      storeSettingsModeActive ? "bg-blue-500 text-white" : "bg-blue-50 text-blue-600 border border-blue-200"
                     }`}
                   >
-                    {settingsModeActive ? "완료" : "설정"}
+                    {storeSettingsModeActive ? "완료" : "설정"}
                   </button>
                   <button
                     onClick={() => {
-                      setDeleteModeActive((v) => !v);
-                      setSettingsModeActive(false);
+                      setStoreDeleteModeActive((active) => {
+                        if (active) setDeleteTarget(null);
+                        return !active;
+                      });
+                      setStoreSettingsModeActive(false);
                       setSettingsTarget(null);
                     }}
                     className={`h-7 px-2.5 rounded-lg text-[12px] transition-colors ${
-                      deleteModeActive ? "bg-red-500 text-white" : "bg-red-50 text-red-500 border border-red-200"
+                      storeDeleteModeActive ? "bg-red-500 text-white" : "bg-red-50 text-red-500 border border-red-200"
                     }`}
                   >
-                    {deleteModeActive ? "완료" : "삭제"}
+                    {storeDeleteModeActive ? "완료" : "삭제"}
                   </button>
                 </div>
               </div>
@@ -1433,7 +2355,7 @@ export function AdminPage() {
                       />
                       <input
                         value={editForm.phone}
-                        onChange={(e) => setEditForm((prev) => ({ ...prev, phone: e.target.value }))}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, phone: formatPhoneInput(e.target.value) }))}
                         className="w-full h-9 rounded-md bg-white px-3 text-[12px]"
                         placeholder="연락처"
                       />
@@ -1508,7 +2430,7 @@ export function AdminPage() {
                     >
                       <button
                         type="button"
-                        onClick={() => !deleteModeActive && !settingsModeActive && openOwnerStoreEditor(store, "list")}
+                        onClick={() => !storeDeleteModeActive && !storeSettingsModeActive && openOwnerStoreEditor(store, "list")}
                         className="flex-1 text-left"
                       >
                         <p className="text-[13px] text-gray-900">{store.name}</p>
@@ -1523,7 +2445,7 @@ export function AdminPage() {
                           </p>
                         )}
                       </button>
-                      {settingsModeActive && (
+                      {storeSettingsModeActive && (
                         <button
                           onClick={() => openStoreSettings(store)}
                           className="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 active:bg-blue-200 transition-colors"
@@ -1532,7 +2454,7 @@ export function AdminPage() {
                           <Settings className="w-4 h-4" />
                         </button>
                       )}
-                      {deleteModeActive && (
+                      {storeDeleteModeActive && (
                         <button
                           onClick={() => openDeleteConfirm({ id: store.id, name: store.name })}
                           className="flex-shrink-0 w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center text-red-500 active:bg-red-200 transition-colors"
@@ -1732,6 +2654,228 @@ export function AdminPage() {
               }`}
             >
               삭제
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {(customerAddOpen || customerSettingsTarget) && (
+      <div className="app-modal-overlay fixed inset-0 flex items-center justify-center">
+        <div
+          className="absolute inset-0 bg-black/50"
+          onClick={() => {
+            setCustomerAddOpen(false);
+            setCustomerSettingsTarget(null);
+            setCustomerForm(EMPTY_CUSTOMER_FORM);
+            setCustomerFormError("");
+          }}
+        />
+        <div className="app-modal-content relative bg-white rounded-2xl shadow-xl p-6 mx-6 w-full max-w-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <Settings className="w-5 h-5 text-blue-500" />
+            <p className="text-[15px] font-semibold text-gray-900">
+              {customerAddOpen ? "손님 계정 추가" : "손님 계정 설정"}
+            </p>
+          </div>
+
+          <div className="space-y-3 mb-4">
+            <div>
+              <label className="block text-[12px] text-gray-500 mb-1">닉네임</label>
+              <input
+                value={customerForm.name}
+                onChange={(e) => setCustomerForm((prev) => ({ ...prev, name: e.target.value }))}
+                className="w-full h-10 rounded-lg border border-gray-200 bg-gray-50 px-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-blue-300"
+              />
+            </div>
+            <div>
+              <label className="block text-[12px] text-gray-500 mb-1">휴대폰 번호 (로그인 ID)</label>
+              <input
+                type="tel"
+                value={customerForm.phone}
+                onChange={(e) => setCustomerForm((prev) => ({ ...prev, phone: formatPhoneInput(e.target.value) }))}
+                maxLength={13}
+                placeholder="010-0000-0000"
+                className="w-full h-10 rounded-lg border border-gray-200 bg-gray-50 px-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-blue-300"
+              />
+            </div>
+            <div>
+              <label className="block text-[12px] text-gray-500 mb-1">이메일</label>
+              <input
+                type="email"
+                value={customerForm.email}
+                onChange={(e) => setCustomerForm((prev) => ({ ...prev, email: e.target.value }))}
+                placeholder="example@email.com"
+                className="w-full h-10 rounded-lg border border-gray-200 bg-gray-50 px-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-blue-300"
+              />
+            </div>
+            <div>
+              <label className="block text-[12px] text-gray-500 mb-1">PIN 번호</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={customerForm.pin}
+                onChange={(e) => setCustomerForm((prev) => ({ ...prev, pin: e.target.value.replace(/\D/g, "").slice(0, 6) }))}
+                maxLength={6}
+                placeholder="4~6자리"
+                className="w-full h-10 rounded-lg border border-gray-200 bg-gray-50 px-3 text-[13px] tracking-widest focus:outline-none focus:ring-1 focus:ring-blue-300"
+              />
+            </div>
+          </div>
+
+          {customerFormError && (
+            <p className="text-[11px] text-red-400 mb-3">{customerFormError}</p>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                setCustomerAddOpen(false);
+                setCustomerSettingsTarget(null);
+                setCustomerForm(EMPTY_CUSTOMER_FORM);
+                setCustomerFormError("");
+              }}
+              className="flex-1 h-10 rounded-xl bg-gray-100 text-[13px] text-gray-700 font-medium"
+            >
+              취소
+            </button>
+            <button
+              onClick={customerAddOpen ? handleAddCustomer : handleSaveCustomerSettings}
+              className="flex-1 h-10 rounded-xl bg-blue-500 text-[13px] text-white font-medium"
+            >
+              {customerAddOpen ? "추가" : "저장"}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {customerDeleteTarget && (
+      <div className="app-modal-overlay fixed inset-0 flex items-center justify-center">
+        <div
+          className="absolute inset-0 bg-black/50"
+          onClick={() => { setCustomerDeleteTarget(null); setCustomerDeleteInput(""); }}
+        />
+        <div className="app-modal-content relative bg-white rounded-2xl shadow-xl p-6 mx-6 w-full max-w-sm">
+          <p className="text-[15px] font-semibold text-gray-900 mb-1">이 손님을 삭제하시겠습니까?</p>
+          <div className="text-[13px] text-gray-500 mb-4 space-y-2">
+            <p>
+              <span className="font-medium text-gray-800">{customerDeleteTarget.name}</span> 손님 계정을 삭제합니다.
+            </p>
+            <p>
+              삭제를 원하신다면 아래에 <span className="font-bold text-red-500">삭제</span>를 입력해주세요.
+            </p>
+          </div>
+          <input
+            value={customerDeleteInput}
+            onChange={(e) => setCustomerDeleteInput(e.target.value)}
+            placeholder="삭제"
+            className="w-full h-10 rounded-lg border border-gray-200 bg-gray-50 px-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-red-300 mb-4"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setCustomerDeleteTarget(null); setCustomerDeleteInput(""); }}
+              className="flex-1 h-10 rounded-xl bg-gray-100 text-[13px] text-gray-700 font-medium"
+            >
+              취소
+            </button>
+            <button
+              onClick={() => customerDeleteInput === "삭제" && handleDeleteCustomer()}
+              className={`flex-1 h-10 rounded-xl text-[13px] font-medium transition-colors ${
+                customerDeleteInput === "삭제"
+                  ? "bg-red-500 text-white"
+                  : "bg-red-100 text-red-300 cursor-not-allowed"
+              }`}
+            >
+              삭제
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {unregisteredDeleteTarget && (
+      <div className="app-modal-overlay fixed inset-0 flex items-center justify-center">
+        <div
+          className="absolute inset-0 bg-black/50"
+          onClick={() => { setUnregisteredDeleteTarget(null); setUnregisteredDeleteInput(""); }}
+        />
+        <div className="app-modal-content relative bg-white rounded-2xl shadow-xl p-6 mx-6 w-full max-w-sm">
+          <p className="text-[15px] font-semibold text-gray-900 mb-1">미등록 계정을 삭제하시겠습니까?</p>
+          <div className="text-[13px] text-gray-500 mb-4 space-y-2">
+            <p>
+              <span className="font-medium text-gray-800">{unregisteredDeleteTarget.name}</span> 계정을 삭제합니다.
+            </p>
+            <p>
+              삭제를 원하신다면 아래에 <span className="font-bold text-red-500">삭제</span>를 입력해주세요.
+            </p>
+          </div>
+          <input
+            value={unregisteredDeleteInput}
+            onChange={(e) => setUnregisteredDeleteInput(e.target.value)}
+            placeholder="삭제"
+            className="w-full h-10 rounded-lg border border-gray-200 bg-gray-50 px-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-red-300 mb-4"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setUnregisteredDeleteTarget(null); setUnregisteredDeleteInput(""); }}
+              className="flex-1 h-10 rounded-xl bg-gray-100 text-[13px] text-gray-700 font-medium"
+            >
+              취소
+            </button>
+            <button
+              onClick={() => unregisteredDeleteInput === "삭제" && handleDeleteUnregisteredAccount()}
+              className={`flex-1 h-10 rounded-xl text-[13px] font-medium transition-colors ${
+                unregisteredDeleteInput === "삭제"
+                  ? "bg-red-500 text-white"
+                  : "bg-red-100 text-red-300 cursor-not-allowed"
+              }`}
+            >
+              삭제
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {unregisteredDeleteAllOpen && (
+      <div className="app-modal-overlay fixed inset-0 flex items-center justify-center">
+        <div
+          className="absolute inset-0 bg-black/50"
+          onClick={() => { setUnregisteredDeleteAllOpen(false); setUnregisteredDeleteAllInput(""); }}
+        />
+        <div className="app-modal-content relative bg-white rounded-2xl shadow-xl p-6 mx-6 w-full max-w-sm">
+          <p className="text-[15px] font-semibold text-gray-900 mb-1">시장 미등록 계정 전체 삭제</p>
+          <div className="text-[13px] text-gray-500 mb-4 space-y-2">
+            <p>
+              미등록 계정 <span className="font-medium text-gray-800">{unregisteredLoginAccounts.length}개</span>를 모두 삭제합니다.
+            </p>
+            <p>
+              삭제를 원하신다면 아래에 <span className="font-bold text-red-500">삭제</span>를 입력해주세요.
+            </p>
+          </div>
+          <input
+            value={unregisteredDeleteAllInput}
+            onChange={(e) => setUnregisteredDeleteAllInput(e.target.value)}
+            placeholder="삭제"
+            className="w-full h-10 rounded-lg border border-gray-200 bg-gray-50 px-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-red-300 mb-4"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setUnregisteredDeleteAllOpen(false); setUnregisteredDeleteAllInput(""); }}
+              className="flex-1 h-10 rounded-xl bg-gray-100 text-[13px] text-gray-700 font-medium"
+            >
+              취소
+            </button>
+            <button
+              onClick={() => unregisteredDeleteAllInput === "삭제" && handleDeleteAllUnregisteredAccounts()}
+              className={`flex-1 h-10 rounded-xl text-[13px] font-medium transition-colors ${
+                unregisteredDeleteAllInput === "삭제"
+                  ? "bg-red-500 text-white"
+                  : "bg-red-100 text-red-300 cursor-not-allowed"
+              }`}
+            >
+              전체 삭제
             </button>
           </div>
         </div>

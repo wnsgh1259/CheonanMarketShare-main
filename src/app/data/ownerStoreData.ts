@@ -159,6 +159,43 @@ export function migrateLegacyOwnerDraftIfNeeded() {
   }
 }
 
+export function mergeOwnerCatalog(
+  local: OwnerDashboardCatalog,
+  remote: OwnerDashboardCatalog,
+): OwnerDashboardCatalog {
+  const storeById = new Map<number, SharedDraftStore>();
+  for (const store of remote.stores ?? []) {
+    storeById.set(store.id, store);
+  }
+  for (const store of local.stores ?? []) {
+    const existing = storeById.get(store.id);
+    storeById.set(store.id, existing ? { ...existing, ...store } : store);
+  }
+
+  const facilityById = new Map<number, SharedFacility>();
+  for (const facility of remote.facilities ?? []) {
+    facilityById.set(facility.id, facility);
+  }
+  for (const facility of local.facilities ?? []) {
+    const existing = facilityById.get(facility.id);
+    facilityById.set(facility.id, existing ? { ...existing, ...facility } : facility);
+  }
+
+  return {
+    stores: Array.from(storeById.values()),
+    facilities: Array.from(facilityById.values()),
+  };
+}
+
+export async function refreshOwnerCatalogFromRemote(): Promise<OwnerDashboardCatalog> {
+  const local = loadOwnerCatalog();
+  const remote = await loadOwnerCatalogRemote();
+  if (!remote) return local;
+  const merged = mergeOwnerCatalog(local, remote);
+  saveOwnerCatalog(merged);
+  return merged;
+}
+
 export function upsertCatalogStore(store: SharedDraftStore) {
   const catalog = loadOwnerCatalog();
   const stores = catalog.stores.some((item) => item.id === store.id)
