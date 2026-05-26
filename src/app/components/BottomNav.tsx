@@ -1,10 +1,24 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
-import { Home, MapPin, ShoppingCart, MessageCircle, User, Ticket, Receipt } from "lucide-react";
+import { Home, MapPin, ShoppingCart, MessageCircle, User, Ticket, Receipt, ChevronLeft } from "lucide-react";
 import { useCart } from "./CartContext";
 
 export const OWNER_MODE_KEY = "owner_mode";
 export const OWNER_STORE_MGMT_RETURN_KEY = "owner_store_mgmt_return";
+export const STORE_SETTINGS_PATH = "/owner/store-registration?section=settings";
+
+export function isOwnerModeActive() {
+  return localStorage.getItem(OWNER_MODE_KEY) === "true";
+}
+
+export function getSettingsPath() {
+  const ownerMode = isOwnerModeActive();
+  const role = localStorage.getItem("user_role");
+  if (ownerMode || role === "owner") {
+    return STORE_SETTINGS_PATH;
+  }
+  return "/settings";
+}
 
 export function setOwnerMode(active: boolean) {
   if (active) localStorage.setItem(OWNER_MODE_KEY, "true");
@@ -25,9 +39,9 @@ export function OwnerBackToStoreButton({ className = "" }: { className?: string 
         navigate(returnPath, { replace: true });
       }}
       className={`w-10 h-10 flex items-center justify-center ${className}`}
-      aria-label="상점 관리로 돌아가기"
+      aria-label="뒤로가기"
     >
-      <Home className="w-[20px] h-[20px] text-gray-600" />
+      <ChevronLeft className="w-[20px] h-[20px] text-gray-600" />
     </button>
   );
 }

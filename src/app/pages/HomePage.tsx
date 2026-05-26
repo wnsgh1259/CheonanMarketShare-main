@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { Bell, MapPin, Store, ChevronRight, Clock, Tag, ShoppingCart, Settings } from "lucide-react";
 import { useCart } from "../components/CartContext";
-import { BottomNav, OWNER_MODE_KEY, OwnerBackToStoreButton } from "../components/BottomNav";
+import { BottomNav, OWNER_MODE_KEY, OwnerBackToStoreButton, getSettingsPath } from "../components/BottomNav";
 
 type MarketId = "jungang" | "byeongcheon" | "seonghwan";
 
@@ -112,7 +112,7 @@ export function HomePage() {
                   <Bell className="w-[20px] h-[20px] text-gray-600" />
                   <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-red-500 rounded-full" />
                 </button>
-                <Link to="/settings" className="w-10 h-10 flex items-center justify-center">
+                <Link to={getSettingsPath()} className="w-10 h-10 flex items-center justify-center">
                   <Settings className="w-[20px] h-[20px] text-gray-600" />
                 </Link>
               </>

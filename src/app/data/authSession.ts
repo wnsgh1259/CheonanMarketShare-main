@@ -1,4 +1,4 @@
-import { ADMIN_PHONE, matchesAdminCredentials, loadStoreAccountsMap, type StoreAccountRecord } from "./adminAccount";
+import { ADMIN_PHONE, ADMIN_PIN, matchesAdminCredentials, loadStoreAccountsMap, type StoreAccountRecord } from "./adminAccount";
 import { getSignupRejectReason } from "./ownerSignupApplications";
 import { findRegisteredUserByPhone, type RegisteredUser } from "./userAccounts";
 
@@ -223,4 +223,32 @@ export function isAdminSession(session: AuthSession = readAuthSession()) {
 
 export function isOwnerSession(session: AuthSession = readAuthSession()) {
   return session.role === "owner" && session.status === "active";
+}
+
+const ADMIN_SESSION_BACKUP_KEY = "admin_session_backup";
+
+export function backupAdminSessionForImpersonation() {
+  const session = readAuthSession();
+  if (session.role !== "admin") return;
+  sessionStorage.setItem(ADMIN_SESSION_BACKUP_KEY, JSON.stringify(session));
+}
+
+export function restoreAdminSessionFromBackup(): boolean {
+  const raw = sessionStorage.getItem(ADMIN_SESSION_BACKUP_KEY);
+  if (!raw) return false;
+  try {
+    const session = JSON.parse(raw) as AuthSession;
+    writeAuthSession(session, ADMIN_PIN);
+    sessionStorage.removeItem(ADMIN_SESSION_BACKUP_KEY);
+    return true;
+  } catch {
+    sessionStorage.removeItem(ADMIN_SESSION_BACKUP_KEY);
+    return false;
+  }
+}
+
+export function setAdminStorePreviewContext(storeId: number, storeName: string) {
+  localStorage.setItem("owner_store_id", String(storeId));
+  localStorage.setItem("owner_current_store_name", storeName);
+  localStorage.setItem("owner_approved_store_name", storeName);
 }

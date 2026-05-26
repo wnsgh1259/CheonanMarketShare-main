@@ -6,9 +6,11 @@ import {
   formatPhoneDisplay as formatAdminPhoneDisplay,
   resolveStoreLoginPhone,
 } from "../data/adminAccount";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { setOwnerMode, OWNER_STORE_MGMT_RETURN_KEY } from "../components/BottomNav";
 import { useAuth } from "../context/AuthContext";
+import { restoreAdminSessionFromBackup } from "../data/authSession";
+import { peekAdminReturnState, buildAdminReturnUrl } from "../data/adminNavigation";
 import { saveUserEmail, isValidEmail, findRegisteredUserByPhone } from "../data/userAccounts";
 import { STORES_BY_MARKET } from "../data/storeData";
 import {
@@ -64,6 +66,21 @@ type DraftStore = {
 
 type OwnerSection = "store" | "product" | "communication" | "customerMode" | "community" | "promotion" | "settings";
 
+function parseOwnerSection(value: string | null): OwnerSection | null {
+  if (
+    value === "store" ||
+    value === "product" ||
+    value === "communication" ||
+    value === "customerMode" ||
+    value === "community" ||
+    value === "promotion" ||
+    value === "settings"
+  ) {
+    return value;
+  }
+  return null;
+}
+
 type OwnerMenu = {
   id: number;
   name: string;
@@ -82,6 +99,30 @@ type OwnerDashboardDraft = {
 };
 
 const OWNER_APPROVED_STORE_NAME_KEY = "owner_approved_store_name";
+
+function readEditStoreDraftSync(storeId: number): DraftStore | null {
+  try {
+    const rawEdit = window.localStorage.getItem(OWNER_EDIT_STORE_KEY);
+    if (rawEdit) {
+      const parsed = JSON.parse(rawEdit) as DraftStore;
+      if (parsed.id === storeId) return parsed;
+    }
+  } catch {
+    // ignore corrupted draft
+  }
+  migrateLegacyOwnerDraftIfNeeded();
+  const catalog = loadOwnerCatalog();
+  return (catalog.stores ?? []).find((store) => store.id === storeId) ?? null;
+}
+
+function resolveInitialStoreLabel(storeId: number | null, isAdminNewStore: boolean) {
+  if (isAdminNewStore) return "새 상점 등록";
+  if (storeId !== null) {
+    const target = readEditStoreDraftSync(storeId);
+    if (target?.name) return target.name;
+  }
+  return "~~사장님";
+}
 
 const MARKET_VIEW_CONFIG: Record<MarketId, {
   label: string;
@@ -151,19 +192,19 @@ declare global {
 
 export function StoreRegistrationPage() {
   const navigate = useNavigate();
-  const { logout } = useAuth();
-  const query = new URLSearchParams(window.location.search);
-  const queryMarket = query.get("market");
-  const editStoreIdParam = query.get("editStoreId");
+  const { logout, refresh } = useAuth();
+  const [searchParams] = useSearchParams();
+  const queryMarket = searchParams.get("market");
+  const editStoreIdParam = searchParams.get("editStoreId");
   const queryEditStoreId =
     editStoreIdParam != null && editStoreIdParam !== "" ? Number(editStoreIdParam) : Number.NaN;
   const sessionStoreIdRaw = localStorage.getItem("owner_store_id");
   const sessionStoreId = sessionStoreIdRaw ? Number(sessionStoreIdRaw) : Number.NaN;
   const isAdminNewStore =
-    query.get("returnTo") === "admin" &&
-    query.get("adminNew") === "1" &&
+    searchParams.get("returnTo") === "admin" &&
+    searchParams.get("adminNew") === "1" &&
     !Number.isFinite(queryEditStoreId);
-  const initialEditStoreId = Number.isFinite(queryEditStoreId)
+  const editStoreId = Number.isFinite(queryEditStoreId)
     ? queryEditStoreId
     : !isAdminNewStore && Number.isFinite(sessionStoreId)
       ? sessionStoreId
@@ -172,20 +213,16 @@ export function StoreRegistrationPage() {
     queryMarket === "jungang" || queryMarket === "byeongcheon" || queryMarket === "seonghwan"
       ? queryMarket
       : "byeongcheon";
-  const returnToAdmin = query.get("returnTo") === "admin";
-  const adminReturnHint =
-    query.get("adminReturn") === "map" || query.get("adminReturn") === "list" ? query.get("adminReturn") : null;
+  const returnToAdmin = searchParams.get("returnTo") === "admin";
+  const storeLoadGenerationRef = useRef(0);
 
-  const goBackToAdmin = (opts?: { replace?: boolean }) => {
-    const q = new URLSearchParams();
-    q.set("market", initialMarket);
-    if (adminReturnHint === "map") {
-      q.set("adminReturn", "map");
-    } else if (adminReturnHint === "list" && initialEditStoreId !== null) {
-      q.set("adminReturn", "list");
-      q.set("focusStore", String(initialEditStoreId));
-    }
-    navigate(`/admin?${q.toString()}`, { replace: opts?.replace === true });
+  const goBackToAdmin = () => {
+    restoreAdminSessionFromBackup();
+    refresh();
+    setOwnerMode(false);
+    const saved = peekAdminReturnState();
+    const market = saved?.market ?? initialMarket;
+    navigate(buildAdminReturnUrl(market), { replace: true });
   };
 
   const saveStoreMgmtReturnPath = () => {
@@ -201,12 +238,12 @@ export function StoreRegistrationPage() {
   };
 
   useEffect(() => {
-    if (query.get("returnTo") === "admin") {
+    if (searchParams.get("returnTo") === "admin") {
       saveStoreMgmtReturnPath();
     }
-  }, []);
+  }, [searchParams]);
 
-  const resolvedStoreId = initialEditStoreId ?? (Number.isFinite(sessionStoreId) ? sessionStoreId : null);
+  const resolvedStoreId = editStoreId ?? (Number.isFinite(sessionStoreId) ? sessionStoreId : null);
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<NaverMapRef | null>(null);
@@ -218,7 +255,8 @@ export function StoreRegistrationPage() {
   const [pin, setPin] = useState<{ lat: number; lng: number } | null>(null);
   const [selectedMarket, setSelectedMarket] = useState<MarketId>(initialMarket);
   const [stores, setStores] = useState<DraftStore[]>([]);
-  const [editingStoreId, setEditingStoreId] = useState<number | null>(initialEditStoreId);
+  const [editingStoreId, setEditingStoreId] = useState<number | null>(editStoreId);
+  const [isStoreHydrating, setIsStoreHydrating] = useState(() => editStoreId !== null && !isAdminNewStore);
   const [form, setForm] = useState({
     name: "",
     location: "",
@@ -228,7 +266,9 @@ export function StoreRegistrationPage() {
     representativePhotoName: "",
     representativePhotoUrl: "",
   });
-  const [activeSection, setActiveSection] = useState<OwnerSection | null>(null);
+  const [activeSection, setActiveSection] = useState<OwnerSection | null>(() =>
+    parseOwnerSection(searchParams.get("section")),
+  );
   const [activeCommunicationSubSection, setActiveCommunicationSubSection] = useState<"review" | "inquiry">("review");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedPayments, setSelectedPayments] = useState<string[]>([]);
@@ -239,19 +279,19 @@ export function StoreRegistrationPage() {
   const [reviewReply, setReviewReply] = useState("");
   const [inquiryReply, setInquiryReply] = useState("");
   const [saveNotice, setSaveNotice] = useState("");
-  const [pageTitle, setPageTitle] = useState(isAdminNewStore ? "새 상점 등록" : "~~사장님");
-  const [approvedStoreName, setApprovedStoreName] = useState(() =>
-    isAdminNewStore
-      ? ""
-      : localStorage.getItem(OWNER_APPROVED_STORE_NAME_KEY)
-      || localStorage.getItem("owner_current_store_name")
-      || localStorage.getItem("user_name")
-      || "",
-  );
+  const [pageTitle, setPageTitle] = useState(() => resolveInitialStoreLabel(editStoreId, isAdminNewStore));
+  const [approvedStoreName, setApprovedStoreName] = useState(() => {
+    if (isAdminNewStore) return "";
+    if (editStoreId !== null) {
+      const target = readEditStoreDraftSync(editStoreId);
+      if (target?.name) return target.name;
+    }
+    return "";
+  });
   const [adminNewCredentials, setAdminNewCredentials] = useState<{ phone: string; pin: string } | null>(() =>
     isAdminNewStore ? generateUniqueStoreCredentials() : null,
   );
-  const [ownerPhone, setOwnerPhone] = useState(() => resolveStoreLoginPhone(initialEditStoreId));
+  const [ownerPhone, setOwnerPhone] = useState(() => resolveStoreLoginPhone(editStoreId));
   const [ownerEmail, setOwnerEmail] = useState(() => localStorage.getItem("user_email") || "");
   const [settingsModal, setSettingsModal] = useState<"storeName" | "phone" | "pin" | "email" | null>(null);
   const [settingsInput, setSettingsInput] = useState("");
@@ -330,29 +370,135 @@ export function StoreRegistrationPage() {
   const isStoreNamePending = Boolean(pendingStoreNameRequest);
   const isPhonePending = Boolean(pendingPhoneRequest);
 
+  const applyDraftStoreToState = (target: DraftStore) => {
+    const fixedName = target.name || localStorage.getItem(OWNER_APPROVED_STORE_NAME_KEY) || "";
+    if (fixedName) {
+      setApprovedStoreName(fixedName);
+      localStorage.setItem(OWNER_APPROVED_STORE_NAME_KEY, fixedName);
+      localStorage.setItem("owner_current_store_name", fixedName);
+      localStorage.setItem("owner_store_id", String(target.id));
+    }
+    setPageTitle(fixedName || "~~사장님");
+    if (target.marketId) setSelectedMarket(target.marketId);
+    const dummyMatch = target.marketId
+      ? STORES_BY_MARKET[target.marketId].find((store) => store.name === target.name)
+      : undefined;
+    setActiveSection("store");
+    setForm({
+      name: target.name,
+      location: target.location,
+      hours: target.hours ?? dummyMatch?.hours ?? "",
+      phone: target.phone,
+      description: target.description,
+      representativePhotoName: target.image || dummyMatch?.image ? "기존 대표사진" : "",
+      representativePhotoUrl: target.image ?? dummyMatch?.image ?? "",
+    });
+    setSelectedCategories(
+      target.category
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean),
+    );
+    setPin({ lat: target.lat, lng: target.lng });
+    if (target.menus?.length) {
+      setMenus(target.menus);
+    } else if (dummyMatch?.menus?.length) {
+      setMenus(
+        dummyMatch.menus.map((menu, index) => ({
+          id: Number(menu.id) || Date.now() + index,
+          name: menu.name,
+          price: String(menu.price),
+          photoName: "",
+        })),
+      );
+    }
+    setEditingStoreId(target.id);
+    setIsStoreHydrating(false);
+  };
+
+  const resetStoreEditorState = () => {
+    setPageTitle("~~사장님");
+    setApprovedStoreName("");
+    setForm({
+      name: "",
+      location: "",
+      hours: "",
+      phone: "",
+      description: "",
+      representativePhotoName: "",
+      representativePhotoUrl: "",
+    });
+    setSelectedCategories([]);
+    setSelectedPayments([]);
+    setPin(null);
+    pinMarkerRef.current?.setMap(null);
+    setMenus([{ id: Date.now(), name: "", price: "", photoName: "" }]);
+    setTodayDeal("");
+    setNews("");
+    setCouponEvent("");
+    setReviewReply("");
+    setInquiryReply("");
+    setEditingStoreId(null);
+  };
+
+  useLayoutEffect(() => {
+    if (isAdminNewStore || editStoreId === null) return;
+
+    storeLoadGenerationRef.current += 1;
+    setIsStoreHydrating(true);
+
+    const target = readEditStoreDraftSync(editStoreId);
+    if (target) {
+      applyDraftStoreToState(target);
+      return;
+    }
+
+    resetStoreEditorState();
+    setPageTitle("불러오는 중...");
+    setEditingStoreId(editStoreId);
+  }, [editStoreId, isAdminNewStore]);
+
   useEffect(() => {
-    migrateLegacyOwnerDraftIfNeeded();
+    if (isAdminNewStore) return;
+
+    const loadGeneration = storeLoadGenerationRef.current;
     let cancelled = false;
+
     const load = async () => {
       try {
-        const remoteCatalog = await loadOwnerCatalogRemote();
+        migrateLegacyOwnerDraftIfNeeded();
+
         const localCatalog = loadOwnerCatalog();
+        if (editStoreId !== null && !cancelled && loadGeneration === storeLoadGenerationRef.current) {
+          const localTarget =
+            (localCatalog.stores ?? []).find((store) => store.id === editStoreId) ??
+            readEditStoreDraftSync(editStoreId);
+          if (localTarget) {
+            applyDraftStoreToState(localTarget);
+          }
+        }
+
+        const remoteCatalog = await loadOwnerCatalogRemote();
+        if (cancelled || loadGeneration !== storeLoadGenerationRef.current) return;
+
         const catalog =
           remoteCatalog && localCatalog.stores.length === 0 && (localCatalog.facilities?.length ?? 0) === 0
             ? remoteCatalog
-            : localCatalog;
+            : localCatalog.stores.length > 0
+              ? localCatalog
+              : remoteCatalog ?? localCatalog;
         if (remoteCatalog && catalog === remoteCatalog) {
           saveOwnerCatalog(remoteCatalog);
         }
-        if (cancelled) return;
 
         setStores(catalog.stores ?? []);
 
-        const workspaceStoreId = resolvedStoreId;
+        const workspaceStoreId = editStoreId ?? resolvedStoreId;
         let workspace = workspaceStoreId ? loadOwnerStoreWorkspace(workspaceStoreId) : null;
         if (workspaceStoreId) {
           const remoteWorkspace = await loadOwnerStoreWorkspaceRemote(workspaceStoreId);
-          if (remoteWorkspace && !cancelled) {
+          if (cancelled || loadGeneration !== storeLoadGenerationRef.current) return;
+          if (remoteWorkspace) {
             const localRaw = localStorage.getItem(`owner-store-workspace-v1-${workspaceStoreId}`);
             if (!localRaw) {
               workspace = remoteWorkspace;
@@ -361,7 +507,7 @@ export function StoreRegistrationPage() {
           }
         }
 
-        if (workspace && !cancelled) {
+        if (workspace && !cancelled && loadGeneration === storeLoadGenerationRef.current) {
           setMenus(workspace.menus?.length ? workspace.menus : [{ id: Date.now(), name: "", price: "", photoName: "" }]);
           setTodayDeal(workspace.todayDeal ?? "");
           setNews(workspace.news ?? "");
@@ -370,66 +516,30 @@ export function StoreRegistrationPage() {
           setInquiryReply(workspace.inquiryReply ?? "");
         }
 
-        if (initialEditStoreId !== null) {
-          const directTarget = (catalog.stores ?? []).find((store) => store.id === initialEditStoreId);
-          const rawEdit = window.localStorage.getItem(OWNER_EDIT_STORE_KEY);
-          const editTarget = rawEdit ? (JSON.parse(rawEdit) as DraftStore) : null;
+        if (editStoreId !== null && !cancelled && loadGeneration === storeLoadGenerationRef.current) {
+          const directTarget = (catalog.stores ?? []).find((store) => store.id === editStoreId);
+          const editTarget = readEditStoreDraftSync(editStoreId);
           const target =
             directTarget ??
-            (editTarget && editTarget.id === initialEditStoreId ? editTarget : null);
+            (editTarget && editTarget.id === editStoreId ? editTarget : null);
           if (target) {
-            const fixedName = target.name || localStorage.getItem(OWNER_APPROVED_STORE_NAME_KEY) || "";
-            if (fixedName) {
-              setApprovedStoreName(fixedName);
-              localStorage.setItem(OWNER_APPROVED_STORE_NAME_KEY, fixedName);
-              localStorage.setItem("owner_current_store_name", fixedName);
-            }
-            setPageTitle(fixedName || "~~사장님");
-            if (target.marketId) setSelectedMarket(target.marketId);
-            const dummyMatch = target.marketId
-              ? STORES_BY_MARKET[target.marketId].find((store) => store.name === target.name)
-              : undefined;
-            setActiveSection("store");
-            setForm({
-              name: target.name,
-              location: target.location,
-              hours: target.hours ?? dummyMatch?.hours ?? "",
-              phone: target.phone,
-              description: target.description,
-              representativePhotoName: target.image || dummyMatch?.image ? "기존 대표사진" : "",
-              representativePhotoUrl: target.image ?? dummyMatch?.image ?? "",
-            });
-            setSelectedCategories(
-              target.category
-                .split(",")
-                .map((item) => item.trim())
-                .filter(Boolean),
-            );
-            setPin({ lat: target.lat, lng: target.lng });
-            if (target.menus?.length) {
-              setMenus(target.menus);
-            } else if (dummyMatch?.menus?.length) {
-              setMenus(
-                dummyMatch.menus.map((menu, index) => ({
-                  id: Number(menu.id) || Date.now() + index,
-                  name: menu.name,
-                  price: String(menu.price),
-                  photoName: "",
-                })),
-              );
-            }
-            setEditingStoreId(target.id);
+            applyDraftStoreToState(target);
+          } else {
+            setIsStoreHydrating(false);
           }
         }
       } catch {
-        // Ignore corrupted local draft.
+        if (!cancelled && loadGeneration === storeLoadGenerationRef.current) {
+          setIsStoreHydrating(false);
+        }
       }
     };
+
     void load();
     return () => {
       cancelled = true;
     };
-  }, [initialEditStoreId, resolvedStoreId]);
+  }, [editStoreId, resolvedStoreId, isAdminNewStore]);
 
   useEffect(() => {
     if (!isAdminNewStore) return;
@@ -474,14 +584,6 @@ export function StoreRegistrationPage() {
       localStorage.setItem("user_email", registered.email);
     }
   }, [resolvedStoreId, isAdminNewStore]);
-
-  useEffect(() => {
-    if (isAdminNewStore) return;
-    if (approvedStoreName) {
-      setPageTitle(approvedStoreName);
-      localStorage.setItem(OWNER_APPROVED_STORE_NAME_KEY, approvedStoreName);
-    }
-  }, [approvedStoreName, isAdminNewStore]);
 
   const submitChangeRequest = (type: "storeName" | "phone", newValue: string) => {
     const trimmed = newValue.trim();
@@ -827,7 +929,7 @@ export function StoreRegistrationPage() {
       });
     }
     if (returnToAdmin) {
-      goBackToAdmin({ replace: true });
+      goBackToAdmin();
       return;
     }
     setForm({ name: "", location: "", hours: "", phone: "", description: "", representativePhotoName: "", representativePhotoUrl: "" });
@@ -1024,7 +1126,13 @@ export function StoreRegistrationPage() {
           </div>
         )}
 
-        {activeSection === "store" && (
+        {activeSection === "store" && isStoreHydrating && (
+          <div className="bg-white rounded-xl p-8 text-center text-[13px] text-gray-500">
+            상점 정보를 불러오는 중...
+          </div>
+        )}
+
+        {activeSection === "store" && !isStoreHydrating && (
           <>
             <div className="bg-white rounded-xl p-4">
               <h2 className="text-[14px] text-gray-900 mb-1">지도에서 핀 지정</h2>

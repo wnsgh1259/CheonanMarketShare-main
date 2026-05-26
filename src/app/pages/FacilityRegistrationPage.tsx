@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ImagePlus, MapPin, ParkingSquare, Armchair, Toilet, Info, Package, Music } from "lucide-react";
 import { useNavigate } from "react-router";
+import { useAuth } from "../context/AuthContext";
+import { restoreAdminSessionFromBackup } from "../data/authSession";
+import { peekAdminReturnState, buildAdminReturnUrl } from "../data/adminNavigation";
 import type { MarketId } from "../components/CartContext";
 import { MARKET_VIEW_CONFIG } from "../map/storeMapPlacement";
 import {
@@ -64,6 +67,7 @@ declare global {
 
 export function FacilityRegistrationPage() {
   const navigate = useNavigate();
+  const { refresh } = useAuth();
   const query = new URLSearchParams(window.location.search);
   const queryMarket = query.get("market");
   const editFacilityIdParam = query.get("editFacilityId");
@@ -76,8 +80,12 @@ export function FacilityRegistrationPage() {
   const initialEditFacilityId = Number.isFinite(queryEditFacilityId) ? queryEditFacilityId : null;
   const returnToAdmin = query.get("returnTo") === "admin" || initialEditFacilityId !== null;
 
-  const goBackToAdmin = (opts?: { replace?: boolean }) => {
-    navigate(`/admin?market=${encodeURIComponent(selectedMarket)}&tab=facility`, { replace: opts?.replace === true });
+  const goBackToAdmin = () => {
+    restoreAdminSessionFromBackup();
+    refresh();
+    const saved = peekAdminReturnState();
+    const market = saved?.market ?? initialMarket;
+    navigate(buildAdminReturnUrl(market), { replace: true });
   };
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -355,7 +363,7 @@ export function FacilityRegistrationPage() {
     persistDraftFacilities(nextFacilities);
 
     if (returnToAdmin) {
-      goBackToAdmin({ replace: true });
+      goBackToAdmin();
       return;
     }
     setSaveNotice("저장되었습니다.");

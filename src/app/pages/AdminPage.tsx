@@ -20,6 +20,15 @@ import {
 import { refreshOwnerChangeRequestsFromRemote } from "../data/ownerChangeRequestsSync";
 import { refreshOwnerSignupApplicationsFromRemote } from "../data/ownerSignupApplicationsSync";
 import { formatPhoneDisplay, formatPhoneInput } from "../utils/phoneFormat";
+import {
+  backupAdminSessionForImpersonation,
+  setAdminStorePreviewContext,
+} from "../data/authSession";
+import {
+  saveAdminReturnState,
+  consumeAdminReturnState,
+  type AdminReturnState,
+} from "../data/adminNavigation";
 
 const FACILITY_COLOR_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
   "#448AFF": ParkingSquare,
@@ -341,6 +350,46 @@ export function AdminPage() {
     setCustomerForm(EMPTY_CUSTOMER_FORM);
     setCustomerFormError("");
   };
+
+  const captureAdminReturnState = (scrollTargetId?: string) => {
+    saveAdminReturnState({
+      market: selectedMarket,
+      adminPanelView,
+      membersListTab,
+      managementTab,
+      scrollTargetId,
+    });
+  };
+
+  useEffect(() => {
+    const restore = consumeAdminReturnState();
+    if (!restore) return;
+
+    setSelectedMarket(restore.market);
+    setAdminPanelView(restore.adminPanelView);
+    setMembersListTab(restore.membersListTab);
+    setManagementTab(restore.managementTab);
+    setSelectedStoreId(null);
+    setIsEditing(false);
+    resetListEditModes();
+
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("market", restore.market);
+        next.delete("adminReturn");
+        next.delete("focusStore");
+        return next;
+      },
+      { replace: true },
+    );
+
+    if (restore.scrollTargetId) {
+      window.requestAnimationFrame(() => {
+        document.getElementById(restore.scrollTargetId)?.scrollIntoView({ block: "center", behavior: "smooth" });
+      });
+    }
+  }, [setSearchParams]);
 
   const openAdminPanel = (view: AdminPanelView) => {
     setAdminPanelView((current) => {
@@ -966,7 +1015,8 @@ export function AdminPage() {
 
   const openStoreListAdd = () => {
     window.localStorage.removeItem(OWNER_EDIT_STORE_KEY);
-    navigate(`/owner/store-registration?market=${storeListMarket}&returnTo=admin&adminNew=1&adminReturn=list`);
+    captureAdminReturnState();
+    navigate(`/owner/store-registration?market=${storeListMarket}&returnTo=admin&adminNew=1`);
   };
 
   const openStoreListSettings = (item: LoginableStoreItem) => {
@@ -1083,9 +1133,28 @@ export function AdminPage() {
   };
 
   const handleLoginAsStore = (item: LoginableStoreItem) => {
+    const isAdminSession = localStorage.getItem("user_role") === "admin";
+    if (isAdminSession && item.storeId != null) {
+      const store = mergedStores.find((entry) => entry.id === item.storeId);
+      const marketId = store?.marketId ?? item.marketId ?? storeListMarket;
+      setAdminStorePreviewContext(item.storeId, item.name);
+      captureAdminReturnState();
+      navigate(
+        `/owner/store-registration?market=${marketId}&editStoreId=${item.storeId}&returnTo=admin`,
+        { replace: true },
+      );
+      return;
+    }
+
+    if (isAdminSession) {
+      backupAdminSessionForImpersonation();
+      captureAdminReturnState();
+    }
+
     const result = login(item.phone, item.pin);
     if (result.ok) {
-      navigate(result.redirect, { replace: true });
+      const returnQuery = isAdminSession ? "?returnTo=admin" : "";
+      navigate(`${result.redirect}${returnQuery}`, { replace: true });
       return;
     }
     window.alert(result.error);
@@ -1327,21 +1396,23 @@ export function AdminPage() {
       : [ensuredStore, ...draft.stores];
     saveDraft({ ...draft, stores: nextStores });
     window.localStorage.setItem(OWNER_EDIT_STORE_KEY, JSON.stringify(ensuredStore));
-    const returnHint =
-      source === "map"
-        ? "&adminReturn=map"
-        : `&adminReturn=list&focusStore=${encodeURIComponent(String(ensuredStore.id))}`;
+    setAdminStorePreviewContext(ensuredStore.id, ensuredStore.name);
+    captureAdminReturnState(
+      source === "map" ? "admin-store-map-section" : `admin-store-card-${ensuredStore.id}`,
+    );
     navigate(
-      `/owner/store-registration?market=${ensuredStore.marketId}&editStoreId=${ensuredStore.id}&returnTo=admin${returnHint}`,
+      `/owner/store-registration?market=${ensuredStore.marketId}&editStoreId=${ensuredStore.id}&returnTo=admin`,
     );
   };
 
   const openOwnerNewStoreEditor = () => {
     window.localStorage.removeItem(OWNER_EDIT_STORE_KEY);
+    captureAdminReturnState();
     navigate(`/owner/store-registration?market=${selectedMarket}&returnTo=admin&adminNew=1`);
   };
 
   const openFacilityRegistration = () => {
+    captureAdminReturnState();
     navigate(`/owner/facility-registration?market=${selectedMarket}&returnTo=admin`);
   };
 
@@ -1351,6 +1422,7 @@ export function AdminPage() {
       marketId: facility.marketId ?? selectedMarket,
     };
     window.localStorage.setItem(OWNER_EDIT_FACILITY_KEY, JSON.stringify(ensured));
+    captureAdminReturnState();
     navigate(
       `/owner/facility-registration?market=${ensured.marketId}&editFacilityId=${ensured.id}&returnTo=admin`,
     );
@@ -1405,8 +1477,7 @@ export function AdminPage() {
         return;
       }
       if (adminReturn === "list") {
-        setAdminPanelView("members");
-        setMembersListTab("stores");
+        setAdminPanelView("market");
         setManagementTab("store");
         setSelectedStoreId(null);
         setIsEditing(false);

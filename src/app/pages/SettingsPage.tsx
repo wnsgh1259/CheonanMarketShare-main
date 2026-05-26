@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, LogOut, User, Bell, Store, Phone, Lock, Mail } from "lucide-react";
-import { useNavigate } from "react-router";
-import { OWNER_MODE_KEY } from "../components/BottomNav";
+import { Navigate, useNavigate } from "react-router";
+import { OWNER_MODE_KEY, STORE_SETTINGS_PATH } from "../components/BottomNav";
 import { useAuth } from "../context/AuthContext";
 import { loadRegisteredUsers, upsertRegisteredUser, saveUserEmail, isValidEmail, findRegisteredUserByPhone } from "../data/userAccounts";
 import { resolveStoreLoginPhone } from "../data/adminAccount";
@@ -20,6 +20,7 @@ export function SettingsPage() {
   const { logout } = useAuth();
 
   const ownerMode = localStorage.getItem(OWNER_MODE_KEY) === "true";
+  const isOwnerAccount = localStorage.getItem("user_role") === "owner";
   const ownerStoreName = localStorage.getItem("owner_current_store_name") || "";
 
   const [nickname, setNickname] = useState(
@@ -200,6 +201,10 @@ export function SettingsPage() {
     setSettingsPinConfirm("");
     setSettingsNotice("");
   };
+
+  if (ownerMode || isOwnerAccount) {
+    return <Navigate to={STORE_SETTINGS_PATH} replace />;
+  }
 
   return (
     <div className="min-h-screen bg-[#F7F8FA]">
