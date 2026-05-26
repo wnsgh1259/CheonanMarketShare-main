@@ -29,11 +29,13 @@ export function loadOwnerSignupApplications(): OwnerSignupApplication[] {
 
 export function persistOwnerSignupApplications(applications: OwnerSignupApplication[]) {
   localStorage.setItem(OWNER_SIGNUP_APPLICATIONS_KEY, JSON.stringify(applications));
+  void import("./ownerSignupApplicationsSync").then(({ syncOwnerSignupApplicationsToRemote }) =>
+    syncOwnerSignupApplicationsToRemote(applications),
+  );
 }
 
-function nextSignupApplicationId(applications: OwnerSignupApplication[]) {
-  const maxId = applications.reduce((max, item) => Math.max(max, item.id), 0);
-  return maxId + 1;
+function nextSignupApplicationId() {
+  return Date.now();
 }
 
 export function findPendingSignupByPhone(phone: string): OwnerSignupApplication | null {
@@ -57,7 +59,7 @@ export function submitOwnerSignupApplication(input: {
   const applications = loadOwnerSignupApplications();
   const phoneDigits = input.phone.replace(/\D/g, "");
   const application: OwnerSignupApplication = {
-    id: nextSignupApplicationId(applications),
+    id: nextSignupApplicationId(),
     storeName: input.storeName.trim(),
     email: input.email.trim(),
     phone: phoneDigits,
@@ -71,6 +73,9 @@ export function submitOwnerSignupApplication(input: {
   const next = applications.filter((item) => item.phone.replace(/\D/g, "") !== phoneDigits);
   next.push(application);
   persistOwnerSignupApplications(next);
+  void import("./ownerSignupApplicationsSync").then(({ upsertOwnerSignupApplicationRemote }) =>
+    upsertOwnerSignupApplicationRemote(application),
+  );
   return application;
 }
 
@@ -82,6 +87,12 @@ export function updateOwnerSignupApplication(
     item.id === id ? { ...item, ...patch } : item,
   );
   persistOwnerSignupApplications(next);
+  const updated = next.find((item) => item.id === id);
+  if (updated) {
+    void import("./ownerSignupApplicationsSync").then(({ upsertOwnerSignupApplicationRemote }) =>
+      upsertOwnerSignupApplicationRemote(updated),
+    );
+  }
   return next;
 }
 

@@ -65,6 +65,47 @@ for update
 to anon, authenticated
 using (true)
 with check (true);
+
+-- 사장님 가입 신청 (1-2)
+create table if not exists public.owner_signup_applications (
+  id bigint primary key,
+  store_name text not null,
+  email text not null,
+  phone text not null unique,
+  pin text not null,
+  address text not null default '',
+  store_image text not null default '',
+  market_id text not null default 'jungang',
+  status text not null default 'pending',
+  created_at timestamptz not null default now(),
+  reject_reason text,
+  approved_store_id bigint,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.owner_signup_applications enable row level security;
+
+drop policy if exists "public read owner signup applications" on public.owner_signup_applications;
+create policy "public read owner signup applications"
+on public.owner_signup_applications
+for select
+to anon, authenticated
+using (true);
+
+drop policy if exists "public upsert owner signup applications" on public.owner_signup_applications;
+create policy "public upsert owner signup applications"
+on public.owner_signup_applications
+for insert
+to anon, authenticated
+with check (true);
+
+drop policy if exists "public update owner signup applications" on public.owner_signup_applications;
+create policy "public update owner signup applications"
+on public.owner_signup_applications
+for update
+to anon, authenticated
+using (true)
+with check (true);
 ```
 
 Then create `.env` in project root:

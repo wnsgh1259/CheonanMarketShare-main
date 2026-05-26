@@ -3,9 +3,23 @@ import { useNavigate, useSearchParams } from "react-router";
 import { ChevronLeft, User, Phone, CheckCircle2, Store, ShoppingCart, ImagePlus, Clock, MapPin, Lock, Mail } from "lucide-react";
 import { setOwnerMode } from "../components/BottomNav";
 import { findRegisteredUserByPhoneDigits, upsertRegisteredUser } from "../data/userAccounts";
-import { findPendingSignupByPhone, submitOwnerSignupApplication } from "../data/ownerSignupApplications";
+import { findPendingSignupByPhone, submitOwnerSignupApplication, type OwnerSignupMarketId, OWNER_SIGNUP_MARKET_LABELS } from "../data/ownerSignupApplications";
+import { refreshOwnerSignupApplicationsFromRemote } from "../data/ownerSignupApplicationsSync";
 
-type Field = "nickname" | "email" | "phone" | "pin" | "pinConfirm" | "storeImage" | "address";
+type Field = "nickname" | "email" | "phone" | "pin" | "pinConfirm" | "storeImage" | "address" | "market";
+
+const OWNER_MARKET_OPTIONS: Array<{ id: OwnerSignupMarketId; label: string }> = [
+  { id: "jungang", label: OWNER_SIGNUP_MARKET_LABELS.jungang },
+  { id: "byeongcheon", label: OWNER_SIGNUP_MARKET_LABELS.byeongcheon },
+  { id: "seonghwan", label: OWNER_SIGNUP_MARKET_LABELS.seonghwan },
+];
+
+function formatPhoneInput(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+}
 
 function FieldError({ msg }: { msg: string }) {
   return msg ? <p className="text-[11px] text-red-400 mt-1">{msg}</p> : null;
@@ -21,12 +35,16 @@ export function RegisterPage() {
   const [storeImage, setStoreImage] = useState<string | null>(null);
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
   const [done, setDone] = useState(false);
+  const [ownerStep, setOwnerStep] = useState<"market" | "form">("market");
+  const [selectedMarket, setSelectedMarket] = useState<OwnerSignupMarketId | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const set = (field: "nickname" | "email" | "phone" | "address" | "pin" | "pinConfirm") => (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = field === "pin" || field === "pinConfirm"
       ? e.target.value.replace(/\D/g, "").slice(0, 6)
-      : e.target.value;
+      : field === "phone"
+        ? formatPhoneInput(e.target.value)
+        : e.target.value;
     setForm((prev) => ({ ...prev, [field]: value }));
     setErrors((prev) => ({ ...prev, [field]: "" }));
   };
@@ -54,22 +72,31 @@ export function RegisterPage() {
     else if (!/^[0-9]{4,6}$/.test(form.pin)) e.pin = "PIN 번호는 4~6자리 숫자로 입력해주세요.";
     if (!form.pinConfirm) e.pinConfirm = "PIN 번호 확인을 입력해주세요.";
     else if (form.pin !== form.pinConfirm) e.pinConfirm = "PIN 번호가 일치하지 않습니다.";
+    if (isOwner && !selectedMarket) e.market = "시장을 선택해주세요.";
     if (isOwner && !storeImage) e.storeImage = "상점 이미지를 등록해주세요.";
     if (isOwner && !form.address.trim()) e.address = "상점 주소를 입력해주세요.";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validate()) return;
     const phoneDigits = form.phone.replace(/-/g, "");
+
+    const syncedApplications = await refreshOwnerSignupApplicationsFromRemote();
 
     const existingUser = findRegisteredUserByPhoneDigits(phoneDigits);
     if (existingUser?.status === "active") {
       setErrors((prev) => ({ ...prev, phone: "이미 가입된 전화번호입니다." }));
       return;
     }
-    if (existingUser?.status === "pending" || findPendingSignupByPhone(phoneDigits)) {
+    const hasPendingSignup =
+      existingUser?.status === "pending" ||
+      findPendingSignupByPhone(phoneDigits) ||
+      syncedApplications.some(
+        (item) => item.phone.replace(/\D/g, "") === phoneDigits && item.status === "pending",
+      );
+    if (hasPendingSignup) {
       setErrors((prev) => ({ ...prev, phone: "이미 승인 대기 중인 신청이 있습니다." }));
       return;
     }
@@ -83,6 +110,7 @@ export function RegisterPage() {
         pin: form.pin,
         address: form.address.trim(),
         storeImage,
+        marketId: selectedMarket ?? "jungang",
       });
       upsertRegisteredUser({
         phone: phoneDigits,
@@ -147,11 +175,71 @@ export function RegisterPage() {
     );
   }
 
+  if (isOwner && ownerStep === "market") {
+    return (
+      <div className="flex flex-col min-h-screen bg-white">
+        <div className="flex items-center px-4 py-3 border-b border-gray-100">
+          <button onClick={() => navigate(-1)} className="p-1 mr-2">
+            <ChevronLeft className="w-5 h-5 text-gray-700" />
+          </button>
+          <h1 className="text-[16px] font-semibold text-gray-900">회원가입</h1>
+          <span className="ml-2 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">
+            🏪 사장님
+          </span>
+        </div>
+
+        <div className="flex-1 px-6 py-8">
+          <p className="text-[18px] font-bold text-gray-900 mb-1">어느 시장에서 운영하시나요?</p>
+          <p className="text-[13px] text-gray-400 mb-6">가입할 시장을 먼저 선택해주세요.</p>
+          <div className="space-y-3">
+            {OWNER_MARKET_OPTIONS.map((market) => (
+              <button
+                key={market.id}
+                type="button"
+                onClick={() => {
+                  setSelectedMarket(market.id);
+                  setErrors((prev) => ({ ...prev, market: "" }));
+                }}
+                className={`w-full h-14 rounded-xl border text-[15px] font-medium transition-colors ${
+                  selectedMarket === market.id
+                    ? "border-gray-900 bg-gray-900 text-white"
+                    : "border-gray-200 bg-gray-50 text-gray-800 active:bg-gray-100"
+                }`}
+              >
+                {market.label}
+              </button>
+            ))}
+          </div>
+          <FieldError msg={errors.market || ""} />
+        </div>
+
+        <div className="px-6 pb-10 pt-3 border-t border-gray-100">
+          <button
+            type="button"
+            onClick={() => {
+              if (!selectedMarket) {
+                setErrors((prev) => ({ ...prev, market: "시장을 선택해주세요." }));
+                return;
+              }
+              setOwnerStep("form");
+            }}
+            className="w-full h-[52px] bg-gray-900 text-white rounded-2xl text-[15px] font-semibold active:bg-gray-800 transition-colors"
+          >
+            다음
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-white">
       {/* 헤더 */}
       <div className="flex items-center px-4 py-3 border-b border-gray-100">
-        <button onClick={() => navigate(-1)} className="p-1 mr-2">
+        <button
+          onClick={() => (isOwner ? setOwnerStep("market") : navigate(-1))}
+          className="p-1 mr-2"
+        >
           <ChevronLeft className="w-5 h-5 text-gray-700" />
         </button>
         <h1 className="text-[16px] font-semibold text-gray-900">회원가입</h1>
@@ -163,6 +251,12 @@ export function RegisterPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
+        {isOwner && selectedMarket && (
+          <div className="rounded-xl bg-amber-50 border border-amber-100 px-4 py-3">
+            <p className="text-[11px] text-amber-600 mb-0.5">선택한 시장</p>
+            <p className="text-[14px] font-semibold text-amber-900">{OWNER_SIGNUP_MARKET_LABELS[selectedMarket]}</p>
+          </div>
+        )}
 
         {/* 상점명 / 닉네임 */}
         <div>

@@ -9,6 +9,7 @@ import {
   updateOwnerSignupApplication,
   type OwnerSignupApplication,
 } from "../data/ownerSignupApplications";
+import { refreshOwnerSignupApplicationsFromRemote } from "../data/ownerSignupApplicationsSync";
 
 const FACILITY_COLOR_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
   "#448AFF": ParkingSquare,
@@ -263,6 +264,7 @@ export function AdminPage() {
   const [rejectingSignupId, setRejectingSignupId] = useState<number | null>(null);
   const [signupRejectReasons, setSignupRejectReasons] = useState<Record<number, string>>({});
   const [imageViewApp, setImageViewApp] = useState<OwnerSignupApplication | null>(null);
+  const [signupApprovedModal, setSignupApprovedModal] = useState<string | null>(null);
   const [changeRejectingId, setChangeRejectingId] = useState<number | null>(null);
   const [changeRejectReasons, setChangeRejectReasons] = useState<Record<number, string>>({});
   const [changeRequests, setChangeRequests] = useState<ChangeRequest[]>(() => loadChangeRequests());
@@ -327,10 +329,9 @@ export function AdminPage() {
   };
 
   useEffect(() => {
-    if (showApplications) {
-      setChangeRequests(loadChangeRequests());
-      setSignupApplications(loadOwnerSignupApplications());
-    }
+    if (!showApplications) return;
+    setChangeRequests(loadChangeRequests());
+    void refreshOwnerSignupApplicationsFromRemote().then(setSignupApplications);
   }, [showApplications]);
 
   const persistChangeRequests = (next: ChangeRequest[]) => {
@@ -444,12 +445,17 @@ export function AdminPage() {
     });
   }, [signupApplications]);
 
-  const signupPendingCount = signupApplications.filter((item) => item.status === "pending").length;
+  const pendingSignupApplications = useMemo(
+    () => sortedSignupApplications.filter((item) => item.status === "pending"),
+    [sortedSignupApplications],
+  );
+
+  const signupPendingCount = pendingSignupApplications.length;
   const storeSettingsPendingCount = displayedStoreChangeRequests.filter((item) => item.status === "pending").length;
   const customerSettingsPendingCount = displayedCustomerChangeRequests.filter((item) => item.status === "pending").length;
   const settingsPendingCount = storeSettingsPendingCount + customerSettingsPendingCount;
   const totalPendingCount = signupPendingCount + settingsPendingCount;
-  const hasAdminModalOpen = deleteTarget !== null || settingsTarget !== null || imageViewApp !== null;
+  const hasAdminModalOpen = deleteTarget !== null || settingsTarget !== null || imageViewApp !== null || signupApprovedModal !== null;
 
   useEffect(() => {
     if (hasAdminModalOpen) {
@@ -587,9 +593,10 @@ export function AdminPage() {
       updateOwnerSignupApplication(application.id, {
         status: "approved",
         approvedStoreId: newStoreId,
-      }),
+      }).filter((item) => item.status === "pending"),
     );
     setRejectingSignupId(null);
+    setSignupApprovedModal(application.storeName);
   };
 
   const handleRejectSignup = (application: OwnerSignupApplication) => {
@@ -599,7 +606,7 @@ export function AdminPage() {
       updateOwnerSignupApplication(application.id, {
         status: "rejected",
         rejectReason: reason,
-      }),
+      }).filter((item) => item.status === "pending"),
     );
     setRejectingSignupId(null);
   };
@@ -1154,13 +1161,13 @@ export function AdminPage() {
                   <p className="text-[14px] font-bold text-gray-800">사장님 가입 신청 현황</p>
                   <span className="text-[11px] text-gray-400">총 {signupPendingCount}건 대기중</span>
                 </div>
-                {sortedSignupApplications.length === 0 ? (
+                {pendingSignupApplications.length === 0 ? (
                   <div className="border border-dashed border-gray-200 rounded-xl px-4 py-8 text-center">
                     <p className="text-[13px] text-gray-500">가입 신청이 없습니다.</p>
                     <p className="text-[11px] text-gray-400 mt-1">사장님 회원가입 신청이 들어오면 여기에 표시됩니다.</p>
                   </div>
                 ) : (
-                  sortedSignupApplications.map((app) => {
+                  pendingSignupApplications.map((app) => {
                     const status = signupStatusLabel(app.status);
                     const isRejecting = rejectingSignupId === app.id;
                     return (
@@ -1228,14 +1235,6 @@ export function AdminPage() {
                           </div>
                         )}
 
-                        {app.status === "approved" && (
-                          <p className="text-[11px] text-emerald-600 bg-emerald-50 rounded-lg px-3 py-2">
-                            ✅ 승인 완료됐습니다.{app.approvedStoreId ? ` (상점 ID: ${app.approvedStoreId})` : ""}
-                          </p>
-                        )}
-                        {app.status === "rejected" && app.rejectReason && (
-                          <p className="text-[11px] text-red-500 bg-red-50 rounded-lg px-3 py-2">❌ 거절 사유: {app.rejectReason}</p>
-                        )}
                       </div>
                     );
                   })
@@ -1273,6 +1272,28 @@ export function AdminPage() {
               <img src={imageViewApp.storeImage} alt="상점 이미지" className="w-full h-52 object-cover" />
             </div>
           </>
+        )}
+
+        {signupApprovedModal && (
+          <div className="app-modal-overlay fixed inset-0 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setSignupApprovedModal(null)} />
+            <div className="app-modal-content relative bg-white rounded-2xl shadow-xl p-6 mx-6 w-full max-w-sm text-center">
+              <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+                <span className="text-[24px]">✅</span>
+              </div>
+              <p className="text-[16px] font-bold text-gray-900 mb-2">
+                {signupApprovedModal} 상점 승인이 완료됐습니다
+              </p>
+              <p className="text-[13px] text-gray-500 mb-5">사장님이 로그인하여 상점 관리를 시작할 수 있습니다.</p>
+              <button
+                type="button"
+                onClick={() => setSignupApprovedModal(null)}
+                className="w-full h-11 rounded-xl bg-gray-900 text-white text-[14px] font-semibold active:bg-gray-800 transition-colors"
+              >
+                확인
+              </button>
+            </div>
+          </div>
         )}
 
         {!showApplications && <div className="bg-white rounded-xl p-4">
