@@ -12,6 +12,7 @@ import {
 import {
   loadOwnerCatalog,
   loadOwnerCatalogRemote,
+  mergeOwnerCatalog,
   migrateLegacyOwnerDraftIfNeeded,
   saveOwnerCatalog,
 } from "../data/ownerStoreData";
@@ -133,12 +134,11 @@ export function FacilityRegistrationPage() {
       try {
         const remoteCatalog = await loadOwnerCatalogRemote();
         const localCatalog = loadOwnerCatalog();
-        const catalog =
-          remoteCatalog && localCatalog.stores.length === 0 && (localCatalog.facilities?.length ?? 0) === 0
-            ? remoteCatalog
-            : localCatalog;
-        if (remoteCatalog && catalog === remoteCatalog) {
-          saveOwnerCatalog(remoteCatalog);
+        const catalog = remoteCatalog
+          ? mergeOwnerCatalog(localCatalog, remoteCatalog)
+          : localCatalog;
+        if (remoteCatalog) {
+          saveOwnerCatalog(catalog);
         }
         if (cancelled) return;
         const facilities = catalog.facilities ?? [];

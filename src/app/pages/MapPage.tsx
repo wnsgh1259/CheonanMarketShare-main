@@ -16,9 +16,8 @@ import {
 } from "../data/storeData";
 import {
   loadOwnerCatalog,
-  loadOwnerCatalogRemote,
   migrateLegacyOwnerDraftIfNeeded,
-  saveOwnerCatalog,
+  refreshOwnerCatalogFromRemote,
 } from "../data/ownerStoreData";
 import { syntheticSeedStoreId } from "../data/seedStoreIds";
 import { buildFacilityMarkerIcon, buildStoreMarkerIcon } from "../map/naverMarkerIcons";
@@ -130,6 +129,10 @@ function emptyDraftOverrides(): DraftOverrides {
   return { byId: new Map(), byName: new Map() };
 }
 
+function usableLatLng(lat: number, lng: number) {
+  return Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0);
+}
+
 function buildDraftOverridesForMarket(stores: DraftStorePin[], marketId: MarketId): DraftOverrides {
   const byId = new Map<number, DraftStorePin>();
   const byName = new Map<string, DraftStorePin>();
@@ -138,6 +141,7 @@ function buildDraftOverridesForMarket(stores: DraftStorePin[], marketId: MarketI
       store.marketId !== marketId ||
       typeof store.lat !== "number" ||
       typeof store.lng !== "number" ||
+      !usableLatLng(store.lat, store.lng) ||
       !store.name
     ) {
       continue;
@@ -218,7 +222,7 @@ function resolveDraftOverride(
 }
 
 function getStoreLatLng(store: StoreData, center: { lat: number; lng: number }) {
-  if (typeof store.lat === "number" && typeof store.lng === "number") {
+  if (typeof store.lat === "number" && typeof store.lng === "number" && usableLatLng(store.lat, store.lng)) {
     return { lat: store.lat, lng: store.lng };
   }
   return toStoreLatLng(center, store.mx, store.my);
@@ -263,6 +267,10 @@ function NaverMarketMap({
   const customPinMarkerRef = useRef<NaverMarkerRef | null>(null);
   const onCustomPinClickRef = useRef(onCustomPinClick);
   onCustomPinClickRef.current = onCustomPinClick;
+  const onSelectStoreRef = useRef(onSelectStore);
+  onSelectStoreRef.current = onSelectStore;
+  const onSelectFacilityRef = useRef(onSelectFacility);
+  onSelectFacilityRef.current = onSelectFacility;
   const customLocationPinRef = useRef(customLocationPin);
   customLocationPinRef.current = customLocationPin;
   /** 첫 번째 selectedMarket effect 실행 여부 추적 (초기 마운트 판별) */
@@ -431,11 +439,11 @@ function NaverMarketMap({
         },
       });
       naver.maps.Event.addListener(marker, "click", () => {
-        onSelectStore(store);
+        onSelectStoreRef.current(store);
       });
       return marker;
     });
-  }, [visibleStores, highlightedStore, onSelectStore, zoomLevel, selectedMarket, mapInstanceEpoch]);
+  }, [visibleStores, highlightedStore, zoomLevel, selectedMarket, mapInstanceEpoch]);
 
   useEffect(() => {
     if (!window.naver?.maps || !mapRef.current) return;
@@ -458,11 +466,11 @@ function NaverMarketMap({
         },
       });
       naver.maps.Event.addListener(marker, "click", () => {
-        onSelectFacility(facility);
+        onSelectFacilityRef.current(facility);
       });
       return marker;
     });
-  }, [facilities, zoomLevel, selectedMarket, onSelectFacility, mapInstanceEpoch]);
+  }, [facilities, zoomLevel, selectedMarket, mapInstanceEpoch]);
 
   useEffect(() => {
     if (!window.naver?.maps || !mapRef.current) return;
@@ -474,10 +482,7 @@ function NaverMarketMap({
     const resizeMap = () => {
       naver.maps.Event.trigger(map, "resize");
       map.setSize(new naver.maps.Size(el.clientWidth, el.clientHeight));
-      // 커스텀 핀 표시 중에는 pinRef 위치를 유지 (시장 중심으로 리셋하지 않음)
-      const pin = customLocationPinRef.current;
-      const center = pin ? { lat: pin.lat, lng: pin.lng } : centerRef.current;
-      map.setCenter(new naver.maps.LatLng(center.lat, center.lng));
+      // 현재 뷰를 유지한다. setCenter로 시장 중심 강제 이동하지 않음.
     };
 
     resizeMap();
@@ -488,9 +493,19 @@ function NaverMarketMap({
     });
     ro.observe(el);
 
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        window.requestAnimationFrame(resizeMap);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pageshow", resizeMap);
+
     return () => {
       window.clearTimeout(t);
       ro.disconnect();
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pageshow", resizeMap);
     };
   }, [selectedMarket, mapInstanceEpoch]);
 
@@ -675,8 +690,12 @@ export function MapPage() {
   const [pendingCartItem, setPendingCartItem] = useState<CartItem | null>(null);
   const [likedStores, setLikedStores] = useState<Set<number>>(new Set());
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
-  const [sharedStores, setSharedStores] = useState<DraftStorePin[] | null>(null);
-  const [sharedFacilities, setSharedFacilities] = useState<DraftFacilityPin[] | null>(null);
+  const [sharedStores, setSharedStores] = useState<DraftStorePin[]>(
+    () => (loadOwnerCatalog().stores ?? []) as DraftStorePin[],
+  );
+  const [sharedFacilities, setSharedFacilities] = useState<DraftFacilityPin[]>(
+    () => (loadOwnerCatalog().facilities ?? []) as DraftFacilityPin[],
+  );
   const [listActiveSnap, setListActiveSnap] = useState<number | null>(LIST_SNAP_MIN_FALLBACK);
   /** 지도 드래그 중: 상점 목록·헤더줄 숨기고 핸들(위로 당기기)만 표시 */
   const [isMapDragging, setIsMapDragging] = useState(false);
@@ -731,11 +750,10 @@ export function MapPage() {
     migrateLegacyOwnerDraftIfNeeded();
     let cancelled = false;
     const load = async () => {
-      const remote = await loadOwnerCatalogRemote();
-      if (!remote || cancelled) return;
-      setSharedStores((remote.stores ?? []) as DraftStorePin[]);
-      setSharedFacilities((remote.facilities ?? []) as DraftFacilityPin[]);
-      saveOwnerCatalog(remote);
+      const merged = await refreshOwnerCatalogFromRemote();
+      if (cancelled) return;
+      setSharedStores((merged.stores ?? []) as DraftStorePin[]);
+      setSharedFacilities((merged.facilities ?? []) as DraftFacilityPin[]);
     };
     void load();
     return () => {
@@ -744,11 +762,14 @@ export function MapPage() {
   }, []);
 
   const allStores = useMemo(() => {
-    const rawDrafts = sharedStores
-      ? sharedStores.filter(
-          (s) => s.marketId === selectedMarket && typeof s.lat === "number" && typeof s.lng === "number" && s.name,
-        )
-      : readAllRawDraftStores(selectedMarket);
+    const rawDrafts = sharedStores.filter(
+      (s) =>
+        s.marketId === selectedMarket &&
+        typeof s.lat === "number" &&
+        typeof s.lng === "number" &&
+        usableLatLng(s.lat, s.lng) &&
+        s.name,
+    );
 
     const maps = buildDraftOverridesForMarket(rawDrafts, selectedMarket);
 
@@ -790,8 +811,11 @@ export function MapPage() {
   }, [selectedMarket, sharedStores]);
   const marketInfo = MARKET_INFO[selectedMarket];
   const facilities = useMemo(() => {
-    const source = sharedFacilities ?? loadOwnerCatalog().facilities ?? [];
-    return source.filter((facility) => facility.marketId === selectedMarket);
+    return sharedFacilities.filter(
+      (facility) =>
+        facility.marketId === selectedMarket &&
+        usableLatLng(facility.lat, facility.lng),
+    );
   }, [selectedMarket, sharedFacilities]);
 
   const filteredStores = useMemo(

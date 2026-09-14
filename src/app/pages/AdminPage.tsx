@@ -325,8 +325,26 @@ export function AdminPage() {
 
   useEffect(() => {
     if (adminPanelView !== "applications") return;
-    void refreshOwnerChangeRequestsFromRemote().then(setChangeRequests);
-    void refreshOwnerSignupApplicationsFromRemote().then(setSignupApplications);
+
+    const refreshApplications = () => {
+      void refreshOwnerChangeRequestsFromRemote().then(setChangeRequests);
+      void refreshOwnerSignupApplicationsFromRemote().then(setSignupApplications);
+    };
+
+    refreshApplications();
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refreshApplications();
+    };
+    window.addEventListener("focus", refreshApplications);
+    document.addEventListener("visibilitychange", onVisibility);
+    const intervalId = window.setInterval(refreshApplications, 12_000);
+
+    return () => {
+      window.removeEventListener("focus", refreshApplications);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.clearInterval(intervalId);
+    };
   }, [adminPanelView]);
 
   useEffect(() => {

@@ -78,27 +78,48 @@ export async function loadOwnerSignupApplicationsFromRemote(): Promise<OwnerSign
   }
 }
 
-export async function upsertOwnerSignupApplicationRemote(app: OwnerSignupApplication) {
+export async function upsertOwnerSignupApplicationRemote(app: OwnerSignupApplication): Promise<boolean> {
   const client = getSupabaseClient();
-  if (!client) return;
+  if (!client) return false;
+  const row = applicationToRow(app);
   try {
-    await client
+    // phone UNIQUE: 같은 번호면 기존 행을 UPDATE (재신청 시 새 id INSERT 실패 방지)
+    const { data: existing, error: lookupError } = await client
       .from(OWNER_SIGNUP_APPLICATIONS_TABLE)
-      .upsert(applicationToRow(app), { onConflict: "id" });
+      .select("id")
+      .eq("phone", row.phone)
+      .maybeSingle();
+
+    if (!lookupError && existing?.id != null) {
+      const { error: updateError } = await client
+        .from(OWNER_SIGNUP_APPLICATIONS_TABLE)
+        .update({
+          ...row,
+          id: Number(existing.id),
+        })
+        .eq("id", existing.id);
+      if (!updateError) return true;
+    }
+
+    const { error: upsertError } = await client
+      .from(OWNER_SIGNUP_APPLICATIONS_TABLE)
+      .upsert(row, { onConflict: "id" });
+    if (!upsertError) return true;
+
+    // phone unique 충돌 시 phone 기준 upsert 재시도
+    const { error: phoneUpsertError } = await client
+      .from(OWNER_SIGNUP_APPLICATIONS_TABLE)
+      .upsert(row, { onConflict: "phone" });
+    return !phoneUpsertError;
   } catch {
-    /* ignore network/schema issues */
+    return false;
   }
 }
 
 export async function syncOwnerSignupApplicationsToRemote(applications: OwnerSignupApplication[]) {
-  const client = getSupabaseClient();
-  if (!client || applications.length === 0) return;
-  try {
-    await client
-      .from(OWNER_SIGNUP_APPLICATIONS_TABLE)
-      .upsert(applications.map(applicationToRow), { onConflict: "id" });
-  } catch {
-    /* ignore network/schema issues */
+  if (!applications.length) return;
+  for (const app of applications) {
+    await upsertOwnerSignupApplicationRemote(app);
   }
 }
 
@@ -126,6 +147,17 @@ function shouldPreferSignupApplication(
   existing: OwnerSignupApplication,
   incoming: OwnerSignupApplication,
 ): boolean {
+  const existingTime = Date.parse(existing.createdAt) || 0;
+  const incomingTime = Date.parse(incoming.createdAt) || 0;
+
+  // 재신청: 더 최신 pending이 이전 approved/rejected보다 우선 (관리자 대기 목록에 뜨게)
+  if (incoming.status === "pending" && existing.status !== "pending" && incomingTime >= existingTime) {
+    return true;
+  }
+  if (existing.status === "pending" && incoming.status !== "pending" && existingTime >= incomingTime) {
+    return false;
+  }
+
   const existingPriority = SIGNUP_STATUS_PRIORITY[existing.status];
   const incomingPriority = SIGNUP_STATUS_PRIORITY[incoming.status];
   if (incomingPriority !== existingPriority) {
@@ -138,7 +170,7 @@ function shouldPreferSignupApplication(
       return incomingApprovedAt > existingApprovedAt;
     }
   }
-  return new Date(incoming.createdAt).getTime() >= new Date(existing.createdAt).getTime();
+  return incomingTime >= existingTime;
 }
 
 export function mergeOwnerSignupApplications(

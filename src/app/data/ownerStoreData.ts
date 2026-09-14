@@ -67,25 +67,53 @@ export function saveOwnerCatalog(catalog: OwnerDashboardCatalog) {
       facilities: catalog.facilities ?? [],
     }),
   );
-  void saveSharedOwnerDraftById(CATALOG_REMOTE_ID, catalog);
+  void pushOwnerCatalogRemote(catalog);
+}
+
+/** 원격 저장: 상점 목록이 비어 있으면 기존 remote/legacy 상점을 지우지 않는다. */
+async function pushOwnerCatalogRemote(catalog: OwnerDashboardCatalog) {
+  const nextStores = catalog.stores ?? [];
+  const nextFacilities = catalog.facilities ?? [];
+
+  if (nextStores.length > 0) {
+    await saveSharedOwnerDraftById(CATALOG_REMOTE_ID, {
+      stores: nextStores,
+      facilities: nextFacilities,
+    });
+    return;
+  }
+
+  const existing = await loadSharedOwnerDraftById(CATALOG_REMOTE_ID);
+  const legacy = await loadSharedOwnerDraftById(LEGACY_CATALOG_REMOTE_ID);
+  const preservedStores =
+    (existing?.stores?.length ? existing.stores : null) ??
+    (legacy?.stores?.length ? legacy.stores : null) ??
+    [];
+
+  await saveSharedOwnerDraftById(CATALOG_REMOTE_ID, {
+    stores: preservedStores,
+    facilities: nextFacilities.length ? nextFacilities : existing?.facilities ?? legacy?.facilities ?? [],
+  });
 }
 
 export async function loadOwnerCatalogRemote(): Promise<OwnerDashboardCatalog | null> {
   const catalog = await loadSharedOwnerDraftById(CATALOG_REMOTE_ID);
-  if (catalog) {
-    return {
-      stores: catalog.stores ?? [],
-      facilities: catalog.facilities ?? [],
-    };
-  }
-
   const legacy = await loadSharedOwnerDraftById(LEGACY_CATALOG_REMOTE_ID);
-  if (!legacy) return null;
 
-  return {
-    stores: legacy.stores ?? [],
-    facilities: legacy.facilities ?? [],
-  };
+  if (!catalog && !legacy) return null;
+
+  // catalog 행이 비어 있어도 legacy(global)에 남은 상점·시설을 합친다.
+  // (관리자 추가 버그로 catalog.stores=[] 가 되어도 global 백업을 살림)
+  return mergeOwnerCatalog(
+    {
+      stores: catalog?.stores ?? [],
+      facilities: catalog?.facilities ?? [],
+    },
+    {
+      stores: legacy?.stores ?? [],
+      facilities: legacy?.facilities ?? [],
+    },
+  );
 }
 
 export function loadOwnerStoreWorkspace(storeId: number): OwnerStoreWorkspace {
@@ -192,6 +220,7 @@ export async function refreshOwnerCatalogFromRemote(): Promise<OwnerDashboardCat
   const remote = await loadOwnerCatalogRemote();
   if (!remote) return local;
   const merged = mergeOwnerCatalog(local, remote);
+  // 로컬·catalog가 비어 있어도 legacy에서 복구된 내용을 다시 catalog/local에 심는다
   saveOwnerCatalog(merged);
   return merged;
 }

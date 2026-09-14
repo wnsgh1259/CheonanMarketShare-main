@@ -86,8 +86,12 @@ export function submitOwnerSignupApplication(input: {
 }): OwnerSignupApplication {
   const applications = loadOwnerSignupApplications();
   const phoneDigits = input.phone.replace(/\D/g, "");
+  // 동일 전화번호는 기존 행 id를 재사용 (phone UNIQUE + 새 id INSERT 실패 방지)
+  const existingSamePhone = applications.find(
+    (item) => item.phone.replace(/\D/g, "") === phoneDigits,
+  );
   const application: OwnerSignupApplication = {
-    id: nextSignupApplicationId(),
+    id: existingSamePhone?.id ?? nextSignupApplicationId(),
     storeName: input.storeName.trim(),
     email: input.email.trim(),
     phone: phoneDigits,
@@ -97,10 +101,12 @@ export function submitOwnerSignupApplication(input: {
     marketId: input.marketId ?? "jungang",
     status: "pending",
     createdAt: new Date().toISOString(),
+    rejectReason: undefined,
+    approvedStoreId: undefined,
   };
+  // 같은 번호의 이전 승인/거절/대기 행은 교체 (approved를 남겨 pending이 merge에서 사라지지 않게)
   const next = applications.filter(
-    (item) =>
-      item.phone.replace(/\D/g, "") !== phoneDigits || item.status === "approved",
+    (item) => item.phone.replace(/\D/g, "") !== phoneDigits,
   );
   next.push(application);
   persistOwnerSignupApplications(next);
@@ -108,6 +114,22 @@ export function submitOwnerSignupApplication(input: {
     upsertOwnerSignupApplicationRemote(application),
   );
   return application;
+}
+
+/** 원격 upsert까지 기다림 — 모바일 신청 직후 관리자 연동용 */
+export async function submitOwnerSignupApplicationAndSync(input: {
+  storeName: string;
+  email: string;
+  phone: string;
+  pin: string;
+  address: string;
+  storeImage: string;
+  marketId?: OwnerSignupMarketId;
+}): Promise<{ application: OwnerSignupApplication; synced: boolean }> {
+  const application = submitOwnerSignupApplication(input);
+  const { upsertOwnerSignupApplicationRemote } = await import("./ownerSignupApplicationsSync");
+  const synced = await upsertOwnerSignupApplicationRemote(application);
+  return { application, synced };
 }
 
 export function updateOwnerSignupApplication(

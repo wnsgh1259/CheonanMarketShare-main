@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import { ChevronLeft, User, Phone, CheckCircle2, Store, ShoppingCart, ImagePlus, Clock, MapPin, Lock, Mail } from "lucide-react";
 import { setOwnerMode } from "../components/BottomNav";
 import { findRegisteredUserByPhoneDigits, upsertRegisteredUser } from "../data/userAccounts";
-import { findPendingSignupByPhone, submitOwnerSignupApplication, type OwnerSignupMarketId, OWNER_SIGNUP_MARKET_LABELS } from "../data/ownerSignupApplications";
+import { findPendingSignupByPhone, submitOwnerSignupApplicationAndSync, type OwnerSignupMarketId, OWNER_SIGNUP_MARKET_LABELS } from "../data/ownerSignupApplications";
 import { refreshOwnerSignupApplicationsFromRemote } from "../data/ownerSignupApplicationsSync";
 import { formatPhoneInput } from "../utils/phoneFormat";
 
@@ -107,7 +107,7 @@ export function RegisterPage() {
 
     if (isOwner) {
       if (!storeImage) return;
-      submitOwnerSignupApplication({
+      const { synced } = await submitOwnerSignupApplicationAndSync({
         storeName: form.nickname.trim(),
         email: form.email.trim(),
         phone: phoneDigits,
@@ -124,6 +124,11 @@ export function RegisterPage() {
         role: "owner",
         status: "pending",
       });
+      if (!synced) {
+        window.alert(
+          "신청은 저장됐지만 서버 동기화에 실패했습니다. 네트워크를 확인한 뒤, 관리자 화면에 신청이 없으면 다시 시도해주세요.",
+        );
+      }
     } else {
       localStorage.setItem("user_name", form.nickname.trim());
       localStorage.setItem("user_email", form.email.trim());

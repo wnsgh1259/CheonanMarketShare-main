@@ -106,8 +106,8 @@ export type StoreDraftLatLng = { lat?: number; lng?: number };
 /**
  * 지도에 찍을 좌표.
  * - 저장된 초안(override) 또는 상점에 직접 붙은 lat·lng가 있으면 **그대로 사용**한다.
- *   (사장님이 찍은 핀이 폴리곤 경계 밖으로 분류돼도 무시되면 안 됨)
- * - 좌표가 없을 때만 mx/my·시장 안 나선 보정으로 계산한다.
+ *   (사장님이 찍은 핀 / 시드 좌표가 폴리곤 경계 밖으로 보여도 무시되면 안 됨)
+ * - (0,0)만 무효로 보고, 좌표가 없을 때만 mx/my·시장 안 나선 보정으로 계산한다.
  */
 export function pickStoreDisplayLatLng(
   marketId: MarketId,
@@ -147,5 +147,9 @@ export function pickStoreDisplayLatLng(
     if (isLatLngInsideMarketArea(marketId, lat, lng)) return { lat, lng };
     r *= 0.62;
   }
-  return { lat: view.center.lat, lng: view.center.lng };
+  // 폴리곤이 매우 좁아 나선이 실패해도 상점마다 다른 오프셋을 유지 (한 점에 몰리지 않음)
+  return {
+    lat: view.center.lat + Math.cos(angle) * 0.00012,
+    lng: view.center.lng + Math.sin(angle) * 0.00018,
+  };
 }

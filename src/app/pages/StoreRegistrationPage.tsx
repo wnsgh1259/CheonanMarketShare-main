@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChevronLeft, MapPin, Plus, ImagePlus, Settings, Lock, Phone, Mail, LogOut } from "lucide-react";
 import {
   generateUniqueStoreCredentials,
@@ -21,6 +22,7 @@ import {
   loadOwnerCatalogRemote,
   loadOwnerStoreWorkspace,
   loadOwnerStoreWorkspaceRemote,
+  mergeOwnerCatalog,
   migrateLegacyOwnerDraftIfNeeded,
   saveOwnerCatalog,
   saveOwnerStoreWorkspace,
@@ -254,7 +256,9 @@ export function StoreRegistrationPage() {
   const [mapZoomLevel, setMapZoomLevel] = useState(MARKET_VIEW_CONFIG[initialMarket].zoom);
   const [pin, setPin] = useState<{ lat: number; lng: number } | null>(null);
   const [selectedMarket, setSelectedMarket] = useState<MarketId>(initialMarket);
-  const [stores, setStores] = useState<DraftStore[]>([]);
+  const [stores, setStores] = useState<DraftStore[]>(
+    () => (loadOwnerCatalog().stores ?? []) as DraftStore[],
+  );
   const [editingStoreId, setEditingStoreId] = useState<number | null>(editStoreId);
   const [isStoreHydrating, setIsStoreHydrating] = useState(() => editStoreId !== null && !isAdminNewStore);
   const [form, setForm] = useState({
@@ -279,6 +283,103 @@ export function StoreRegistrationPage() {
   const [reviewReply, setReviewReply] = useState("");
   const [inquiryReply, setInquiryReply] = useState("");
   const [saveNotice, setSaveNotice] = useState("");
+  type EditorBaseline = {
+    marketId: MarketId;
+    form: {
+      name: string;
+      location: string;
+      hours: string;
+      phone: string;
+      description: string;
+      representativePhotoName: string;
+      representativePhotoUrl: string;
+    };
+    selectedCategories: string[];
+    selectedPayments: string[];
+    pin: { lat: number; lng: number } | null;
+    menus: Array<{ name: string; price: string; photoName: string }>;
+    todayDeal: string;
+    news: string;
+    couponEvent: string;
+    reviewReply: string;
+    inquiryReply: string;
+  };
+  const baselineRef = useRef<EditorBaseline | null>(null);
+  const baselineSyncTimerRef = useRef<number | null>(null);
+  const editorStateRef = useRef({
+    selectedMarket,
+    form,
+    selectedCategories,
+    selectedPayments,
+    pin,
+    menus,
+    todayDeal,
+    news,
+    couponEvent,
+    reviewReply,
+    inquiryReply,
+  });
+  editorStateRef.current = {
+    selectedMarket,
+    form,
+    selectedCategories,
+    selectedPayments,
+    pin,
+    menus,
+    todayDeal,
+    news,
+    couponEvent,
+    reviewReply,
+    inquiryReply,
+  };
+
+  const normalizeMenusForCompare = (list: OwnerMenu[]) =>
+    list
+      .map((menu) => ({
+        name: menu.name.trim(),
+        price: menu.price.trim(),
+        photoName: menu.photoName.trim(),
+      }))
+      .filter((menu) => menu.name || menu.price || menu.photoName);
+
+  const syncBaselineFromCurrentState = () => {
+    const s = editorStateRef.current;
+    baselineRef.current = {
+      marketId: s.selectedMarket,
+      form: {
+        name: s.form.name,
+        location: s.form.location,
+        hours: s.form.hours,
+        phone: s.form.phone,
+        description: s.form.description,
+        representativePhotoName: s.form.representativePhotoName,
+        representativePhotoUrl: s.form.representativePhotoUrl,
+      },
+      selectedCategories: [...s.selectedCategories],
+      selectedPayments: [...s.selectedPayments],
+      pin: s.pin
+        ? { lat: Number(s.pin.lat.toFixed(6)), lng: Number(s.pin.lng.toFixed(6)) }
+        : null,
+      menus: normalizeMenusForCompare(s.menus),
+      todayDeal: s.todayDeal,
+      news: s.news,
+      couponEvent: s.couponEvent,
+      reviewReply: s.reviewReply,
+      inquiryReply: s.inquiryReply,
+    };
+  };
+
+  const queueSyncBaseline = () => {
+    if (baselineSyncTimerRef.current != null) {
+      window.clearTimeout(baselineSyncTimerRef.current);
+    }
+    baselineSyncTimerRef.current = window.setTimeout(() => {
+      window.requestAnimationFrame(() => {
+        syncBaselineFromCurrentState();
+        baselineSyncTimerRef.current = null;
+      });
+    }, 0);
+  };
   const [pageTitle, setPageTitle] = useState(() => resolveInitialStoreLabel(editStoreId, isAdminNewStore));
   const [approvedStoreName, setApprovedStoreName] = useState(() => {
     if (isAdminNewStore) return "";
@@ -294,6 +395,10 @@ export function StoreRegistrationPage() {
   const [ownerPhone, setOwnerPhone] = useState(() => resolveStoreLoginPhone(editStoreId));
   const [ownerEmail, setOwnerEmail] = useState(() => localStorage.getItem("user_email") || "");
   const [settingsModal, setSettingsModal] = useState<"storeName" | "phone" | "pin" | "email" | null>(null);
+  const [sectionLeavePrompt, setSectionLeavePrompt] = useState<{
+    nextSection: OwnerSection | null;
+    onConfirm?: () => void;
+  } | null>(null);
   const [settingsInput, setSettingsInput] = useState("");
   const [settingsPinConfirm, setSettingsPinConfirm] = useState("");
   const [changeRequests, setChangeRequests] = useState<OwnerChangeRequest[]>([]);
@@ -318,7 +423,17 @@ export function StoreRegistrationPage() {
 
   const persistOwnerCatalog = (storesList: DraftStore[]) => {
     const catalog = loadOwnerCatalog();
-    saveOwnerCatalog({ ...catalog, stores: storesList });
+    // in-memory `stores`가 비어 있거나 일부만 있어도 기존 카탈로그를 지우지 않도록 id 기준 병합
+    const byId = new Map<number, DraftStore>();
+    for (const store of catalog.stores ?? []) {
+      if (typeof store.id === "number") byId.set(store.id, store as DraftStore);
+    }
+    for (const store of storesList) {
+      if (typeof store.id === "number") byId.set(store.id, store);
+    }
+    const mergedStores = Array.from(byId.values());
+    saveOwnerCatalog({ ...catalog, stores: mergedStores });
+    return mergedStores;
   };
 
   const persistOwnerWorkspace = (storeId: number) => {
@@ -414,6 +529,7 @@ export function StoreRegistrationPage() {
     }
     setEditingStoreId(target.id);
     setIsStoreHydrating(false);
+    queueSyncBaseline();
   };
 
   const resetStoreEditorState = () => {
@@ -481,14 +597,11 @@ export function StoreRegistrationPage() {
         const remoteCatalog = await loadOwnerCatalogRemote();
         if (cancelled || loadGeneration !== storeLoadGenerationRef.current) return;
 
-        const catalog =
-          remoteCatalog && localCatalog.stores.length === 0 && (localCatalog.facilities?.length ?? 0) === 0
-            ? remoteCatalog
-            : localCatalog.stores.length > 0
-              ? localCatalog
-              : remoteCatalog ?? localCatalog;
-        if (remoteCatalog && catalog === remoteCatalog) {
-          saveOwnerCatalog(remoteCatalog);
+        const catalog = remoteCatalog
+          ? mergeOwnerCatalog(localCatalog, remoteCatalog)
+          : localCatalog;
+        if (remoteCatalog) {
+          saveOwnerCatalog(catalog);
         }
 
         setStores(catalog.stores ?? []);
@@ -514,6 +627,7 @@ export function StoreRegistrationPage() {
           setCouponEvent(workspace.couponEvent ?? "");
           setReviewReply(workspace.reviewReply ?? "");
           setInquiryReply(workspace.inquiryReply ?? "");
+          queueSyncBaseline();
         }
 
         if (editStoreId !== null && !cancelled && loadGeneration === storeLoadGenerationRef.current) {
@@ -543,6 +657,8 @@ export function StoreRegistrationPage() {
 
   useEffect(() => {
     if (!isAdminNewStore) return;
+    migrateLegacyOwnerDraftIfNeeded();
+    setStores((loadOwnerCatalog().stores ?? []) as DraftStore[]);
     window.localStorage.removeItem(OWNER_EDIT_STORE_KEY);
     setEditingStoreId(null);
     setActiveSection("store");
@@ -562,7 +678,16 @@ export function StoreRegistrationPage() {
     setPin(null);
     pinMarkerRef.current?.setMap(null);
     setAdminNewCredentials(generateUniqueStoreCredentials());
+    queueSyncBaseline();
   }, [isAdminNewStore]);
+
+  useEffect(() => {
+    return () => {
+      if (baselineSyncTimerRef.current != null) {
+        window.clearTimeout(baselineSyncTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (isAdminNewStore) return;
@@ -915,8 +1040,7 @@ export function StoreRegistrationPage() {
         ? stores.map((store) => (store.id === editingStoreId ? next : store))
         : [next, ...stores]
       : [next, ...stores];
-    setStores(updatedStores);
-    persistOwnerCatalog(updatedStores);
+    setStores(persistOwnerCatalog(updatedStores));
     if (resolvedStoreId) {
       persistOwnerWorkspace(resolvedStoreId);
     }
@@ -940,6 +1064,7 @@ export function StoreRegistrationPage() {
     pinMarkerRef.current?.setMap(null);
     setSaveNotice("저장되었습니다.");
     window.setTimeout(() => setSaveNotice(""), 1800);
+    queueSyncBaseline();
   };
 
   const toggleOption = (value: string, selected: string[], setSelected: (value: string[]) => void) => {
@@ -992,36 +1117,73 @@ export function StoreRegistrationPage() {
         });
       }
     }
-    setStores(patchedStores);
-    persistOwnerCatalog(patchedStores);
+    setStores(persistOwnerCatalog(patchedStores));
+    syncBaselineFromCurrentState();
     if (notice) {
       setSaveNotice(notice);
       window.setTimeout(() => setSaveNotice(""), 1800);
     }
   };
 
-  const hasUnsavedStoreChanges = Boolean(
-    form.location.trim() ||
-    form.hours.trim() ||
-    form.phone.trim() ||
-    form.description.trim() ||
-    form.representativePhotoName ||
-    selectedCategories.length > 0 ||
-    selectedPayments.length > 0 ||
-    pin,
-  );
+  const samePin = (
+    a: { lat: number; lng: number } | null | undefined,
+    b: { lat: number; lng: number } | null | undefined,
+  ) => {
+    if (!a && !b) return true;
+    if (!a || !b) return false;
+    return Number(a.lat.toFixed(6)) === Number(b.lat.toFixed(6))
+      && Number(a.lng.toFixed(6)) === Number(b.lng.toFixed(6));
+  };
 
-  const hasUnsavedProductChanges = menus.some(
-    (menu) => menu.name.trim() || menu.price.trim() || menu.photoName.trim(),
-  );
+  const sameStringList = (a: string[], b: string[]) => {
+    if (a.length !== b.length) return false;
+    const left = [...a].map((v) => v.trim()).sort();
+    const right = [...b].map((v) => v.trim()).sort();
+    return left.every((v, i) => v === right[i]);
+  };
 
-  const hasUnsavedCommunicationChanges = Boolean(
-    reviewReply.trim() || inquiryReply.trim(),
-  );
+  const hasUnsavedStoreChanges = (() => {
+    const baseline = baselineRef.current;
+    if (!baseline) return false;
+    return (
+      selectedMarket !== baseline.marketId ||
+      form.location.trim() !== baseline.form.location.trim() ||
+      form.hours.trim() !== baseline.form.hours.trim() ||
+      form.phone.trim() !== baseline.form.phone.trim() ||
+      form.description.trim() !== baseline.form.description.trim() ||
+      form.name.trim() !== baseline.form.name.trim() ||
+      form.representativePhotoUrl !== baseline.form.representativePhotoUrl ||
+      form.representativePhotoName !== baseline.form.representativePhotoName ||
+      !sameStringList(selectedCategories, baseline.selectedCategories) ||
+      !sameStringList(selectedPayments, baseline.selectedPayments) ||
+      !samePin(pin, baseline.pin)
+    );
+  })();
 
-  const hasUnsavedPromotionChanges = Boolean(
-    todayDeal.trim() || news.trim() || couponEvent.trim(),
-  );
+  const hasUnsavedProductChanges = (() => {
+    const baseline = baselineRef.current;
+    if (!baseline) return false;
+    return JSON.stringify(normalizeMenusForCompare(menus)) !== JSON.stringify(baseline.menus);
+  })();
+
+  const hasUnsavedCommunicationChanges = (() => {
+    const baseline = baselineRef.current;
+    if (!baseline) return false;
+    return (
+      reviewReply.trim() !== baseline.reviewReply.trim() ||
+      inquiryReply.trim() !== baseline.inquiryReply.trim()
+    );
+  })();
+
+  const hasUnsavedPromotionChanges = (() => {
+    const baseline = baselineRef.current;
+    if (!baseline) return false;
+    return (
+      todayDeal.trim() !== baseline.todayDeal.trim() ||
+      news.trim() !== baseline.news.trim() ||
+      couponEvent.trim() !== baseline.couponEvent.trim()
+    );
+  })();
 
   const hasUnsavedChanges = (section: OwnerSection | null) => {
     if (section === "store") return hasUnsavedStoreChanges;
@@ -1031,13 +1193,151 @@ export function StoreRegistrationPage() {
     return false;
   };
 
-  const closeOrMoveSection = (nextSection: OwnerSection | null, onConfirm?: () => void) => {
-    if (hasUnsavedChanges(activeSection)) {
-      const shouldSave = window.confirm("설정내용을 저장하시겠습니까?");
-      if (shouldSave) {
-        saveOwnerDraft();
+  /** 메뉴 이동 시 상점 관리 저장 — 폼 초기화/페이지 이탈 없이 persist */
+  const persistStoreFormWithoutLeaving = (): boolean => {
+    const existingForEdit = editingStoreId !== null ? stores.find((s) => s.id === editingStoreId) : undefined;
+    let existingFromKey: DraftStore | undefined;
+    if (editingStoreId !== null) {
+      try {
+        const raw = window.localStorage.getItem(OWNER_EDIT_STORE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw) as DraftStore;
+          if (parsed.id === editingStoreId) existingFromKey = parsed;
+        }
+      } catch {
+        /* ignore */
       }
     }
+    const existing = existingForEdit ?? existingFromKey;
+    const isEditing = editingStoreId !== null;
+    const coords =
+      pin ??
+      (existing &&
+      typeof existing.lat === "number" &&
+      typeof existing.lng === "number" &&
+      !(existing.lat === 0 && existing.lng === 0)
+        ? { lat: existing.lat, lng: existing.lng }
+        : null);
+    const nameStr = isAdminNewStore
+      ? form.name.trim()
+      : (approvedStoreName.trim() || form.name.trim() || (isEditing ? (existing?.name ?? "").trim() : "")).trim();
+    const locationStr = (form.location.trim() || (isEditing ? (existing?.location ?? "").trim() : "")).trim();
+    const categoryStr =
+      selectedCategories.length > 0
+        ? selectedCategories.join(", ")
+        : (isEditing ? (existing?.category ?? "").trim() : "");
+
+    if (!coords || !nameStr || !categoryStr || !locationStr) {
+      const msg = !coords
+        ? "지도에서 위치를 찍어 주세요."
+        : !nameStr
+          ? "상점명을 입력해 주세요."
+          : !categoryStr
+            ? "카테고리를 하나 이상 선택해 주세요."
+            : "위치(호수)를 입력해 주세요.";
+      setSaveNotice(msg);
+      window.setTimeout(() => setSaveNotice(""), 4200);
+      return false;
+    }
+
+    const next: DraftStore = {
+      id: editingStoreId ?? Date.now(),
+      name: nameStr,
+      category: categoryStr,
+      location: locationStr,
+      hours: form.hours.trim(),
+      phone: form.phone.trim(),
+      description: form.description.trim(),
+      lat: Number(coords.lat.toFixed(6)),
+      lng: Number(coords.lng.toFixed(6)),
+      marketId: selectedMarket,
+      image: form.representativePhotoUrl || undefined,
+      menus: menus.filter((menu) => menu.name.trim()).map((menu) => ({
+        ...menu,
+        price: menu.price.trim(),
+      })),
+    };
+    const updatedStores = editingStoreId
+      ? stores.some((store) => store.id === editingStoreId)
+        ? stores.map((store) => (store.id === editingStoreId ? next : store))
+        : [next, ...stores]
+      : [next, ...stores];
+    setStores(persistOwnerCatalog(updatedStores));
+    setEditingStoreId(next.id);
+    if (resolvedStoreId || next.id) {
+      persistOwnerWorkspace(resolvedStoreId ?? next.id);
+    }
+    syncBaselineFromCurrentState();
+    setSaveNotice("저장되었습니다.");
+    window.setTimeout(() => setSaveNotice(""), 1800);
+    return true;
+  };
+
+  const revertSectionToBaseline = (section: OwnerSection | null) => {
+    const baseline = baselineRef.current;
+    if (!baseline || !section) return;
+
+    if (section === "store") {
+      setSelectedMarket(baseline.marketId);
+      setForm({ ...baseline.form });
+      setSelectedCategories([...baseline.selectedCategories]);
+      setSelectedPayments([...baseline.selectedPayments]);
+      setPin(baseline.pin ? { lat: baseline.pin.lat, lng: baseline.pin.lng } : null);
+    } else if (section === "product") {
+      setMenus(
+        baseline.menus.length
+          ? baseline.menus.map((menu, index) => ({
+              id: Date.now() + index,
+              name: menu.name,
+              price: menu.price,
+              photoName: menu.photoName,
+            }))
+          : [{ id: Date.now(), name: "", price: "", photoName: "" }],
+      );
+    } else if (section === "communication") {
+      setReviewReply(baseline.reviewReply);
+      setInquiryReply(baseline.inquiryReply);
+    } else if (section === "promotion") {
+      setTodayDeal(baseline.todayDeal);
+      setNews(baseline.news);
+      setCouponEvent(baseline.couponEvent);
+    }
+    queueSyncBaseline();
+  };
+
+  const closeOrMoveSection = (nextSection: OwnerSection | null, onConfirm?: () => void) => {
+    // 변경 없으면 팝업 없이 바로 이동
+    if (!hasUnsavedChanges(activeSection)) {
+      onConfirm?.();
+      setActiveSection(nextSection);
+      return;
+    }
+    // 변경 있으면 저장 여부 확인 (자동 저장하지 않음)
+    setSectionLeavePrompt({ nextSection, onConfirm });
+  };
+
+  const handleSectionLeaveDiscard = () => {
+    if (!sectionLeavePrompt) return;
+    const { nextSection, onConfirm } = sectionLeavePrompt;
+    revertSectionToBaseline(activeSection);
+    setSectionLeavePrompt(null);
+    onConfirm?.();
+    setActiveSection(nextSection);
+  };
+
+  const handleSectionLeaveSave = () => {
+    if (!sectionLeavePrompt) return;
+    const { nextSection, onConfirm } = sectionLeavePrompt;
+    if (activeSection === "store") {
+      const saved = persistStoreFormWithoutLeaving();
+      if (!saved) {
+        setSectionLeavePrompt(null);
+        return;
+      }
+    } else {
+      saveOwnerDraft();
+    }
+    setSectionLeavePrompt(null);
     onConfirm?.();
     setActiveSection(nextSection);
   };
@@ -1878,6 +2178,42 @@ export function StoreRegistrationPage() {
 
         
       </div>
+
+      {sectionLeavePrompt &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 px-6">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="section-leave-title"
+              className="relative z-[10000] w-full max-w-[320px] rounded-2xl bg-white p-5 shadow-xl"
+            >
+              <p id="section-leave-title" className="text-[15px] font-semibold text-gray-900 text-center">
+                값이 변경되었습니다
+              </p>
+              <p className="mt-2 text-[13px] text-gray-600 text-center leading-relaxed">
+                저장하시겠습니까?
+              </p>
+              <div className="mt-5 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={handleSectionLeaveDiscard}
+                  className="h-11 rounded-xl bg-gray-100 text-[14px] font-medium text-gray-700"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSectionLeaveSave}
+                  className="h-11 rounded-xl bg-gray-900 text-[14px] font-medium text-white"
+                >
+                  저장
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
