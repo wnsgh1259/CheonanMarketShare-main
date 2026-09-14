@@ -6,6 +6,7 @@ import {
   upsertStoreAccount,
   formatPhoneDisplay as formatAdminPhoneDisplay,
   resolveStoreLoginPhone,
+  loadStoreAccountsMap,
 } from "../data/adminAccount";
 import { useNavigate, useSearchParams } from "react-router";
 import { setOwnerMode, OWNER_STORE_MGMT_RETURN_KEY } from "../components/BottomNav";
@@ -31,9 +32,11 @@ import {
 import {
   matchesOwnerChangeRequest,
   submitOwnerChangeRequest,
+  applyApprovedChangeRequestsLocally,
   type OwnerChangeRequest,
 } from "../data/ownerChangeRequests";
 import { refreshOwnerChangeRequestsFromRemote } from "../data/ownerChangeRequestsSync";
+import { refreshStoreAccountsFromRemote } from "../data/storeAccountsSync";
 import { formatPhoneDisplay, formatPhoneInput } from "../utils/phoneFormat";
 
 type NaverMapRef = {
@@ -450,13 +453,24 @@ export function StoreRegistrationPage() {
   useEffect(() => {
     if (isAdminNewStore || activeSection !== "settings") return;
     let cancelled = false;
-    void refreshOwnerChangeRequestsFromRemote().then((requests) => {
-      if (!cancelled) setChangeRequests(requests);
-    });
+    void (async () => {
+      await refreshStoreAccountsFromRemote();
+      const requests = await refreshOwnerChangeRequestsFromRemote();
+      if (cancelled) return;
+      applyApprovedChangeRequestsLocally(requests);
+      setChangeRequests(requests);
+      const loginPhone = resolveStoreLoginPhone(resolvedStoreId);
+      if (loginPhone) setOwnerPhone(loginPhone);
+      const approvedName =
+        localStorage.getItem("owner_approved_store_name") ||
+        localStorage.getItem("owner_current_store_name") ||
+        "";
+      if (approvedName) setApprovedStoreName(approvedName);
+    })();
     return () => {
       cancelled = true;
     };
-  }, [activeSection, isAdminNewStore]);
+  }, [activeSection, isAdminNewStore, resolvedStoreId]);
 
   const pendingStoreNameRequest =
     changeRequests.find(
@@ -781,6 +795,20 @@ export function StoreRegistrationPage() {
       return;
     }
     localStorage.setItem("user_pin", settingsInput);
+    const storeIdRaw = localStorage.getItem("owner_store_id");
+    const storeId = storeIdRaw ? Number(storeIdRaw) : resolvedStoreId;
+    if (storeId != null && Number.isFinite(storeId)) {
+      const account = loadStoreAccountsMap()[storeId];
+      const phone = (account?.phone || ownerPhone || resolveStoreLoginPhone(storeId)).replace(/\D/g, "");
+      if (phone) {
+        upsertStoreAccount({
+          storeId,
+          storeName: account?.storeName || approvedStoreName || form.name || `상점 ${storeId}`,
+          phone,
+          pin: settingsInput,
+        });
+      }
+    }
     setSettingsModal(null);
     setSettingsInput("");
     setSettingsPinConfirm("");

@@ -1,11 +1,17 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { ChevronLeft, User, Phone, CheckCircle2, Store, ShoppingCart, ImagePlus, Clock, MapPin, Lock, Mail } from "lucide-react";
 import { setOwnerMode } from "../components/BottomNav";
 import { findRegisteredUserByPhoneDigits, upsertRegisteredUser } from "../data/userAccounts";
-import { findPendingSignupByPhone, submitOwnerSignupApplicationAndSync, type OwnerSignupMarketId, OWNER_SIGNUP_MARKET_LABELS } from "../data/ownerSignupApplications";
+import {
+  findPendingSignupByPhone,
+  consumeOwnerSignupEditDraft,
+  type OwnerSignupMarketId,
+  OWNER_SIGNUP_MARKET_LABELS,
+} from "../data/ownerSignupApplications";
 import { refreshOwnerSignupApplicationsFromRemote } from "../data/ownerSignupApplicationsSync";
 import { formatPhoneInput } from "../utils/phoneFormat";
+import { compressImageFile, withTimeout } from "../utils/imageCompress";
 
 type Field = "nickname" | "email" | "phone" | "pin" | "pinConfirm" | "storeImage" | "address" | "market";
 
@@ -27,11 +33,33 @@ export function RegisterPage() {
 
   const [form, setForm] = useState({ nickname: "", email: "", phone: "", address: "", pin: "", pinConfirm: "" });
   const [storeImage, setStoreImage] = useState<string | null>(null);
+  const [imageCompressing, setImageCompressing] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
   const [done, setDone] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [ownerStep, setOwnerStep] = useState<"market" | "form">("market");
   const [selectedMarket, setSelectedMarket] = useState<OwnerSignupMarketId | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const editDraftAppliedRef = useRef(false);
+
+  useEffect(() => {
+    if (!isOwner || editDraftAppliedRef.current) return;
+    if (searchParams.get("edit") !== "1") return;
+    const draft = consumeOwnerSignupEditDraft();
+    if (!draft) return;
+    editDraftAppliedRef.current = true;
+    setSelectedMarket(draft.marketId);
+    setOwnerStep("form");
+    setForm({
+      nickname: draft.storeName || "",
+      email: draft.email || "",
+      phone: formatPhoneInput(draft.phone || ""),
+      address: draft.address || "",
+      pin: draft.pin || "",
+      pinConfirm: draft.pin || "",
+    });
+    if (draft.storeImage) setStoreImage(draft.storeImage);
+  }, [isOwner, searchParams]);
 
   const set = (field: "nickname" | "email" | "phone" | "address" | "pin" | "pinConfirm") => (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = field === "pin" || field === "pinConfirm"
@@ -43,18 +71,43 @@ export function RegisterPage() {
     setErrors((prev) => ({ ...prev, [field]: "" }));
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setStoreImage(ev.target?.result as string);
+    if (!file.type.startsWith("image/") && !/\.(jpe?g|png|webp|gif|heic|heif)$/i.test(file.name)) {
+      setErrors((prev) => ({ ...prev, storeImage: "이미지 파일만 첨부할 수 있어요." }));
+      return;
+    }
+    setImageCompressing(true);
+    try {
+      const dataUrl = await compressImageFile(file);
+      if (!dataUrl) {
+        setErrors((prev) => ({ ...prev, storeImage: "이미지를 읽지 못했어요. 다른 사진으로 다시 시도해주세요." }));
+        return;
+      }
+      setStoreImage(dataUrl);
       setErrors((prev) => ({ ...prev, storeImage: "" }));
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      setErrors((prev) => ({ ...prev, storeImage: "이미지 처리에 실패했어요. 다른 사진으로 다시 시도해주세요." }));
+    } finally {
+      setImageCompressing(false);
+    }
   };
 
-  const validate = () => {
+  const scrollToFirstError = (nextErrors: Partial<Record<Field, string>>) => {
+    const order: Field[] = ["market", "nickname", "storeImage", "address", "phone", "email", "pin", "pinConfirm"];
+    const first = order.find((key) => nextErrors[key]);
+    if (!first) return;
+    window.requestAnimationFrame(() => {
+      const el = document.querySelector(`[data-field="${first}"]`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  };
+
+  const handleSubmit = async () => {
+    if (submitting || imageCompressing) return;
+    (document.activeElement as HTMLElement | null)?.blur?.();
+
     const e: Partial<Record<Field, string>> = {};
     if (!form.nickname.trim()) e.nickname = isOwner ? "상점명을 입력해주세요." : "닉네임을 입력해주세요.";
     else if (form.nickname.trim().length < 2) e.nickname = isOwner ? "상점명은 2자 이상이어야 해요." : "닉네임은 2자 이상이어야 해요.";
@@ -70,85 +123,108 @@ export function RegisterPage() {
     if (isOwner && !storeImage) e.storeImage = "상점 이미지를 등록해주세요.";
     if (isOwner && !form.address.trim()) e.address = "상점 주소를 입력해주세요.";
     setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const handleSubmit = async () => {
-    if (!validate()) return;
-    const phoneDigits = form.phone.replace(/-/g, "");
-
-    const syncedApplications = await refreshOwnerSignupApplicationsFromRemote();
-
-    const existingUser = findRegisteredUserByPhoneDigits(phoneDigits);
-    if (existingUser?.status === "active") {
-      setErrors((prev) => ({ ...prev, phone: "이미 가입된 전화번호입니다." }));
+    if (Object.keys(e).length > 0) {
+      scrollToFirstError(e);
       return;
     }
-    if (existingUser?.status === "rejected") {
-      upsertRegisteredUser({
-        ...existingUser,
-        name: form.nickname.trim(),
-        email: form.email.trim(),
-        pin: form.pin,
-        role: "owner",
-        status: "pending",
-      });
-    }
-    const hasPendingSignup =
-      existingUser?.status === "pending" ||
-      findPendingSignupByPhone(phoneDigits) ||
-      syncedApplications.some(
-        (item) => item.phone.replace(/\D/g, "") === phoneDigits && item.status === "pending",
+
+    setSubmitting(true);
+    try {
+      const phoneDigits = form.phone.replace(/-/g, "");
+
+      const syncedApplications = await withTimeout(
+        refreshOwnerSignupApplicationsFromRemote(),
+        8000,
+        [] as Awaited<ReturnType<typeof refreshOwnerSignupApplicationsFromRemote>>,
       );
-    if (hasPendingSignup) {
-      setErrors((prev) => ({ ...prev, phone: "이미 승인 대기 중인 신청이 있습니다." }));
-      return;
-    }
 
-    if (isOwner) {
-      if (!storeImage) return;
-      const { synced } = await submitOwnerSignupApplicationAndSync({
-        storeName: form.nickname.trim(),
-        email: form.email.trim(),
-        phone: phoneDigits,
-        pin: form.pin,
-        address: form.address.trim(),
-        storeImage,
-        marketId: selectedMarket ?? "jungang",
-      });
-      upsertRegisteredUser({
-        phone: phoneDigits,
-        pin: form.pin,
-        email: form.email.trim(),
-        name: form.nickname.trim(),
-        role: "owner",
-        status: "pending",
-      });
-      if (!synced) {
-        window.alert(
-          "신청은 저장됐지만 서버 동기화에 실패했습니다. 네트워크를 확인한 뒤, 관리자 화면에 신청이 없으면 다시 시도해주세요.",
-        );
+      const existingUser = findRegisteredUserByPhoneDigits(phoneDigits);
+      if (existingUser?.status === "active") {
+        setErrors((prev) => ({ ...prev, phone: "이미 가입된 전화번호입니다." }));
+        scrollToFirstError({ phone: "이미 가입된 전화번호입니다." });
+        return;
       }
-    } else {
-      localStorage.setItem("user_name", form.nickname.trim());
-      localStorage.setItem("user_email", form.email.trim());
-      localStorage.setItem("user_phone", phoneDigits);
-      localStorage.setItem("user_pin", form.pin);
-      localStorage.setItem("user_role", "customer");
-      localStorage.setItem("user_status", "active");
-      upsertRegisteredUser({
-        phone: phoneDigits,
-        pin: form.pin,
-        email: form.email.trim(),
-        name: form.nickname.trim(),
-        role: "customer",
-        status: "active",
-      });
-    }
+      if (existingUser?.status === "rejected") {
+        upsertRegisteredUser({
+          ...existingUser,
+          name: form.nickname.trim(),
+          email: form.email.trim(),
+          pin: form.pin,
+          role: "owner",
+          status: "pending",
+        });
+      }
+      const hasPendingSignup =
+        existingUser?.status === "pending" ||
+        findPendingSignupByPhone(phoneDigits) ||
+        syncedApplications.some(
+          (item) => item.phone.replace(/\D/g, "") === phoneDigits && item.status === "pending",
+        );
+      if (hasPendingSignup) {
+        setErrors((prev) => ({ ...prev, phone: "이미 승인 대기 중인 신청이 있습니다." }));
+        scrollToFirstError({ phone: "이미 승인 대기 중인 신청이 있습니다." });
+        return;
+      }
 
-    setOwnerMode(false);
-    localStorage.removeItem("owner_current_store_name");
-    setDone(true);
+      if (isOwner) {
+        if (!storeImage) return;
+        // 로컬 저장을 먼저 보장한 뒤, 서버 전송은 타임아웃으로 막히지 않게 처리
+        const { submitOwnerSignupApplication } = await import("../data/ownerSignupApplications");
+        const { upsertOwnerSignupApplicationRemote } = await import("../data/ownerSignupApplicationsSync");
+        const application = submitOwnerSignupApplication({
+          storeName: form.nickname.trim(),
+          email: form.email.trim(),
+          phone: phoneDigits,
+          pin: form.pin,
+          address: form.address.trim(),
+          storeImage,
+          marketId: selectedMarket ?? "jungang",
+        });
+        upsertRegisteredUser({
+          phone: phoneDigits,
+          pin: form.pin,
+          email: form.email.trim(),
+          name: form.nickname.trim(),
+          role: "owner",
+          status: "pending",
+        });
+        const synced = await withTimeout(upsertOwnerSignupApplicationRemote(application), 12000, false);
+        if (!synced) {
+          window.setTimeout(() => {
+            window.alert(
+              "신청은 기기에 저장됐어요. 서버 전송이 지연될 수 있으니, 관리자 화면에 안 보이면 잠시 후 새로고침하거나 다시 신청해주세요.",
+            );
+          }, 300);
+        }
+      } else {
+        localStorage.setItem("user_name", form.nickname.trim());
+        localStorage.setItem("user_email", form.email.trim());
+        localStorage.setItem("user_phone", phoneDigits);
+        localStorage.setItem("user_pin", form.pin);
+        localStorage.setItem("user_role", "customer");
+        localStorage.setItem("user_status", "active");
+        upsertRegisteredUser({
+          phone: phoneDigits,
+          pin: form.pin,
+          email: form.email.trim(),
+          name: form.nickname.trim(),
+          role: "customer",
+          status: "active",
+        });
+      }
+
+      setOwnerMode(false);
+      localStorage.removeItem("owner_current_store_name");
+      setDone(true);
+    } catch {
+      setErrors((prev) => ({
+        ...prev,
+        phone: "신청 처리 중 오류가 발생했어요. 네트워크 상태를 확인한 뒤 다시 시도해주세요.",
+      }));
+      scrollToFirstError({ phone: "error" });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (done) {
@@ -165,13 +241,20 @@ export function RegisterPage() {
           </p>
           <p className="text-[14px] text-gray-400">
             <span className="text-gray-700 font-semibold">{form.nickname}</span>님,{" "}
-            {isOwner ? "신청이 접수됐어요 🏪" : "천안 시장에 오신 걸 환영해요 🎉"}
+            {isOwner ? "신청이 접수됐습니다." : "천안 시장에 오신 걸 환영해요 🎉"}
           </p>
         </div>
         {isOwner && (
-          <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3 w-full">
-            <Clock className="w-4 h-4 text-amber-500 flex-shrink-0" />
-            <p className="text-[12px] text-amber-700">신청 승인은 영업일 기준 1일 이내로 소요됩니다.</p>
+          <div className="w-full space-y-2">
+            <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3">
+              <Clock className="w-4 h-4 text-amber-500 flex-shrink-0" />
+              <p className="text-[12px] text-amber-700">신청 승인은 영업일 기준 1일 이내로 소요됩니다.</p>
+            </div>
+            <div className="rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3">
+              <p className="text-[12px] text-gray-600 leading-relaxed">
+                로그인 후 신청정보 확인가능.
+              </p>
+            </div>
           </div>
         )}
         <button
@@ -268,7 +351,7 @@ export function RegisterPage() {
         )}
 
         {/* 상점명 / 닉네임 */}
-        <div>
+        <div data-field="nickname">
           <label className="flex items-center gap-1.5 text-[13px] font-medium text-gray-700 mb-1.5">
             <User className="w-3.5 h-3.5 text-gray-400" />
             {isOwner ? "상점명" : "닉네임"} <span className="text-red-400">*</span>
@@ -288,7 +371,7 @@ export function RegisterPage() {
 
         {/* 상점 이미지 (사장님 전용, 필수) */}
         {isOwner && (
-          <div>
+          <div data-field="storeImage">
             <label className="flex items-center gap-1.5 text-[13px] font-medium text-gray-700 mb-1.5">
               <ImagePlus className="w-3.5 h-3.5 text-gray-400" />
               상점 이미지 <span className="text-red-400">*</span>
@@ -297,14 +380,19 @@ export function RegisterPage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,.heic,.heif"
               onChange={handleImageChange}
               className="hidden"
             />
-            {storeImage ? (
+            {imageCompressing ? (
+              <div className="w-full h-36 rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-center text-[13px] text-gray-500">
+                사진 최적화 중...
+              </div>
+            ) : storeImage ? (
               <div className="relative w-full h-44 rounded-xl overflow-hidden border border-gray-200">
                 <img src={storeImage} alt="상점 이미지" className="w-full h-full object-cover" />
                 <button
+                  type="button"
                   onClick={() => { setStoreImage(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
                   className="absolute top-2 right-2 w-7 h-7 bg-black/50 rounded-full flex items-center justify-center text-white text-[12px]"
                 >
@@ -316,6 +404,7 @@ export function RegisterPage() {
               </div>
             ) : (
               <button
+                type="button"
                 onClick={() => fileInputRef.current?.click()}
                 className={`w-full h-36 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-colors ${
                   errors.storeImage ? "border-red-300 bg-red-50" : "border-gray-200 bg-gray-50 active:bg-gray-100"
@@ -332,7 +421,7 @@ export function RegisterPage() {
 
         {/* 주소 (사장님 전용, 필수) */}
         {isOwner && (
-          <div>
+          <div data-field="address">
             <label className="flex items-center gap-1.5 text-[13px] font-medium text-gray-700 mb-1.5">
               <MapPin className="w-3.5 h-3.5 text-gray-400" />상점 주소 <span className="text-red-400">*</span>
             </label>
@@ -351,7 +440,7 @@ export function RegisterPage() {
         )}
 
         {/* 전화번호 (필수) */}
-        <div>
+        <div data-field="phone">
           <label className="flex items-center gap-1.5 text-[13px] font-medium text-gray-700 mb-1.5">
             <Phone className="w-3.5 h-3.5 text-gray-400" />전화번호 <span className="text-red-400">*</span>
           </label>
@@ -369,7 +458,7 @@ export function RegisterPage() {
         </div>
 
         {/* 이메일 (필수) */}
-        <div>
+        <div data-field="email">
           <label className="flex items-center gap-1.5 text-[13px] font-medium text-gray-700 mb-1.5">
             <Mail className="w-3.5 h-3.5 text-gray-400" />이메일 <span className="text-red-400">*</span>
           </label>
@@ -387,7 +476,7 @@ export function RegisterPage() {
         </div>
 
         {/* PIN 번호 (필수) */}
-        <div>
+        <div data-field="pin">
           <label className="flex items-center gap-1.5 text-[13px] font-medium text-gray-700 mb-1.5">
             <Lock className="w-3.5 h-3.5 text-gray-400" />PIN 번호 <span className="text-red-400">*</span>
           </label>
@@ -406,7 +495,7 @@ export function RegisterPage() {
         </div>
 
         {/* PIN 번호 확인 (필수) */}
-        <div>
+        <div data-field="pinConfirm">
           <label className="flex items-center gap-1.5 text-[13px] font-medium text-gray-700 mb-1.5">
             <Lock className="w-3.5 h-3.5 text-gray-400" />PIN 번호 확인 <span className="text-red-400">*</span>
           </label>
@@ -431,12 +520,20 @@ export function RegisterPage() {
       </div>
 
       {/* 가입 버튼 */}
-      <div className="px-6 pb-10 pt-3 border-t border-gray-100 space-y-2">
+      <div className="px-6 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-3 border-t border-gray-100 space-y-2 bg-white sticky bottom-0">
         <button
-          onClick={handleSubmit}
-          className="w-full h-[52px] bg-gray-900 text-white rounded-2xl text-[15px] font-semibold active:bg-gray-800 transition-colors"
+          type="button"
+          onClick={() => void handleSubmit()}
+          disabled={submitting || imageCompressing}
+          className="w-full h-[52px] bg-gray-900 text-white rounded-2xl text-[15px] font-semibold active:bg-gray-800 transition-colors disabled:opacity-60 disabled:pointer-events-none touch-manipulation"
         >
-          {isOwner ? "가입 신청하기" : "가입하기"}
+          {imageCompressing
+            ? "사진 처리 중..."
+            : submitting
+              ? (isOwner ? "신청 처리 중..." : "가입 처리 중...")
+              : isOwner
+                ? "가입 신청하기"
+                : "가입하기"}
         </button>
         {isOwner && (
           <div className="flex items-center justify-center gap-1.5">

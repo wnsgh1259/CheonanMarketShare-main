@@ -61,6 +61,43 @@ export function getSignupRejectReason(phone: string): string {
   return rejected?.rejectReason?.trim() || "관리자에 의해 거절되었습니다.";
 }
 
+export const OWNER_SIGNUP_EDIT_DRAFT_KEY = "owner_signup_edit_draft_v1";
+
+export type OwnerSignupEditDraft = {
+  storeName: string;
+  email: string;
+  phone: string;
+  pin: string;
+  address: string;
+  storeImage: string;
+  marketId: OwnerSignupMarketId;
+};
+
+export function saveOwnerSignupEditDraft(app: OwnerSignupApplication) {
+  const draft: OwnerSignupEditDraft = {
+    storeName: app.storeName,
+    email: app.email,
+    phone: app.phone,
+    pin: app.pin,
+    address: app.address,
+    storeImage: app.storeImage,
+    marketId: app.marketId,
+  };
+  sessionStorage.setItem(OWNER_SIGNUP_EDIT_DRAFT_KEY, JSON.stringify(draft));
+}
+
+export function consumeOwnerSignupEditDraft(): OwnerSignupEditDraft | null {
+  try {
+    const raw = sessionStorage.getItem(OWNER_SIGNUP_EDIT_DRAFT_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(OWNER_SIGNUP_EDIT_DRAFT_KEY);
+    return JSON.parse(raw) as OwnerSignupEditDraft;
+  } catch {
+    sessionStorage.removeItem(OWNER_SIGNUP_EDIT_DRAFT_KEY);
+    return null;
+  }
+}
+
 export function findApprovedSignupByPhone(phone: string): OwnerSignupApplication | null {
   const phoneDigits = phone.replace(/\D/g, "");
   return (

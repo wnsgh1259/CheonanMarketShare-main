@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ParkingSquare, Armchair, Toilet, Info, Package, Music, Trash2, Settings } from "lucide-react";
 import { loadRegisteredUsers, persistRegisteredUsers, deleteRegisteredUser, updateRegisteredUserPhone, updateRegisteredUserStatus, upsertRegisteredUser, isValidEmail, type RegisteredUser } from "../data/userAccounts";
-import { ensureStoreAccounts, findDuplicateStoreAccountPhone, loadStoreAccountsMap, saveAllStoreAccounts, upsertStoreAccount, deleteStoreAccount, type StoreAccountRecord } from "../data/adminAccount";
-import { loadStoreAccountsFromRemote, saveStoreAccountsLocally } from "../data/storeAccountsSync";
+import { ensureStoreAccounts, findDuplicateStoreAccountPhone, loadStoreAccountsMap, saveAllStoreAccounts, upsertStoreAccount, deleteStoreAccount, isAdminSession, type StoreAccountRecord } from "../data/adminAccount";
+import { refreshStoreAccountsFromRemote } from "../data/storeAccountsSync";
 import {
   loadOwnerSignupApplications,
   OWNER_SIGNUP_MARKET_LABELS,
@@ -15,10 +15,12 @@ import {
 import {
   loadOwnerChangeRequests,
   updateOwnerChangeRequest,
+  normalizeSource,
   type OwnerChangeRequest,
 } from "../data/ownerChangeRequests";
 import { refreshOwnerChangeRequestsFromRemote } from "../data/ownerChangeRequestsSync";
 import { refreshOwnerSignupApplicationsFromRemote } from "../data/ownerSignupApplicationsSync";
+import { refreshRegisteredUsersFromRemote } from "../data/registeredUsersSync";
 import { formatPhoneDisplay, formatPhoneInput } from "../utils/phoneFormat";
 import {
   backupAdminSessionForImpersonation,
@@ -329,6 +331,7 @@ export function AdminPage() {
     const refreshApplications = () => {
       void refreshOwnerChangeRequestsFromRemote().then(setChangeRequests);
       void refreshOwnerSignupApplicationsFromRemote().then(setSignupApplications);
+      void refreshRegisteredUsersFromRemote().then(setRegisteredUsers);
     };
 
     refreshApplications();
@@ -420,8 +423,9 @@ export function AdminPage() {
   const handleApproveChangeRequest = (request: OwnerChangeRequest) => {
     updateOwnerChangeRequest(request.id, { status: "approved" });
     setChangeRequests((prev) => prev.filter((item) => item.id !== request.id));
+    const source = normalizeSource(request.source);
 
-    if (request.type === "storeName" && request.source !== "customer") {
+    if (request.type === "storeName" && source !== "customer") {
       localStorage.setItem(OWNER_APPROVED_STORE_NAME_KEY, request.newValue);
       localStorage.setItem("owner_current_store_name", request.newValue);
       const updatedStores = draft.stores.map((store) =>
@@ -452,13 +456,19 @@ export function AdminPage() {
     if (request.type === "phone") {
       const newPhone = request.newValue.replace(/\D/g, "");
       const currentPhone = request.currentValue.replace(/\D/g, "");
-      const savedPhone = (localStorage.getItem("user_phone") || "").replace(/\D/g, "");
-      if (!savedPhone || savedPhone === currentPhone) {
-        localStorage.setItem("user_phone", newPhone);
-      }
-      updateRegisteredUserPhone(currentPhone, newPhone);
 
-      if (request.source !== "customer") {
+      // 관리자 세션 번호는 손님/상점 승인으로 덮어쓰지 않음
+      if (!isAdminSession()) {
+        const savedPhone = (localStorage.getItem("user_phone") || "").replace(/\D/g, "");
+        if (!savedPhone || savedPhone === currentPhone) {
+          localStorage.setItem("user_phone", newPhone);
+        }
+      }
+
+      if (source === "customer") {
+        updateRegisteredUserPhone(currentPhone, newPhone);
+        setRegisteredUsers(loadRegisteredUsers());
+      } else {
         const accounts = Object.values(loadStoreAccounts());
         const accountIdx = accounts.findIndex((item) =>
           request.storeId != null
@@ -485,11 +495,11 @@ export function AdminPage() {
   };
 
   const storeChangeRequests = useMemo(
-    () => changeRequests.filter((item) => item.source !== "customer" && item.status === "pending"),
+    () => changeRequests.filter((item) => normalizeSource(item.source) !== "customer" && item.status === "pending"),
     [changeRequests],
   );
   const customerChangeRequests = useMemo(
-    () => changeRequests.filter((item) => item.source === "customer" && item.status === "pending"),
+    () => changeRequests.filter((item) => normalizeSource(item.source) === "customer" && item.status === "pending"),
     [changeRequests],
   );
 
@@ -778,14 +788,14 @@ export function AdminPage() {
   useEffect(() => {
     let cancelled = false;
     const syncAccounts = async () => {
-      const remote = await loadStoreAccountsFromRemote();
+      const merged = await refreshStoreAccountsFromRemote();
       if (cancelled) return;
-      if (remote && remote.length > 0) {
-        saveStoreAccountsLocally(remote);
-        setStoreAccounts(Object.fromEntries(remote.map((item) => [item.storeId, item])));
-      }
+      setStoreAccounts(Object.fromEntries(merged.map((item) => [item.storeId, item])));
     };
     void syncAccounts();
+    void refreshRegisteredUsersFromRemote().then((users) => {
+      if (!cancelled) setRegisteredUsers(users);
+    });
     return () => {
       cancelled = true;
     };

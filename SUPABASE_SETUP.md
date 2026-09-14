@@ -2,6 +2,8 @@
 
 Run this SQL in Supabase SQL Editor:
 
+> Note: 손님 계정(`registered_users`)은 `owner_dashboard_state` 행 id=`registered_users` 의 payload로 동기화됩니다. 별도 테이블은 필요하지 않습니다.
+
 ```sql
 create table if not exists public.owner_dashboard_state (
   id text primary key,

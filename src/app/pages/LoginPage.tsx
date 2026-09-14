@@ -1,9 +1,15 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { X, Store, ShoppingCart } from "lucide-react";
+import { X, Store, ShoppingCart, Clock } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { findRegisteredUserByPhone } from "../data/userAccounts";
+import {
+  findRejectedSignupByPhone,
+  saveOwnerSignupEditDraft,
+} from "../data/ownerSignupApplications";
 import { refreshOwnerSignupApplicationsFromRemote } from "../data/ownerSignupApplicationsSync";
+import { refreshStoreAccountsFromRemote } from "../data/storeAccountsSync";
+import { refreshRegisteredUsersFromRemote } from "../data/registeredUsersSync";
 import { formatPhoneInput } from "../utils/phoneFormat";
 
 export function LoginPage() {
@@ -19,7 +25,9 @@ export function LoginPage() {
   const [findError, setFindError] = useState("");
   const [pinSent, setPinSent] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showPendingModal, setShowPendingModal] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const [rejectPhoneDigits, setRejectPhoneDigits] = useState("");
 
   const goHome = () => {
     const result = enterGuest();
@@ -39,11 +47,21 @@ export function LoginPage() {
       return;
     }
 
-    await refreshOwnerSignupApplicationsFromRemote();
+    await Promise.all([
+      refreshOwnerSignupApplicationsFromRemote(),
+      refreshStoreAccountsFromRemote(),
+      refreshRegisteredUsersFromRemote(),
+    ]);
     const result = login(phoneDigits, pinValue);
     if (!result.ok) {
-      if (result.rejectReason) {
-        setRejectReason(result.rejectReason);
+      if (result.status === "pending") {
+        setShowPendingModal(true);
+        setLoginError("");
+        return;
+      }
+      if (result.status === "rejected" || result.rejectReason) {
+        setRejectReason(result.rejectReason || "관리자에 의해 거절되었습니다.");
+        setRejectPhoneDigits(phoneDigits);
         setShowRejectModal(true);
         setLoginError("");
         return;
@@ -52,6 +70,30 @@ export function LoginPage() {
       return;
     }
     navigate(result.redirect);
+  };
+
+  const handleEditRejectedSignup = () => {
+    const app = findRejectedSignupByPhone(rejectPhoneDigits);
+    if (app) {
+      saveOwnerSignupEditDraft(app);
+    } else {
+      // 신청 데이터가 없으면 로그인 폼 정보만이라도 넘김
+      saveOwnerSignupEditDraft({
+        id: Date.now(),
+        storeName: "",
+        email: "",
+        phone: rejectPhoneDigits,
+        pin: pin.trim(),
+        address: "",
+        storeImage: "",
+        marketId: "jungang",
+        status: "rejected",
+        createdAt: new Date().toISOString(),
+        rejectReason,
+      });
+    }
+    setShowRejectModal(false);
+    navigate("/register?role=owner&edit=1");
   };
 
   const handleSendPinEmail = () => {
@@ -360,6 +402,33 @@ export function LoginPage() {
         </>
       )}
 
+      {/* 신청중 팝업 */}
+      {showPendingModal && (
+        <>
+          <div className="fixed inset-0 bg-black/40 z-[200]" onClick={() => setShowPendingModal(false)} />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[210] w-[300px] max-w-[calc(100vw-48px)] bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <div className="px-6 pt-6 pb-5 text-center">
+              <div className="mx-auto mb-3 w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center">
+                <Clock className="w-6 h-6 text-amber-500" />
+              </div>
+              <p className="text-[16px] font-bold text-gray-800 mb-2">신청중</p>
+              <p className="text-[13px] text-gray-600 leading-relaxed">
+                가입 신청이 접수되어 승인 대기 중입니다.
+                <br />
+                영업일 기준 1일 이내로 처리됩니다.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowPendingModal(false)}
+              className="w-full py-3.5 bg-gray-900 text-white text-[14px] font-semibold active:bg-gray-700 transition-colors"
+            >
+              확인
+            </button>
+          </div>
+        </>
+      )}
+
       {/* 가입 거절 팝업 */}
       {showRejectModal && (
         <>
@@ -367,19 +436,28 @@ export function LoginPage() {
           <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[210] w-[300px] max-w-[calc(100vw-48px)] bg-white rounded-2xl shadow-2xl overflow-hidden">
             <div className="px-6 pt-6 pb-5 text-center">
               <p className="text-[28px] mb-2">❌</p>
-              <p className="text-[16px] font-bold text-gray-800 mb-2">가입 신청이 거절되었습니다</p>
-              <p className="text-[12px] text-gray-400 mb-3">거절 사유</p>
+              <p className="text-[16px] font-bold text-gray-800 mb-2">가입 신청이 반려되었습니다</p>
+              <p className="text-[12px] text-gray-400 mb-3">반려 사유</p>
               <p className="text-[13px] text-gray-600 leading-relaxed whitespace-pre-wrap bg-gray-50 rounded-xl px-4 py-3 text-left">
                 {rejectReason}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setShowRejectModal(false)}
-              className="w-full py-3.5 bg-gray-900 text-white text-[14px] font-semibold active:bg-gray-700 transition-colors"
-            >
-              확인
-            </button>
+            <div className="grid grid-cols-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setShowRejectModal(false)}
+                className="py-3.5 bg-white text-gray-600 text-[14px] font-semibold border-r border-gray-100 active:bg-gray-50"
+              >
+                닫기
+              </button>
+              <button
+                type="button"
+                onClick={handleEditRejectedSignup}
+                className="py-3.5 bg-gray-900 text-white text-[14px] font-semibold active:bg-gray-700"
+              >
+                수정하기
+              </button>
+            </div>
           </div>
         </>
       )}

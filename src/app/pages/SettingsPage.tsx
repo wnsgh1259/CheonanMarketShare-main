@@ -8,9 +8,11 @@ import { resolveStoreLoginPhone } from "../data/adminAccount";
 import {
   matchesOwnerChangeRequest,
   submitOwnerChangeRequest,
+  applyApprovedChangeRequestsLocally,
   type OwnerChangeRequest,
 } from "../data/ownerChangeRequests";
 import { refreshOwnerChangeRequestsFromRemote } from "../data/ownerChangeRequestsSync";
+import { refreshRegisteredUsersFromRemote } from "../data/registeredUsersSync";
 import { formatPhoneDisplay, formatPhoneInput } from "../utils/phoneFormat";
 
 type SettingsModal = "phone" | "pin" | "email" | null;
@@ -55,9 +57,21 @@ export function SettingsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    void refreshOwnerChangeRequestsFromRemote().then((requests) => {
-      if (!cancelled) setChangeRequests(requests);
-    });
+    void (async () => {
+      await refreshRegisteredUsersFromRemote();
+      const requests = await refreshOwnerChangeRequestsFromRemote();
+      if (cancelled) return;
+      applyApprovedChangeRequestsLocally(requests);
+      setChangeRequests(requests);
+      const nextPhone = localStorage.getItem("user_phone") || "";
+      if (nextPhone) setUserPhone(nextPhone);
+      const registered = findRegisteredUserByPhone(nextPhone);
+      if (registered?.email) setUserEmail(registered.email);
+      if (registered?.name) {
+        setNickname(registered.name);
+        setNicknameInput(registered.name);
+      }
+    })();
     return () => {
       cancelled = true;
     };

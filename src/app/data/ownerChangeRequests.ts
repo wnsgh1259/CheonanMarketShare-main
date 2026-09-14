@@ -1,4 +1,7 @@
+import { updateRegisteredUserPhone } from "./userAccounts";
+
 export const OWNER_CHANGE_REQUESTS_KEY = "owner_change_requests";
+export const OWNER_CHANGE_REQUESTS_APPLIED_KEY = "owner_change_requests_applied_v1";
 
 export type OwnerChangeRequestType = "storeName" | "phone";
 export type OwnerChangeRequestSource = "store" | "customer";
@@ -13,6 +16,7 @@ export type OwnerChangeRequest = {
   newValue: string;
   status: OwnerChangeRequestStatus;
   createdAt: string;
+  updatedAt?: string;
   rejectReason?: string;
   source?: OwnerChangeRequestSource;
 };
@@ -22,7 +26,7 @@ function normalizeStatus(value: unknown): OwnerChangeRequestStatus {
   return "pending";
 }
 
-function normalizeSource(value: unknown): OwnerChangeRequestSource {
+export function normalizeSource(value: unknown): OwnerChangeRequestSource {
   return value === "customer" ? "customer" : "store";
 }
 
@@ -35,6 +39,7 @@ function normalizeRequest(item: OwnerChangeRequest): OwnerChangeRequest {
     currentValue:
       item.type === "phone" ? item.currentValue.replace(/\D/g, "") : item.currentValue,
     newValue: item.type === "phone" ? item.newValue.replace(/\D/g, "") : item.newValue,
+    updatedAt: item.updatedAt || item.createdAt,
   };
 }
 
@@ -49,7 +54,7 @@ export function loadOwnerChangeRequests(): OwnerChangeRequest[] {
 }
 
 export function persistOwnerChangeRequests(requests: OwnerChangeRequest[]) {
-  localStorage.setItem(OWNER_CHANGE_REQUESTS_KEY, JSON.stringify(requests));
+  localStorage.setItem(OWNER_CHANGE_REQUESTS_KEY, JSON.stringify(requests.map(normalizeRequest)));
   void import("./ownerChangeRequestsSync").then(({ syncOwnerChangeRequestsToRemote }) =>
     syncOwnerChangeRequestsToRemote(requests),
   );
@@ -68,6 +73,7 @@ export function matchesOwnerChangeRequest(
   if (opts.storeName && request.storeName === opts.storeName) return true;
   const phoneDigits = (opts.phone || "").replace(/\D/g, "");
   if (phoneDigits && request.currentValue.replace(/\D/g, "") === phoneDigits) return true;
+  if (phoneDigits && request.newValue.replace(/\D/g, "") === phoneDigits) return true;
   return false;
 }
 
@@ -98,13 +104,14 @@ export function submitOwnerChangeRequest(input: {
   const currentValue =
     input.type === "phone" ? input.currentValue.replace(/\D/g, "") : input.currentValue.trim();
   const newValue = input.type === "phone" ? input.newValue.replace(/\D/g, "") : input.newValue.trim();
+  const now = new Date().toISOString();
 
   const withoutDuplicate = requests.filter(
     (item) =>
       !(
         item.status === "pending" &&
         item.type === input.type &&
-        item.source === source &&
+        normalizeSource(item.source) === source &&
         matchesOwnerChangeRequest(item, {
           storeId: input.storeId,
           storeName: input.storeName,
@@ -122,7 +129,8 @@ export function submitOwnerChangeRequest(input: {
     currentValue,
     newValue,
     status: "pending",
-    createdAt: new Date().toISOString(),
+    createdAt: now,
+    updatedAt: now,
     source,
   };
 
@@ -138,8 +146,9 @@ export function updateOwnerChangeRequest(
   id: number,
   patch: Partial<Pick<OwnerChangeRequest, "status" | "rejectReason">>,
 ) {
+  const now = new Date().toISOString();
   const next = loadOwnerChangeRequests().map((item) =>
-    item.id === id ? { ...item, ...patch } : item,
+    item.id === id ? { ...item, ...patch, updatedAt: now } : item,
   );
   persistOwnerChangeRequests(next);
   const updated = next.find((item) => item.id === id);
@@ -149,4 +158,79 @@ export function updateOwnerChangeRequest(
     );
   }
   return next;
+}
+
+function loadAppliedRequestIds(): Set<number> {
+  try {
+    const raw = localStorage.getItem(OWNER_CHANGE_REQUESTS_APPLIED_KEY);
+    if (!raw) return new Set();
+    return new Set((JSON.parse(raw) as number[]).filter((id) => Number.isFinite(id)));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveAppliedRequestIds(ids: Set<number>) {
+  localStorage.setItem(OWNER_CHANGE_REQUESTS_APPLIED_KEY, JSON.stringify(Array.from(ids)));
+}
+
+/** 승인된 변경을 현재 기기 세션/계정에 반영 (손님·사장님) */
+export function applyApprovedChangeRequestsLocally(requests: OwnerChangeRequest[]) {
+  const applied = loadAppliedRequestIds();
+  let changed = false;
+  const role = localStorage.getItem("user_role");
+  let sessionPhone = (localStorage.getItem("user_phone") || "").replace(/\D/g, "");
+  const storeIdRaw = localStorage.getItem("owner_store_id");
+  const storeId = storeIdRaw ? Number(storeIdRaw) : null;
+
+  for (const raw of requests) {
+    const request = normalizeRequest(raw);
+    if (request.status !== "approved") continue;
+    if (applied.has(request.id)) continue;
+
+    if (request.type === "phone" && normalizeSource(request.source) === "customer") {
+      const oldPhone = request.currentValue.replace(/\D/g, "");
+      const newPhone = request.newValue.replace(/\D/g, "");
+      if (sessionPhone === oldPhone || sessionPhone === newPhone || !sessionPhone) {
+        updateRegisteredUserPhone(oldPhone, newPhone);
+        localStorage.setItem("user_phone", newPhone);
+        sessionPhone = newPhone;
+        changed = true;
+        applied.add(request.id);
+      }
+    }
+
+    if (request.type === "storeName" && normalizeSource(request.source) === "store") {
+      const matchesStore =
+        (storeId != null && request.storeId === storeId) ||
+        localStorage.getItem("owner_current_store_name") === request.currentValue ||
+        localStorage.getItem("owner_approved_store_name") === request.currentValue ||
+        localStorage.getItem("owner_current_store_name") === request.newValue;
+      if (role === "owner" && matchesStore) {
+        localStorage.setItem("owner_current_store_name", request.newValue);
+        localStorage.setItem("owner_approved_store_name", request.newValue);
+        localStorage.setItem("user_name", request.newValue);
+        changed = true;
+        applied.add(request.id);
+      }
+    }
+
+    if (request.type === "phone" && normalizeSource(request.source) === "store") {
+      const oldPhone = request.currentValue.replace(/\D/g, "");
+      const newPhone = request.newValue.replace(/\D/g, "");
+      const matches =
+        (storeId != null && request.storeId === storeId) ||
+        sessionPhone === oldPhone ||
+        sessionPhone === newPhone;
+      if (role === "owner" && matches) {
+        localStorage.setItem("user_phone", newPhone);
+        sessionPhone = newPhone;
+        changed = true;
+        applied.add(request.id);
+      }
+    }
+  }
+
+  if (changed) saveAppliedRequestIds(applied);
+  return changed;
 }

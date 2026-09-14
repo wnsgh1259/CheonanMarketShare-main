@@ -1,5 +1,9 @@
 import { ADMIN_PHONE, ADMIN_PIN, matchesAdminCredentials, loadStoreAccountsMap, type StoreAccountRecord } from "./adminAccount";
-import { getSignupRejectReason } from "./ownerSignupApplications";
+import {
+  findPendingSignupByPhone,
+  findRejectedSignupByPhone,
+  getSignupRejectReason,
+} from "./ownerSignupApplications";
 import { findRegisteredUserByPhone, type RegisteredUser } from "./userAccounts";
 
 export type UserRole = "guest" | "customer" | "owner" | "admin";
@@ -81,12 +85,26 @@ export function clearAuthSession() {
 
 export type LoginResult =
   | { ok: true; redirect: string }
-  | { ok: false; error: string; rejectReason?: string };
+  | {
+      ok: false;
+      error: string;
+      status?: "pending" | "rejected";
+      rejectReason?: string;
+    };
+
+function buildPendingResult(): LoginResult {
+  return {
+    ok: false,
+    error: "가입 승인 대기중입니다. 영업일 기준 1일 이내 처리됩니다.",
+    status: "pending",
+  };
+}
 
 function buildRejectionResult(phoneDigits: string): LoginResult {
   return {
     ok: false,
     error: "가입 신청이 거절되었습니다.",
+    status: "rejected",
     rejectReason: getSignupRejectReason(phoneDigits),
   };
 }
@@ -127,10 +145,12 @@ export function loginWithCredentials(phoneDigits: string, pin: string): LoginRes
   const registeredUser = findRegisteredUserByPhone(phoneDigits);
   if (registeredUser && registeredUser.pin === pin) {
     if (registeredUser.role === "owner") {
-      if (registeredUser.status === "pending") {
-        return { ok: false, error: "가입 승인 대기중입니다. 영업일 기준 1일 이내 처리됩니다." };
+      const pendingApp = findPendingSignupByPhone(phoneDigits);
+      const rejectedApp = findRejectedSignupByPhone(phoneDigits);
+      if (pendingApp || registeredUser.status === "pending") {
+        return buildPendingResult();
       }
-      if (registeredUser.status === "rejected") {
+      if (rejectedApp || registeredUser.status === "rejected") {
         return buildRejectionResult(phoneDigits);
       }
       writeAuthSession({
@@ -167,10 +187,12 @@ export function loginAsRegisteredUser(user: RegisteredUser): LoginResult {
   }
 
   if (user.role === "owner") {
-    if (user.status === "pending") {
-      return { ok: false, error: "가입 승인 대기중입니다. 영업일 기준 1일 이내 처리됩니다." };
+    const pendingApp = findPendingSignupByPhone(phoneDigits);
+    const rejectedApp = findRejectedSignupByPhone(phoneDigits);
+    if (pendingApp || user.status === "pending") {
+      return buildPendingResult();
     }
-    if (user.status === "rejected") {
+    if (rejectedApp || user.status === "rejected") {
       return buildRejectionResult(phoneDigits);
     }
     writeAuthSession(

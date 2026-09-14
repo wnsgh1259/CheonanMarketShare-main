@@ -27,6 +27,9 @@ export function upsertRegisteredUser(user: RegisteredUser) {
 
 export function persistRegisteredUsers(users: RegisteredUser[]) {
   localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(users));
+  void import("./registeredUsersSync").then(({ syncRegisteredUsersToRemote }) =>
+    syncRegisteredUsersToRemote(users),
+  );
 }
 
 export function deleteRegisteredUser(phone: string) {
