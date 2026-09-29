@@ -149,37 +149,37 @@ export function CartPage() {
   const totalPrice  = items.reduce((s, i) => s + i.price * i.quantity, 0);
 
   return (
-    <div className="min-h-screen bg-[#F7F8FA] pb-24">
+    <div className="min-h-screen bg-white pb-24">
       {/* Header */}
-      <div className="sticky top-0 bg-white z-10 border-b border-gray-100">
+      <div className="sticky top-0 bg-white z-10 border-b border-[#EDE5D8]">
         <div className="flex items-center justify-between px-4 py-3">
           <Link to="/map" className="p-1"><ChevronLeft className="w-5 h-5 text-gray-700" /></Link>
           <div className="text-center">
-            <h1 className="text-[15px] text-gray-900">장바구니</h1>
-            <p className="text-[11px] text-gray-400">{marketName}</p>
+            <h1 className="text-[15px] text-gray-800">장바구니</h1>
+            <p className="text-[11px] text-gray-600">{marketName}</p>
           </div>
           <div className="w-8" />
         </div>
       </div>
 
       {/* Cart Items */}
-      <div className="bg-white mx-4 mt-3 rounded-xl p-4">
+      <div className="bg-white mx-4 mt-3 rounded-xl p-4 ring-1 ring-inset ring-[#EDE5D8]">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[14px] text-gray-900">담은 상품 ({totalCount})</h2>
+          <h2 className="text-[14px] text-gray-800">담은 상품 ({totalCount})</h2>
           {items.length > 0 && (
             <button
               onClick={() => setShowClearConfirm(true)}
-              className="flex items-center gap-1 text-[12px] text-gray-400 active:text-red-500 transition-colors"
+              className="flex items-center gap-1 text-[12px] text-gray-600 active:text-red-500 transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5" />초기화
             </button>
           )}
         </div>
         {items.length === 0 ? (
-          <div className="flex flex-col items-center py-8 text-gray-400">
+          <div className="flex flex-col items-center py-8 text-gray-600">
             <ShoppingCart className="w-10 h-10 mb-2 text-gray-300" />
             <p className="text-[13px] mb-0.5">장바구니가 비어있어요</p>
-            <p className="text-[12px] text-gray-300">지도에서 상품을 담아보세요</p>
+            <p className="text-[12px] text-gray-600">지도에서 상품을 담아보세요</p>
           </div>
         ) : (
           <>
@@ -187,15 +187,15 @@ export function CartPage() {
               <div className="space-y-0">
                 {directItems.map((item) => (
                   <div key={item.id} className="flex items-center gap-3 py-3 border-b border-gray-50 last:border-0">
-                    <div className="w-11 h-11 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
+                    <div className="w-11 h-11 rounded-lg overflow-hidden flex-shrink-0 bg-[#FAF4EC]">
                       <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-[14px] text-gray-900">{item.name}</h3>
-                      <p className="text-[12px] text-gray-400">{item.storeName}</p>
+                      <h3 className="text-[14px] text-gray-800">{item.name}</h3>
+                      <p className="text-[12px] text-gray-600">{item.storeName}</p>
                       <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="text-[14px] text-gray-900">{item.price.toLocaleString()}원</span>
-                        <span className="text-[12px] text-gray-400">× {item.quantity}</span>
+                        <span className="text-[14px] text-gray-800">{item.price.toLocaleString()}원</span>
+                        <span className="text-[12px] text-gray-600">× {item.quantity}</span>
                       </div>
                     </div>
                     <button onClick={() => removeItem(item.id)} className="p-2 text-gray-300 active:text-red-500">
@@ -208,20 +208,20 @@ export function CartPage() {
             {quickItems.length > 0 && (
               <div>
                 {directItems.length > 0 && (
-                  <div className="border-t border-gray-100 pt-3 mt-1 mb-2">
-                    <span className="text-[11px] text-[#0EA5E9]">빠른 장보기로 담은 상품</span>
+                  <div className="border-t border-[#EDE5D8] pt-3 mt-1 mb-2">
+                    <span className="text-[11px] text-[#A9652D]">빠른 장보기로 담은 상품</span>
                   </div>
                 )}
                 {quickItems.map((item) => (
                   <div key={item.id} className="flex items-center gap-3 py-3 border-b border-gray-50 last:border-0">
-                    <div className="w-11 h-11 rounded-lg overflow-hidden flex-shrink-0 bg-sky-50">
+                    <div className="w-11 h-11 rounded-lg overflow-hidden flex-shrink-0 bg-[#FAF0E3]">
                       <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="text-[14px] text-gray-700">{item.name}</h3>
                       <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="text-[14px] text-gray-900">{item.price.toLocaleString()}원</span>
-                        <span className="text-[12px] text-gray-400">× {item.quantity}</span>
+                        <span className="text-[14px] text-gray-800">{item.price.toLocaleString()}원</span>
+                        <span className="text-[12px] text-gray-600">× {item.quantity}</span>
                       </div>
                     </div>
                     <button onClick={() => removeItem(item.id)} className="p-2 text-gray-300 active:text-red-500">
@@ -232,14 +232,14 @@ export function CartPage() {
               </div>
             )}
             {items.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
-                <span className="text-[13px] text-gray-500">담은 상품 합계</span>
-                <span className="text-[18px] text-gray-900">{totalPrice.toLocaleString()}원</span>
+              <div className="mt-3 pt-3 border-t border-[#EDE5D8] flex items-center justify-between">
+                <span className="text-[13px] text-gray-600">담은 상품 합계</span>
+                <span className="text-[18px] text-gray-800">{totalPrice.toLocaleString()}원</span>
               </div>
             )}
             <Link
               to="/map"
-              className="mt-3 flex items-center justify-center w-full py-2.5 border border-dashed border-gray-200 rounded-lg text-[13px] text-gray-400"
+              className="mt-3 flex items-center justify-center w-full py-2.5 border border-dashed border-gray-200 rounded-lg text-[13px] text-gray-600"
             >
               + 상품 추가하기
             </Link>
@@ -248,23 +248,23 @@ export function CartPage() {
       </div>
 
       {/* Quick Shopping */}
-      <div className="bg-white mx-4 mt-2.5 rounded-xl p-4">
+      <div className="bg-white mx-4 mt-2.5 rounded-xl p-4 ring-1 ring-inset ring-[#EDE5D8]">
         <div className="flex items-center gap-2 mb-1">
-          <Zap className="w-4 h-4 text-[#0EA5E9]" />
-          <h2 className="text-[14px] text-gray-900">빠른 장보기</h2>
+          <Zap className="w-4 h-4 text-[#A9652D]" />
+          <h2 className="text-[14px] text-gray-800">빠른 장보기</h2>
         </div>
-        <p className="text-[12px] text-gray-400 mb-3">요리명을 검색하면 재료를 자동 추가해요</p>
+        <p className="text-[12px] text-gray-600 mb-3">요리명을 검색하면 재료를 자동 추가해요</p>
         <div className="flex gap-2 mb-2">
           <input
             type="text" value={recipeQuery}
             onChange={(e) => setRecipeQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleRecipeSearch()}
             placeholder="요리명을 입력하세요"
-            className="flex-1 px-3 py-2.5 bg-gray-100 rounded-lg text-[14px] focus:outline-none focus:ring-1 focus:ring-gray-300 placeholder:text-gray-400"
+            className="flex-1 px-3 py-2.5 bg-[#FAF4EC] rounded-lg text-[14px] focus:outline-none focus:ring-1 focus:ring-[#C9813A] placeholder:text-gray-500"
           />
           <button
             onClick={handleRecipeSearch}
-            className="px-4 py-2.5 bg-gray-900 text-white rounded-lg text-[13px] active:bg-gray-800 transition-colors flex items-center gap-1"
+            className="px-4 py-2.5 bg-[#A9652D] text-white rounded-lg text-[13px] active:bg-[#874E22] transition-colors flex items-center gap-1"
           >
             <Search className="w-3.5 h-3.5" />검색
           </button>
@@ -282,7 +282,7 @@ export function CartPage() {
                 setConflictMsg("");
                 setResultsCollapsed(false);
               }}
-              className="px-2.5 py-1 bg-gray-100 text-gray-600 rounded-md text-[12px] active:bg-gray-200 transition-colors"
+              className="px-2.5 py-1 bg-[#FAF4EC] text-gray-600 rounded-md text-[12px] active:bg-[#EAD3B7] transition-colors"
             >
               {name}
             </button>
@@ -291,32 +291,32 @@ export function CartPage() {
 
         {recipeResults !== null && (
           recipeResults.length === 0 ? (
-            <div className="text-center py-6 text-gray-400">
+            <div className="text-center py-6 text-gray-600">
               <p className="text-[13px]">검색 결과가 없어요</p>
-              <p className="text-[12px] mt-1 text-gray-300">다른 요리명을 입력해 보세요</p>
+              <p className="text-[12px] mt-1 text-gray-600">다른 요리명을 입력해 보세요</p>
             </div>
           ) : (
-            <div className="mt-1 border border-gray-100 rounded-lg overflow-hidden">
-              <div className="flex items-center justify-between px-3 py-2.5 bg-gray-50 border-b border-gray-100">
+            <div className="mt-1 border border-[#EDE5D8] rounded-lg overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-2.5 bg-gray-50 border-b border-[#EDE5D8]">
                 <div className="flex items-center gap-2">
                   <span className="text-[13px] text-gray-800">{recipeTitle} 재료</span>
-                  <span className="text-[11px] text-[#0EA5E9]">{addedIds.size}/{recipeResults.length}</span>
+                  <span className="text-[11px] text-[#A9652D]">{addedIds.size}/{recipeResults.length}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   {!resultsCollapsed && (
                     <button
                       onClick={handleAddAll}
-                      className="text-[11px] px-2.5 py-1 bg-gray-900 text-white rounded-md active:bg-gray-800 transition-colors"
+                      className="text-[11px] px-2.5 py-1 bg-[#A9652D] text-white rounded-md active:bg-[#874E22] transition-colors"
                     >
                       전체 담기
                     </button>
                   )}
-                  <button onClick={() => setResultsCollapsed((v) => !v)} className="p-1.5 text-gray-400">
+                  <button onClick={() => setResultsCollapsed((v) => !v)} className="p-1.5 text-gray-600">
                     {resultsCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
                   </button>
                   <button
                     onClick={() => { setRecipeResults(null); setRecipeTitle(""); setAddedIds(new Set()); setConflictMsg(""); setResultsCollapsed(false); }}
-                    className="p-1.5 text-gray-400"
+                    className="p-1.5 text-gray-600"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -325,7 +325,7 @@ export function CartPage() {
 
               {resultsCollapsed ? (
                 <div
-                  className="px-3 py-2.5 flex items-center justify-between cursor-pointer active:bg-gray-50"
+                  className="px-3 py-2.5 flex items-center justify-between cursor-pointer active:bg-[#FAF0E3]"
                   onClick={() => setResultsCollapsed(false)}
                 >
                   <div className="flex items-center gap-1.5 flex-wrap">
@@ -333,15 +333,15 @@ export function CartPage() {
                       <span
                         key={ing.id}
                         className={`text-[11px] px-2 py-0.5 rounded ${
-                          addedIds.has(ing.id) ? "bg-sky-50 text-[#0EA5E9]" : "bg-gray-100 text-gray-500"
+                          addedIds.has(ing.id) ? "bg-[#FAF0E3] text-[#A9652D]" : "bg-[#FAF4EC] text-gray-600"
                         }`}
                       >
                         {ing.name}
                       </span>
                     ))}
-                    {recipeResults.length > 4 && <span className="text-[11px] text-gray-400">+{recipeResults.length - 4}</span>}
+                    {recipeResults.length > 4 && <span className="text-[11px] text-gray-600">+{recipeResults.length - 4}</span>}
                   </div>
-                  <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0 ml-2" />
+                  <ChevronDown className="w-4 h-4 text-gray-600 flex-shrink-0 ml-2" />
                 </div>
               ) : (
                 <div className="p-3">
@@ -353,7 +353,7 @@ export function CartPage() {
                           key={ing.id}
                           onClick={() => handleToggleIngredient(ing)}
                           className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left ${
-                            isAdded ? "bg-sky-50" : "bg-gray-50 active:bg-gray-100"
+                            isAdded ? "bg-[#FAF0E3]" : "bg-gray-50 active:bg-[#FAF0E3]"
                           }`}
                         >
                           <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center text-[18px] flex-shrink-0">
@@ -362,18 +362,18 @@ export function CartPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
                               <span className="text-[13px] text-gray-800">{ing.name}</span>
-                              <span className="text-[10px] text-gray-400">{ing.amount}</span>
+                              <span className="text-[10px] text-gray-600">{ing.amount}</span>
                             </div>
-                            <span className="text-[11px] text-gray-400">{ing.storeName}</span>
+                            <span className="text-[11px] text-gray-600">{ing.storeName}</span>
                           </div>
                           <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
-                            <span className="text-[13px] text-gray-900">{ing.price.toLocaleString()}원</span>
+                            <span className="text-[13px] text-gray-800">{ing.price.toLocaleString()}원</span>
                             {isAdded ? (
-                              <span className="flex items-center gap-0.5 text-[10px] text-[#0EA5E9]">
+                              <span className="flex items-center gap-0.5 text-[10px] text-[#A9652D]">
                                 <CheckCircle2 className="w-3 h-3" />담김
                               </span>
                             ) : (
-                              <span className="flex items-center gap-0.5 text-[10px] text-gray-400">
+                              <span className="flex items-center gap-0.5 text-[10px] text-gray-600">
                                 <PlusCircle className="w-3 h-3" />담기
                               </span>
                             )}
@@ -383,8 +383,8 @@ export function CartPage() {
                     })}
                   </div>
                   <div className="mt-3 p-3 bg-gray-50 rounded-lg flex items-center justify-between">
-                    <span className="text-[12px] text-gray-500">전체 재료 합계</span>
-                    <span className="text-[14px] text-gray-900">
+                    <span className="text-[12px] text-gray-600">전체 재료 합계</span>
+                    <span className="text-[14px] text-gray-800">
                       {recipeResults.reduce((s, i) => s + i.price, 0).toLocaleString()}원
                     </span>
                   </div>
@@ -397,12 +397,12 @@ export function CartPage() {
       </div>
 
       {/* Route Recommendation */}
-      <div className="bg-white mx-4 mt-2.5 rounded-xl p-4">
+      <div className="bg-white mx-4 mt-2.5 rounded-xl p-4 ring-1 ring-inset ring-[#EDE5D8]">
         <div className="flex items-center gap-2 mb-1">
-          <Route className="w-4 h-4 text-[#0EA5E9]" />
-          <h2 className="text-[14px] text-gray-900">맞춤형 경로 추천</h2>
+          <Route className="w-4 h-4 text-[#A9652D]" />
+          <h2 className="text-[14px] text-gray-800">맞춤형 경로 추천</h2>
         </div>
-        <p className="text-[12px] text-gray-400 mb-4">
+        <p className="text-[12px] text-gray-600 mb-4">
           장바구니 상품 기반으로 3가지 최적 동선을 계산해요
         </p>
         <RouteRecommendation items={items} marketId={currentMarketId as MarketId | null} />
@@ -416,12 +416,12 @@ export function CartPage() {
             <div className="px-6 pt-6 pb-5 text-center">
               <p className="text-[28px] mb-2">🗑️</p>
               <p className="text-[16px] font-bold text-gray-800 mb-1">장바구니 초기화</p>
-              <p className="text-[13px] text-gray-400">담은 상품을 모두 삭제할까요?</p>
+              <p className="text-[13px] text-gray-600">담은 상품을 모두 삭제할까요?</p>
             </div>
-            <div className="flex border-t border-gray-100">
+            <div className="flex border-t border-[#EDE5D8]">
               <button
                 onClick={() => setShowClearConfirm(false)}
-                className="flex-1 py-3.5 text-[14px] text-gray-500 active:bg-gray-50 transition-colors border-r border-gray-100"
+                className="flex-1 py-3.5 text-[14px] text-gray-600 active:bg-[#FAF0E3] transition-colors border-r border-[#EDE5D8]"
               >
                 취소
               </button>

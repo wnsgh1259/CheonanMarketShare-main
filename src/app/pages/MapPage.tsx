@@ -1123,7 +1123,7 @@ export function MapPage() {
 
   return (
     <div
-      className="relative flex flex-col overflow-hidden bg-[#F7F8FA]"
+      className="relative flex flex-col overflow-hidden bg-white"
       style={{ height: "calc(100dvh - 3.5rem - env(safe-area-inset-bottom, 0px))" }}
     >
       <MarketConflictModal
@@ -1133,28 +1133,28 @@ export function MapPage() {
       />
 
       {/* Header */}
-      <div ref={pageHeaderRef} className="z-30 shrink-0 border-b border-gray-100 bg-white shadow-[0_1px_0_rgba(0,0,0,0.04)]">
+      <div ref={pageHeaderRef} className="z-30 shrink-0 border-b border-[#EDE5D8] bg-white shadow-[0_1px_0_rgba(0,0,0,0.04)]">
         <div className="flex items-center gap-2 px-4 py-2.5">
           <Link to="/home" className="p-1"><ChevronLeft className="w-5 h-5 text-gray-700" /></Link>
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
             <input
               type="text"
               placeholder={`${marketInfo.name}에서 검색`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-9 h-9 rounded-lg bg-gray-100 text-[14px] focus:outline-none focus:ring-1 focus:ring-gray-300"
+              className="w-full pl-9 pr-9 h-9 rounded-lg bg-[#FAF4EC] text-[14px] focus:outline-none focus:ring-1 focus:ring-[#C9813A]"
             />
             {searchQuery && (
               <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2">
-                <X className="w-4 h-4 text-gray-400" />
+                <X className="w-4 h-4 text-gray-600" />
               </button>
             )}
           </div>
           <Link to="/cart" className="p-1 relative">
             <ShoppingCart className="w-5 h-5 text-gray-700" />
             {totalCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-[#0EA5E9] text-white text-[10px] min-w-[16px] h-4 rounded-full flex items-center justify-center px-1">
+              <span className="absolute -top-1 -right-1 bg-[#A9652D] text-white text-[10px] min-w-[16px] h-4 rounded-full flex items-center justify-center px-1">
                 {totalCount}
               </span>
             )}
@@ -1167,7 +1167,7 @@ export function MapPage() {
               key={id}
               onClick={() => handleMarketChange(id)}
               className={`flex-1 py-2.5 text-[13px] transition-all border-b-2 ${
-                selectedMarket === id ? "border-gray-900 text-gray-900" : "border-transparent text-gray-400"
+                selectedMarket === id ? "border-[#C9813A] text-gray-800" : "border-transparent text-gray-600"
               }`}
             >
               {info.name}
@@ -1179,13 +1179,13 @@ export function MapPage() {
           <button
             onClick={() => { setShowFavoritesOnly((v) => !v); setSelectedStore(null); setBarPreviewStore(null); setStoreSheetOpen(false); }}
             className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg whitespace-nowrap text-[12px] transition-all flex-shrink-0 ${
-              showFavoritesOnly ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600"
+              showFavoritesOnly ? "bg-[#A9652D] text-white" : "bg-[#FAF4EC] text-gray-600"
             }`}
           >
             <Heart className={`w-3 h-3 ${showFavoritesOnly ? "fill-white" : "text-red-400"}`} />
             단골
             {likedStores.size > 0 && (
-              <span className={`text-[10px] ml-0.5 ${showFavoritesOnly ? "text-gray-300" : "text-gray-400"}`}>
+              <span className={`text-[10px] ml-0.5 ${showFavoritesOnly ? "text-white" : "text-gray-600"}`}>
                 {likedStores.size}
               </span>
             )}
@@ -1197,7 +1197,7 @@ export function MapPage() {
                 key={cat}
                 onClick={() => { setShowFavoritesOnly(false); setSelectedCategory(cat); setSelectedStore(null); setBarPreviewStore(null); setStoreSheetOpen(false); }}
                 className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg whitespace-nowrap text-[12px] transition-all flex-shrink-0 ${
-                  isActive ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600"
+                  isActive ? "bg-[#A9652D] text-white" : "bg-[#FAF4EC] text-gray-600"
                 }`}
               >
                 {cat}
@@ -1239,7 +1239,7 @@ export function MapPage() {
             onCustomPinClick={() => setCustomPinCardOpen(true)}
           />
           <div className="pointer-events-none absolute inset-x-0 bottom-0 top-0">
-            <div className="pointer-events-auto absolute bottom-3 left-3 rounded-md bg-white px-2 py-1 text-[11px] text-gray-500 shadow-md">
+            <div className="pointer-events-auto absolute bottom-3 left-3 rounded-md bg-white px-2 py-1 text-[11px] text-gray-600 shadow-md">
               {filteredStores.length}개 상점
             </div>
             <button
@@ -1248,7 +1248,7 @@ export function MapPage() {
               className="pointer-events-auto absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-md"
               aria-label="현재 위치로 이동"
             >
-              <MapPin className="h-4 w-4 text-gray-500" />
+              <MapPin className="h-4 w-4 text-gray-600" />
             </button>
           </div>
         </div>
@@ -1273,13 +1273,13 @@ export function MapPage() {
             <div className="flex">
               {/* 왼쪽: 상점 정보 */}
               <div className="flex-1 p-3.5 min-w-0">
-                <h3 className="text-[15px] font-semibold text-gray-900 truncate">{barPreviewStore.name}</h3>
+                <h3 className="text-[15px] font-semibold text-gray-800 truncate">{barPreviewStore.name}</h3>
                 <div className="flex items-center gap-1 mt-0.5">
                   <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
                   <span className="text-[12px] font-medium text-gray-700">{barPreviewStore.rating}</span>
                   <span className="text-gray-300 mx-0.5">·</span>
-                  <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                  <span className="text-[11px] text-gray-500 truncate">{barPreviewStore.location}</span>
+                  <MapPin className="w-3 h-3 text-gray-600 flex-shrink-0" />
+                  <span className="text-[11px] text-gray-600 truncate">{barPreviewStore.location}</span>
                 </div>
                 <div className="flex items-center gap-1 mt-1.5 flex-wrap">
                   {barPreviewStore.badge && (
@@ -1287,7 +1287,7 @@ export function MapPage() {
                   )}
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">{barPreviewStore.category}</span>
                 </div>
-                <p className="text-[10px] text-gray-400 mt-2">카드를 눌러 상세·메뉴 보기</p>
+                <p className="text-[10px] text-gray-600 mt-2">카드를 눌러 상세·메뉴 보기</p>
               </div>
               {/* 오른쪽: 대표 이미지 */}
               <div className="flex-none py-2 flex items-center">
@@ -1321,9 +1321,9 @@ export function MapPage() {
                 <MapPin className="w-5 h-5 text-red-500" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[14px] font-semibold text-gray-900">{customMapPin.name}</p>
+                <p className="text-[14px] font-semibold text-gray-800">{customMapPin.name}</p>
                 {customMapPin.description && (
-                  <p className="text-[11px] text-gray-400 mt-0.5">{customMapPin.description}</p>
+                  <p className="text-[11px] text-gray-600 mt-0.5">{customMapPin.description}</p>
                 )}
               </div>
               {/* X: 카드만 닫기 — 핀 마커는 지도에 그대로 유지 */}
@@ -1340,7 +1340,7 @@ export function MapPage() {
                 setCustomMapPin(null);
                 setCustomPinCardOpen(false);
               }}
-              className="w-full flex items-center justify-center gap-1.5 py-3 border-t border-gray-100 text-[13px] font-medium text-red-500 active:bg-red-50 transition-colors"
+              className="w-full flex items-center justify-center gap-1.5 py-3 border-t border-[#EDE5D8] text-[13px] font-medium text-red-500 active:bg-red-50 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -1354,7 +1354,7 @@ export function MapPage() {
       {/* Store list — custom snap bottom sheet */}
       <div
         className={cn(
-          "fixed left-0 right-0 z-[141] mx-auto max-w-md flex flex-col bg-white rounded-t-2xl border border-gray-100 shadow-[0_-4px_20px_rgba(0,0,0,0.12)] overflow-hidden",
+          "fixed left-0 right-0 z-[141] mx-auto max-w-md flex flex-col bg-white rounded-t-2xl border border-[#EDE5D8] shadow-[0_-4px_20px_rgba(0,0,0,0.12)] overflow-hidden",
           STORE_SHEET_BOTTOM_CLASS,
           mapDragHideFullSheet && "pointer-events-none opacity-0",
         )}
@@ -1376,19 +1376,19 @@ export function MapPage() {
         >
           {isStoreSheetCollapsed ? (
             <div className="flex justify-center pb-1.5 pt-2.5">
-              <ChevronUp className="w-7 h-7 text-gray-400" strokeWidth={2.25} />
+              <ChevronUp className="w-7 h-7 text-gray-600" strokeWidth={2.25} />
             </div>
           ) : (
             <div className="mx-auto mb-2 mt-3 h-1 w-10 rounded-full bg-gray-300" />
           )}
           <div className="flex items-center justify-between px-4 pb-3.5 pt-0.5">
-            <span className="text-[14px] font-semibold leading-snug text-gray-900">{marketInfo.name}</span>
-            <span className="shrink-0 rounded-full bg-gray-100 px-2.5 py-0.5 text-[12px] leading-snug text-gray-500">{filteredStores.length}개</span>
+            <span className="text-[14px] font-semibold leading-snug text-gray-800">{marketInfo.name}</span>
+            <span className="shrink-0 rounded-full bg-[#FAF4EC] px-2.5 py-0.5 text-[12px] leading-snug text-gray-600">{filteredStores.length}개</span>
           </div>
         </div>
         {/* 목록 영역 — 최소 스냅일 때 CSS로 숨김(스크롤 위치 보존을 위해 언마운트 안 함) */}
         <div
-          className="border-t border-gray-100 flex min-h-0 flex-1 flex-col overflow-hidden"
+          className="border-t border-[#EDE5D8] flex min-h-0 flex-1 flex-col overflow-hidden"
           style={{ visibility: isStoreSheetCollapsed ? "hidden" : "visible" }}
           aria-hidden={isStoreSheetCollapsed}
         >
@@ -1399,7 +1399,7 @@ export function MapPage() {
             className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 pb-3 [-webkit-overflow-scrolling:touch]"
           >
         {filteredStores.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+          <div className="flex flex-col items-center justify-center py-12 text-gray-600">
             <Search className="w-8 h-8 mb-2 text-gray-300" />
             <p className="text-[13px]">{showFavoritesOnly ? "단골 매장이 없어요" : "검색 결과가 없어요"}</p>
             {showFavoritesOnly && <p className="text-[11px] mt-1 text-gray-300">매장 카드의 하트를 눌러 등록하세요</p>}
@@ -1411,7 +1411,7 @@ export function MapPage() {
                 key={store.id}
                 data-store-id={store.id}
                 data-store-row="1"
-                className="bg-gray-50 rounded-xl overflow-hidden active:bg-gray-100 transition-colors cursor-pointer"
+                className="bg-white ring-1 ring-inset ring-[#EDE5D8] rounded-xl overflow-hidden active:bg-[#FAF0E3] transition-colors cursor-pointer"
                 onClick={() => {
                   setSelectedStore(store);
                   setBarPreviewStore(null);
@@ -1426,7 +1426,7 @@ export function MapPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <h3 className="text-[13px] font-medium text-gray-900">{store.name}</h3>
+                        <h3 className="text-[13px] font-medium text-gray-800">{store.name}</h3>
                         {store.badge && (
                           <span className={`text-[9px] px-1.5 py-0.5 rounded ${badgeStyle(store.badge)}`}>{store.badge}</span>
                         )}
@@ -1435,12 +1435,12 @@ export function MapPage() {
                         <Heart className={`w-3.5 h-3.5 ${likedStores.has(store.id) ? "fill-red-500 text-red-500" : "text-gray-300"}`} />
                       </button>
                     </div>
-                    <div className="flex items-center gap-1 text-[10px] text-gray-400 mt-0.5">
+                    <div className="flex items-center gap-1 text-[10px] text-gray-600 mt-0.5">
                       <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
                       <span className="truncate">{store.location}</span>
                     </div>
                     <div className="flex items-center justify-between mt-0.5">
-                      <span className="text-[10px] text-gray-400">{store.hours}</span>
+                      <span className="text-[10px] text-gray-600">{store.hours}</span>
                       <div className="flex items-center gap-0.5">
                         <Star className="w-2.5 h-2.5 text-amber-400 fill-amber-400" />
                         <span className="text-[11px] text-gray-600">{store.rating}</span>
@@ -1458,7 +1458,7 @@ export function MapPage() {
                         <MessageCircle className="w-2.5 h-2.5" />채팅
                       </Link>
                       <button
-                        className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-gray-800 text-white text-[10px]"
+                        className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-[#A9652D] text-white active:bg-[#874E22] text-[10px]"
                         onClick={(e) => {
                           e.stopPropagation();
                           if (store.menus.length > 0) handleAddToCart(store.menus[0], store);
@@ -1528,23 +1528,23 @@ export function MapPage() {
                 </div>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-                <div className="space-y-1.5 border-b border-gray-100 py-3">
-                  <p className="text-[13px] leading-relaxed text-gray-500">{selectedStore.description}</p>
-                  <div className="flex items-center gap-2 text-[12px] text-gray-400">
+                <div className="space-y-1.5 border-b border-[#EDE5D8] py-3">
+                  <p className="text-[13px] leading-relaxed text-gray-600">{selectedStore.description}</p>
+                  <div className="flex items-center gap-2 text-[12px] text-gray-600">
                     <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
                     <span>{selectedStore.location}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-[12px] text-gray-400">
+                  <div className="flex items-center gap-2 text-[12px] text-gray-600">
                     <Clock className="h-3.5 w-3.5 flex-shrink-0" />
                     <span>{selectedStore.hours}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-[12px] text-gray-400">
+                  <div className="flex items-center gap-2 text-[12px] text-gray-600">
                     <Phone className="h-3.5 w-3.5 flex-shrink-0" />
                     <span>{selectedStore.phone}</span>
                   </div>
                 </div>
                 <div className="pt-3">
-                  <h3 className="mb-2.5 text-[14px] text-gray-900">메뉴 / 상품</h3>
+                  <h3 className="mb-2.5 text-[14px] text-gray-800">메뉴 / 상품</h3>
                   <div className="space-y-2">
                     {selectedStore.menus.map((menu) => {
                       return (
@@ -1552,10 +1552,10 @@ export function MapPage() {
                           <div className="flex-1">
                             <p className="text-[14px] text-gray-800">{menu.name}</p>
                             <div className="mt-0.5 flex items-center gap-2">
-                              <span className="text-[14px] text-gray-900">{menu.price.toLocaleString()}원</span>
+                              <span className="text-[14px] text-gray-800">{menu.price.toLocaleString()}원</span>
                               {menu.originalPrice && (
                                 <>
-                                  <span className="text-[11px] text-gray-400 line-through">{menu.originalPrice.toLocaleString()}원</span>
+                                  <span className="text-[11px] text-gray-600 line-through">{menu.originalPrice.toLocaleString()}원</span>
                                   <span className="text-[11px] text-red-500">-{menu.discount}%</span>
                                 </>
                               )}
@@ -1564,7 +1564,7 @@ export function MapPage() {
                           <button
                             type="button"
                             onClick={() => handleAddToCart(menu, selectedStore)}
-                            className="flex items-center gap-1 rounded-lg px-3 py-2 text-[12px] bg-gray-900 text-white active:bg-gray-700"
+                            className="flex items-center gap-1 rounded-lg px-3 py-2 text-[12px] bg-[#A9652D] text-white active:bg-[#874E22]"
                           >
                             <Plus className="h-3.5 w-3.5" />
                             담기
@@ -1574,13 +1574,13 @@ export function MapPage() {
                     })}
                   </div>
                   <div className="mt-4 flex gap-2">
-                    <button type="button" className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-white border-2 border-gray-400 py-3 text-[13px] font-semibold text-gray-800 transition-colors active:bg-gray-50">
+                    <button type="button" className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-white border-2 border-[#E0C8AC] py-3 text-[13px] font-semibold text-gray-800 transition-colors active:bg-[#FAF0E3]">
                       <Phone className="h-4 w-4" />
                       전화하기
                     </button>
                     <Link
                       to={`/chat?store=${encodeURIComponent(selectedStore.name)}`}
-                      className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-gray-900 py-3 text-[13px] text-white transition-colors active:bg-gray-800"
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#A9652D] py-3 text-[13px] text-white transition-colors active:bg-[#874E22]"
                       onClick={() => setStoreSheetOpen(false)}
                     >
                       <MessageCircle className="h-4 w-4" />
@@ -1590,7 +1590,7 @@ export function MapPage() {
                   <button
                     type="button"
                     onClick={() => setStoreSheetOpen(false)}
-                    className="mt-2 w-full py-3 text-[13px] font-semibold text-gray-800 border-2 border-gray-400 rounded-xl transition-colors active:bg-gray-50"
+                    className="mt-2 w-full py-3 text-[13px] font-semibold text-gray-800 border-2 border-[#E0C8AC] rounded-xl transition-colors active:bg-[#FAF0E3]"
                   >
                     닫기
                   </button>
@@ -1642,20 +1642,20 @@ export function MapPage() {
                 </div>
               </div>
               <div className="space-y-2 px-4 py-4">
-                <div className="flex items-center gap-2 text-[12px] text-gray-500">
+                <div className="flex items-center gap-2 text-[12px] text-gray-600">
                   <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
                   <span>
                     {selectedFacility.lat}, {selectedFacility.lng}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 text-[12px] text-gray-500">
+                <div className="flex items-center gap-2 text-[12px] text-gray-600">
                   <Clock className="h-3.5 w-3.5 flex-shrink-0" />
                   <span>{selectedFacility.hours || "운영시간 정보 없음"}</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setFacilitySheetOpen(false)}
-                  className="mt-2 w-full py-3 text-[13px] text-gray-400 transition-colors active:text-gray-600"
+                  className="mt-2 w-full py-3 text-[13px] text-gray-600 transition-colors active:text-gray-600"
                 >
                   닫기
                 </button>

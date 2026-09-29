@@ -215,7 +215,7 @@ export function RouteRecommendation({ items, marketId }: Props) {
 
   if (items.length === 0) {
     return (
-      <div className="text-center py-6 text-gray-400">
+      <div className="text-center py-6 text-gray-600">
         <MapPin className="w-8 h-8 mx-auto mb-2 text-gray-200" />
         <p className="text-[13px]">상품을 담으면 경로를 추천해 드려요</p>
       </div>
@@ -224,7 +224,7 @@ export function RouteRecommendation({ items, marketId }: Props) {
 
   if (!routes || storeEntries.length === 0) {
     return (
-      <div className="text-center py-6 text-gray-400">
+      <div className="text-center py-6 text-gray-600">
         <AlertCircle className="w-8 h-8 mx-auto mb-2 text-gray-200" />
         <p className="text-[13px]">경로를 계산할 수 없어요</p>
       </div>
@@ -249,7 +249,7 @@ export function RouteRecommendation({ items, marketId }: Props) {
               key={type}
               onClick={() => setSelected(type)}
               className={`w-full p-3 rounded-xl border-2 transition-all text-left ${
-                isActive ? `${m.border} bg-white` : "border-gray-100 bg-white"
+                isActive ? `${m.border} bg-white` : "border-[#EDE5D8] bg-white"
               }`}
             >
               <div className="flex items-center gap-3">
@@ -267,8 +267,8 @@ export function RouteRecommendation({ items, marketId }: Props) {
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-gray-400 mb-1.5">{m.desc}</p>
-                  <div className="flex gap-3 text-[12px] text-gray-500">
+                  <p className="text-[11px] text-gray-600 mb-1.5">{m.desc}</p>
+                  <div className="flex gap-3 text-[12px] text-gray-600">
                     <span className="text-gray-900">{r.totalPrice.toLocaleString()}원</span>
                     <span className="flex items-center gap-0.5">
                       <Navigation className="w-3 h-3" />{r.distance}m
@@ -308,10 +308,10 @@ export function RouteRecommendation({ items, marketId }: Props) {
       )}
 
       {/* Step-by-step detail */}
-      <div className="border border-gray-100 rounded-xl overflow-hidden">
-        <div className={`px-4 py-2.5 ${meta.light} border-b border-gray-100 flex items-center justify-between`}>
+      <div className="border border-[#EDE5D8] rounded-xl overflow-hidden">
+        <div className={`px-4 py-2.5 ${meta.light} border-b border-[#EDE5D8] flex items-center justify-between`}>
           <span className={`text-[13px] ${meta.textColor}`}>{meta.label} {meta.title} 상세</span>
-          <span className="text-[11px] text-gray-500">{selectedRoute.distance}m · {selectedRoute.time}분</span>
+          <span className="text-[11px] text-gray-600">{selectedRoute.distance}m · {selectedRoute.time}분</span>
         </div>
         <div className="p-3 space-y-0">
           {/* Entry point */}
@@ -322,7 +322,7 @@ export function RouteRecommendation({ items, marketId }: Props) {
               </div>
               <div className="w-px h-4 bg-gray-200 my-0.5" />
             </div>
-            <span className="text-[12px] text-gray-400">시장 입구 출발</span>
+            <span className="text-[12px] text-gray-600">시장 입구 출발</span>
           </div>
 
           {selectedRoute.path.map((entry, idx) => {
@@ -349,7 +349,7 @@ export function RouteRecommendation({ items, marketId }: Props) {
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-1 text-[11px] text-gray-400 mt-0.5">
+                      <div className="flex items-center gap-1 text-[11px] text-gray-600 mt-0.5">
                         <Navigation className="w-3 h-3" />
                         <span>{entry.hopDistance}m 이동</span>
                         <span className="text-gray-200">·</span>
@@ -370,7 +370,7 @@ export function RouteRecommendation({ items, marketId }: Props) {
                         }`}
                       >
                         {ci.name}
-                        {ci.quantity > 1 && <span className="text-gray-400"> ×{ci.quantity}</span>}
+                        {ci.quantity > 1 && <span className="text-gray-600"> ×{ci.quantity}</span>}
                       </span>
                     ))}
                   </div>
@@ -381,8 +381,8 @@ export function RouteRecommendation({ items, marketId }: Props) {
         </div>
 
         {/* Summary bar */}
-        <div className="border-t border-gray-100 px-4 py-3 flex items-center justify-between bg-gray-50">
-          <div className="text-[12px] text-gray-500 space-y-0.5">
+        <div className="border-t border-[#EDE5D8] px-4 py-3 flex items-center justify-between bg-gray-50">
+          <div className="text-[12px] text-gray-600 space-y-0.5">
             <div>총 {selectedRoute.path.length}개 매장 · {selectedRoute.distance}m 이동</div>
             {selectedRoute.savings > 0 && (
               <div className="text-emerald-600">
@@ -392,13 +392,13 @@ export function RouteRecommendation({ items, marketId }: Props) {
           </div>
           <div className="text-right">
             <div className="text-[18px] text-gray-900">{selectedRoute.totalPrice.toLocaleString()}원</div>
-            <div className="text-[11px] text-gray-400">예상 합계</div>
+            <div className="text-[11px] text-gray-600">예상 합계</div>
           </div>
         </div>
       </div>
 
       {/* Mini Route Map */}
-      <div className="mt-3 rounded-xl overflow-hidden border border-gray-100 relative" style={{ height: 160 }}>
+      <div className="mt-3 rounded-xl overflow-hidden border border-[#EDE5D8] relative" style={{ height: 160 }}>
         {mapCfg && (
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full">
             <rect x="0" y="0" width="100" height="100" fill="#F0F1F3" />
@@ -459,7 +459,7 @@ export function RouteRecommendation({ items, marketId }: Props) {
 
       <Link
         to="/map"
-        className="mt-2.5 flex items-center justify-center gap-1.5 w-full py-3 bg-gray-100 text-gray-600 rounded-xl text-[13px] active:bg-gray-200 transition-colors"
+        className="mt-2.5 flex items-center justify-center gap-1.5 w-full py-3 bg-[#FAF0E3] text-[#804A23] rounded-xl text-[13px] active:bg-[#EAD3B7] transition-colors"
       >
         <MapPin className="w-4 h-4" />
         지도에서 자세히 보기

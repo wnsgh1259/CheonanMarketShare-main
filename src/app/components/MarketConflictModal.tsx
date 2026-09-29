@@ -9,8 +9,8 @@ export function MarketConflictModal({ open, onConfirm, onCancel }: MarketConflic
   return (
     <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/30 px-6">
       <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
-        <h3 className="text-center text-[15px] text-gray-900 mb-2">시장을 변경할까요?</h3>
-        <p className="text-[13px] text-gray-500 text-center mb-6 leading-relaxed">
+        <h3 className="text-center text-[15px] text-gray-800 mb-2">시장을 변경할까요?</h3>
+        <p className="text-[13px] text-gray-600 text-center mb-6 leading-relaxed">
           장바구니에는 같은 시장의 상품만 담을 수 있어요.
           <br />
           변경하면 기존 상품이 삭제됩니다.
@@ -18,13 +18,13 @@ export function MarketConflictModal({ open, onConfirm, onCancel }: MarketConflic
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className="flex-1 py-3 rounded-xl bg-gray-100 text-gray-600 text-[14px] active:bg-gray-200 transition-colors"
+            className="flex-1 py-3 rounded-xl bg-[#FAF4EC] text-gray-600 text-[14px] active:bg-[#EAD3B7] transition-colors"
           >
             취소
           </button>
           <button
             onClick={onConfirm}
-            className="flex-1 py-3 rounded-xl bg-gray-900 text-white text-[14px] active:bg-gray-800 transition-colors"
+            className="flex-1 py-3 rounded-xl bg-[#A9652D] text-white text-[14px] active:bg-[#874E22] transition-colors"
           >
             변경하기
           </button>

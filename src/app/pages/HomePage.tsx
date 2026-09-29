@@ -96,30 +96,30 @@ export function HomePage() {
   const courses = coursesByMarket[selectedMarketId];
 
   return (
-    <div className="min-h-screen bg-[#FFFBF6] pb-20">
+    <div className="min-h-screen bg-white pb-20">
       {/* Header */}
-      <div className="sticky top-0 bg-[#FFFBF6] z-10 px-4 py-3 border-b border-[#EDE5D8]">
+      <div className="sticky top-0 bg-white z-10 px-4 py-3 border-b border-[#EDE5D8]">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-[11px] text-[#85715F] tracking-wide">천안 스마트 장보기</p>
-            <h1 className="text-[17px] text-[#3F342B] tracking-tight">{selectedMarket.name}</h1>
+            <p className="text-[11px] text-gray-600 tracking-wide">천안 스마트 장보기</p>
+            <h1 className="text-[17px] text-gray-800 tracking-tight">{selectedMarket.name}</h1>
           </div>
           <div className="flex items-center gap-1">
             {ownerMode ? (
               <>
                 <OwnerBackToStoreButton />
                 <button className="w-10 h-10 flex items-center justify-center relative">
-                  <Bell className="w-[20px] h-[20px] text-[#6F5B4B]" />
+                  <Bell className="w-[20px] h-[20px] text-gray-700" />
                   <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-[#C9813A] rounded-full" />
                 </button>
                 <Link to={getSettingsPath()} className="w-10 h-10 flex items-center justify-center">
-                  <Settings className="w-[20px] h-[20px] text-[#6F5B4B]" />
+                  <Settings className="w-[20px] h-[20px] text-gray-700" />
                 </Link>
               </>
             ) : (
               <>
                 <Link to="/cart" className="w-10 h-10 flex items-center justify-center relative">
-                  <ShoppingCart className="w-[20px] h-[20px] text-[#6F5B4B]" />
+                  <ShoppingCart className="w-[20px] h-[20px] text-gray-700" />
                   {totalCount > 0 && (
                     <span className="absolute top-1 right-0.5 bg-[#A9652D] text-white text-[10px] min-w-[16px] h-4 rounded-full flex items-center justify-center px-1">
                       {totalCount}
@@ -127,7 +127,7 @@ export function HomePage() {
                   )}
                 </Link>
                 <button className="w-10 h-10 flex items-center justify-center relative">
-                  <Bell className="w-[20px] h-[20px] text-[#6F5B4B]" />
+                  <Bell className="w-[20px] h-[20px] text-gray-700" />
                   <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-[#C9813A] rounded-full" />
                 </button>
               </>
@@ -137,7 +137,7 @@ export function HomePage() {
       </div>
 
       {/* Market Selector */}
-      <div className="bg-[#FAF4EC] px-4 pt-4 pb-4">
+      <div className="bg-white px-4 pt-4 pb-4">
         <div className="flex gap-2">
           {markets.map((market) => (
             <button
@@ -145,8 +145,8 @@ export function HomePage() {
               onClick={() => setSelectedMarketId(market.id)}
               className={`flex-1 relative rounded-xl overflow-hidden h-[88px] transition-all ${
                 selectedMarketId === market.id
-                  ? "ring-2 ring-[#C9813A] ring-offset-1 ring-offset-[#FAF4EC]"
-                  : "opacity-60"
+                  ? "ring-2 ring-[#C9813A] ring-offset-1 ring-offset-white"
+                  : "opacity-85"
               }`}
             >
               <img src={market.image} alt={market.name} className="w-full h-full object-cover" />
@@ -164,22 +164,22 @@ export function HomePage() {
       <div className="mx-4 mt-3 bg-white rounded-xl p-4 ring-1 ring-inset ring-[#EDE5D8]">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 bg-[#FAF0E3] rounded-xl flex items-center justify-center flex-shrink-0">
-            <Store className="w-5 h-5 text-[#6F5B4B]" />
+            <Store className="w-5 h-5 text-gray-700" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
-              <h3 className="text-[15px] text-[#3F342B]">{selectedMarket.name}</h3>
-              <span className="text-[11px] text-[#786553] bg-[#FAF0E3] px-2 py-0.5 rounded-md">
+              <h3 className="text-[15px] text-gray-800">{selectedMarket.name}</h3>
+              <span className="text-[11px] text-gray-700 bg-[#FAF0E3] px-2 py-0.5 rounded-md">
                 {selectedMarket.tag}
               </span>
             </div>
-            <div className="flex items-center gap-1 text-[12px] text-[#85715F] mb-0.5">
+            <div className="flex items-center gap-1 text-[12px] text-gray-600 mb-0.5">
               <MapPin className="w-3 h-3" />{selectedMarket.location}
             </div>
-            <div className="flex items-center gap-1 text-[12px] text-[#85715F] mb-2">
+            <div className="flex items-center gap-1 text-[12px] text-gray-600 mb-2">
               <Clock className="w-3 h-3" />{selectedMarket.openDays}
             </div>
-            <p className="text-[13px] text-[#786553] leading-relaxed">{selectedMarket.description}</p>
+            <p className="text-[13px] text-gray-700 leading-relaxed">{selectedMarket.description}</p>
           </div>
         </div>
         <Link
@@ -196,8 +196,8 @@ export function HomePage() {
         {/* Spots */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-[15px] text-[#3F342B]">인기 명소</h2>
-            <button className="flex items-center text-[13px] text-[#85715F]">
+            <h2 className="text-[15px] text-gray-800">인기 명소</h2>
+            <button className="flex items-center text-[13px] text-gray-600">
               모두보기 <ChevronRight className="w-4 h-4" />
             </button>
           </div>
@@ -223,9 +223,9 @@ export function HomePage() {
         <div className="bg-[#FAF0E3] rounded-xl p-4 mb-6">
           <div className="flex items-center gap-2 mb-1">
             <Tag className="w-4 h-4 text-[#A9652D]" />
-            <span className="text-[14px] text-[#3F342B]">마감 할인 알림</span>
+            <span className="text-[14px] text-gray-800">마감 할인 알림</span>
           </div>
-          <p className="text-[12px] text-[#85715F] mb-3">
+          <p className="text-[12px] text-gray-600 mb-3">
             {selectedMarket.name} 상인들의 오늘 마감 특가를 확인하세요
           </p>
           <Link
@@ -238,7 +238,7 @@ export function HomePage() {
 
         {/* Courses */}
         <div className="mb-4">
-          <h2 className="text-[15px] text-[#3F342B] mb-3">추천 코스</h2>
+          <h2 className="text-[15px] text-gray-800 mb-3">추천 코스</h2>
           <div className="space-y-2.5">
             {courses.map((course) => (
               <Link key={course.id} to="/map" className="block relative h-[130px] rounded-xl overflow-hidden">

@@ -78,7 +78,7 @@ export function BottomNav() {
     : REGULAR_NAV.map((item) => ({ ...item, exitOwnerMode: false }));
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-[140] bg-[#FFFBF6] border-t border-[#EDE5D8] max-w-md mx-auto">
+    <div className="fixed bottom-0 left-0 right-0 z-[140] bg-white border-t border-[#EDE5D8] max-w-md mx-auto">
       <div className="flex items-center h-14">
         {navItems.map(({ to, icon: Icon, label, exitOwnerMode }) => {
           const isActive = location.pathname === to || (to === "/home" && location.pathname === "/");
@@ -89,7 +89,7 @@ export function BottomNav() {
               to={to}
               onClick={exitOwnerMode ? () => setOwnerMode(false) : undefined}
               className={`flex-1 flex flex-col items-center justify-center gap-0.5 relative transition-colors active:text-[#874E22] ${
-                isActive ? "text-[#A9652D]" : "text-[#85715F]"
+                isActive ? "text-[#A9652D]" : "text-gray-600"
               }`}
             >
               <div className="relative">
