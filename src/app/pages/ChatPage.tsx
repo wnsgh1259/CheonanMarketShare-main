@@ -510,27 +510,39 @@ export function ChatPage() {
 
   /* ── 리스트 뷰 ── */
   return (
-    <div className="min-h-screen bg-[#F7F6F1] pb-20 max-w-md mx-auto relative">
+    <div className="relative isolate mx-auto min-h-screen max-w-md bg-gradient-to-b from-[#EAF3F6] via-[#F3F6F3] to-[#F8F7F3] pb-20">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+        <span className="profile-leaf profile-leaf-one">🍁</span>
+        <span className="profile-leaf profile-leaf-two">🍂</span>
+        <span className="profile-leaf profile-leaf-three">🍁</span>
+        <span className="profile-leaf home-leaf-four">🍂</span>
+        <span className="profile-leaf home-leaf-five">🍁</span>
+        <span className="profile-leaf home-leaf-six">🍂</span>
+        <span className="profile-leaf home-leaf-seven">🍁</span>
+        <span className="profile-leaf home-leaf-eight">🍂</span>
+        <span className="profile-leaf home-leaf-nine">🍁</span>
+        <span className="profile-leaf home-leaf-ten">🍂</span>
+      </div>
       <div className="sticky top-0 bg-white z-20 border-b border-[#EEEAE4]">
         <div className="flex items-center justify-between px-4 pt-3 pb-1">
           <div className="flex gap-4">
             <button onClick={() => setMainTab("community")} className={`text-[16px] pb-1 transition-colors ${mainTab === "community" ? "text-[#46352C] border-b-2 border-[#A55345] font-semibold" : "text-[#8A776B]"}`}>커뮤니티</button>
             <button onClick={() => setMainTab("chat")} className={`text-[16px] pb-1 transition-colors relative ${mainTab === "chat" ? "text-[#46352C] border-b-2 border-[#A55345] font-semibold" : "text-[#8A776B]"}`}>
               채팅
-              {chatRooms.some((r) => r.unread > 0) && <span className="absolute -top-0.5 -right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full" />}
+              {chatRooms.some((r) => r.unread > 0) && <span className={`absolute -top-0.5 -right-1.5 h-1.5 w-1.5 rounded-full bg-red-500 ${mainTab === "chat" ? "" : "chat-unread-pulse"}`} />}
             </button>
           </div>
           <div className="flex items-center gap-2 text-[#5A453B]">
             {ownerMode && <OwnerBackToStoreButton />}
             {mainTab === "community" ? (
               <>
-                <button onClick={() => { setSearchOpen((v) => !v); setSearchQuery(""); }}><Search className="w-5 h-5" /></button>
-                <button onClick={() => setSearchQuery("")}><RefreshCw className="w-4 h-4" /></button>
+                <button className="group" onClick={() => { setSearchOpen((v) => !v); setSearchQuery(""); }}><Search className="community-search-motion w-5 h-5" /></button>
+                <button className="group" onClick={() => setSearchQuery("")}><RefreshCw className="community-refresh-motion w-4 h-4" /></button>
               </>
             ) : (
               <>
-                <button><Bell className="w-5 h-5" /></button>
-                <button><Settings className="w-5 h-5" /></button>
+                <button className="group"><Bell className="bell-swing-target w-5 h-5" /></button>
+                <button className="group"><Settings className="community-settings-motion w-5 h-5" /></button>
               </>
             )}
           </div>
@@ -562,6 +574,7 @@ export function ChatPage() {
         )}
       </div>
 
+      <main className="relative z-10">
       {/* ── 커뮤니티 ── */}
       {mainTab === "community" && (
         <div>
@@ -587,7 +600,7 @@ export function ChatPage() {
               filteredPosts.map((post) => {
                 const mine = isMyPost(post);
                 return (
-                  <div key={post.id} className="relative bg-white rounded-2xl mb-3 ring-1 ring-inset ring-[#EAE8DF] shadow-[0_8px_24px_-22px_rgba(47,61,43,0.45)]">
+                  <div key={post.id} className="relative bg-white rounded-2xl mb-3 ring-1 ring-inset ring-[#D8C6B8] shadow-[0_8px_24px_-20px_rgba(70,53,44,0.3)]">
                     <button
                       className="w-full py-4 px-4 text-left active:bg-[#F5F5EF] transition-colors rounded-2xl"
                       onClick={() => navigate(`/post/${post.id}`)}
@@ -671,7 +684,7 @@ export function ChatPage() {
 
           <Link
             to="/write"
-            className="fixed bottom-24 right-[max(16px,calc(50%-208px))] flex items-center gap-1.5 bg-[#75845F] text-white px-5 py-3.5 rounded-full shadow-[0_10px_24px_-10px_rgba(69,85,54,0.55)] active:bg-[#64734F] transition-colors z-10"
+            className="fixed bottom-24 right-[max(16px,calc(50%-208px))] z-10 flex items-center gap-1.5 rounded-full border border-[#E8DDD2] bg-[#FFFDF8] px-5 py-3.5 font-semibold text-[#5A453B] shadow-[0_8px_22px_-12px_rgba(70,53,44,0.34)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#D8C5B3] hover:bg-[#F8F1E8] hover:shadow-[0_12px_24px_-12px_rgba(70,53,44,0.38)] active:translate-y-0 active:scale-[0.97]"
           >
             <Plus className="w-4 h-4" /><span className="text-[13px]">글쓰기</span>
           </Link>
@@ -696,10 +709,10 @@ export function ChatPage() {
           ) : (
             <div className="bg-white">
               {filteredRooms.map((room) => (
-                <button key={room.id} onClick={() => { setActiveChatId(room.id); setChatRooms((prev) => prev.map((r) => r.id === room.id ? { ...r, unread: 0, read: true } : r)); }} className="w-full flex items-center gap-3 px-4 py-3.5 border-b border-[#F1EFEB] text-left transition-colors duration-200 hover:bg-[#F8F7F5] active:bg-[#EEECE8]">
+                <button key={room.id} onClick={() => { setActiveChatId(room.id); setChatRooms((prev) => prev.map((r) => r.id === room.id ? { ...r, unread: 0, read: true } : r)); }} className="w-full flex items-center gap-3 px-4 py-3.5 border-b border-[#D8C6B8] text-left transition-colors duration-200 hover:bg-[#F8F7F5] active:bg-[#EEECE8]">
                   <div className="relative flex-shrink-0">
                     <div className="w-11 h-11 rounded-full overflow-hidden"><img src={room.image} alt="" className="w-full h-full object-cover" /></div>
-                    {room.unread > 0 && <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center">{room.unread}</span>}
+                    {room.unread > 0 && <span className="chat-unread-badge-glow absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] text-white">{room.unread}</span>}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-0.5">
@@ -714,6 +727,7 @@ export function ChatPage() {
           )}
         </div>
       )}
+      </main>
 
       <BottomNav />
     </div>

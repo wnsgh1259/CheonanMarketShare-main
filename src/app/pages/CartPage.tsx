@@ -149,9 +149,21 @@ export function CartPage() {
   const totalPrice  = items.reduce((s, i) => s + i.price * i.quantity, 0);
 
   return (
-    <div className="min-h-screen bg-[#F7F6F1] pb-24">
+    <div className="relative isolate min-h-screen bg-gradient-to-b from-[#EAF3F6] via-[#F3F6F3] to-[#F8F7F3] pb-24">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+        <span className="profile-leaf profile-leaf-one">🍁</span>
+        <span className="profile-leaf profile-leaf-two">🍂</span>
+        <span className="profile-leaf profile-leaf-three">🍁</span>
+        <span className="profile-leaf home-leaf-four">🍂</span>
+        <span className="profile-leaf home-leaf-five">🍁</span>
+        <span className="profile-leaf home-leaf-six">🍂</span>
+        <span className="profile-leaf home-leaf-seven">🍁</span>
+        <span className="profile-leaf home-leaf-eight">🍂</span>
+        <span className="profile-leaf home-leaf-nine">🍁</span>
+        <span className="profile-leaf home-leaf-ten">🍂</span>
+      </div>
       {/* Header */}
-      <div className="sticky top-0 bg-white z-10 border-b border-[#EEEAE4]">
+      <div className="sticky top-0 z-20 border-b border-[#EEEAE4] bg-white">
         <div className="flex items-center justify-between px-4 py-3">
           <Link to="/map" className="p-1"><ChevronLeft className="w-5 h-5 text-[#5A453B]" /></Link>
           <div className="text-center">
@@ -162,6 +174,7 @@ export function CartPage() {
         </div>
       </div>
 
+      <main className="relative z-10">
       {/* Cart Items */}
       <div className="bg-white mx-4 mt-4 rounded-2xl p-4 ring-1 ring-inset ring-[#EAE8DF] shadow-[0_8px_24px_-22px_rgba(47,61,43,0.45)]">
         <div className="flex items-center justify-between mb-3">
@@ -407,6 +420,7 @@ export function CartPage() {
         </p>
         <RouteRecommendation items={items} marketId={currentMarketId as MarketId | null} />
       </div>
+      </main>
 
       {/* 초기화 확인 팝업 */}
       {showClearConfirm && (

@@ -115,17 +115,22 @@ export function ProfilePage() {
         <div className="flex items-center justify-between px-4 py-3">
           <Link to="/home" className="p-1"><ChevronLeft className="w-5 h-5 text-[#5A453B]" /></Link>
           <h1 className="text-[15px] text-[#46352C] font-semibold">마이페이지</h1>
-          <Link to="/settings" className="p-1"><Settings className="w-5 h-5 text-[#5A453B]" /></Link>
+          <Link to="/settings" className="group p-1"><Settings className="community-settings-motion w-5 h-5 text-[#5A453B]" /></Link>
         </div>
       </div>
 
       {/* ── 프로필 히어로 카드 ── */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-[#E9EDDF] via-[#F3F0E5] to-[#F4E9D8] px-5 pb-5 pt-6">
-        <div className="pointer-events-none absolute -right-10 -top-14 h-44 w-44 rounded-full bg-[#B8C5A2]/25 blur-2xl" />
-        <div className="pointer-events-none absolute -bottom-20 -left-10 h-40 w-40 rounded-full bg-[#E7BC78]/20 blur-2xl" />
-        <div className="relative mb-4 flex items-center gap-2 text-[11px] font-semibold tracking-wide text-[#718064]"><Sparkles className="h-3.5 w-3.5" /> 나의 시장 기록</div>
+      <div className="relative overflow-hidden bg-gradient-to-br from-[#E5F0F4] via-[#EEF4F2] to-[#F4EAE0] px-5 pb-5 pt-6">
+        <div className="pointer-events-none absolute -right-10 -top-14 h-44 w-44 rounded-full bg-[#B9D7E1]/35 blur-2xl" />
+        <div className="pointer-events-none absolute -bottom-20 -left-10 h-40 w-40 rounded-full bg-[#E8C9AA]/25 blur-2xl" />
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+          <span className="profile-leaf profile-leaf-one">🍁</span>
+          <span className="profile-leaf profile-leaf-two">🍂</span>
+          <span className="profile-leaf profile-leaf-three">🍁</span>
+        </div>
+        <div className="relative z-10 mb-4 flex items-center gap-2 text-[11px] font-semibold tracking-wide text-[#8A776B]"><Sparkles className="h-3.5 w-3.5" /> 나의 시장 기록</div>
 
-        <div className="relative mb-5 flex items-center gap-4 rounded-[24px] border border-white/80 bg-white/75 p-4 shadow-[0_10px_30px_-24px_rgba(47,61,43,0.55)] backdrop-blur-sm">
+        <div className="relative z-10 mb-5 flex items-center gap-4 rounded-[24px] border border-[#D8C6B8] bg-white/75 p-4 shadow-[0_10px_30px_-24px_rgba(47,61,43,0.55)] backdrop-blur-sm">
           <button
             onClick={() => { setSheetDetail(null); setShowTitleSheet(true); }}
             className="relative flex-shrink-0"
@@ -138,59 +143,59 @@ export function ProfilePage() {
                 희귀
               </span>
             )}
-            <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 text-[9px] bg-white text-[#7F8378] border border-[#ECEBE4] px-2 py-0.5 rounded-full whitespace-nowrap">
+            <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 text-[9px] bg-white text-[#8A776B] border border-[#ECEBE4] px-2 py-0.5 rounded-full whitespace-nowrap">
               탭해서 변경
             </span>
           </button>
 
           <div className="flex-1">
-            <p className="text-[#858A7C] text-[11px] mb-0.5">오늘도 시장을 둘러본</p>
-            <h2 className="text-[#343B32] text-[21px] font-bold leading-tight">{user.name}</h2>
+            <p className="text-[#8A776B] text-[11px] mb-0.5">오늘도 시장을 둘러본</p>
+            <h2 className="text-[#46352C] text-[21px] font-bold leading-tight">{user.name}</h2>
             <button
               onClick={() => { setSheetDetail(null); setShowTitleSheet(true); }}
-              className="mt-1 inline-flex items-center gap-1 bg-[#EFF2E8] border border-[#E1E6D8] rounded-full px-2.5 py-1 active:bg-gray-50 transition-colors"
+              className="profile-title-glint relative mt-1 inline-flex items-center gap-1 overflow-hidden rounded-full border border-[#EEDC9C] bg-[#FFF6D9] px-2.5 py-1 text-[#8B6828] transition-colors active:bg-[#F8EDC8]"
             >
-              <span className="text-[#59684C] text-[11px] font-semibold">{currentTitle.name}</span>
+              <span className="text-[11px] font-semibold">{currentTitle.name}</span>
             </button>
           </div>
 
           <div className="flex-shrink-0 flex flex-col items-end gap-1.5">
-            <div className="bg-[#F7F4E9] border border-[#E7E1D0] rounded-xl px-3 pt-2 pb-3 text-center">
-              <p className="text-[#8C8878] text-[10px]">마일리지</p>
-              <p className="text-[#343B32] text-[16px] font-bold leading-none">
-                {mileage.toLocaleString()}<span className="text-[10px] text-gray-400 font-normal ml-0.5">P</span>
+            <div className="rounded-xl border border-[#D9E7EC] bg-gradient-to-br from-[#F1F7F8] to-[#E7F0F4] px-3 pb-3 pt-2 text-center shadow-[0_6px_16px_-14px_rgba(61,104,120,0.45)]">
+              <p className="text-[#6C8790] text-[10px]">마일리지</p>
+              <p className="text-[#3F5962] text-[16px] font-bold leading-none">
+                {mileage.toLocaleString()}<span className="text-[10px] text-[#8AA0A6] font-normal ml-0.5">P</span>
               </p>
             </div>
             <button
               onClick={() => { setExchangeResult(null); setShowGiftShop(true); }}
-              className="flex items-center gap-1 bg-[#75845F] rounded-xl px-2.5 py-1.5 active:bg-[#64734F] transition-colors shadow-sm"
+              className="flex items-center gap-1 rounded-xl border border-[#E8C9C1] bg-[#F9EEEA] px-2.5 py-1.5 text-[#934F43] shadow-[0_4px_12px_-9px_rgba(143,75,64,0.35)] transition-all duration-300 hover:border-[#D4A096] hover:bg-[#F4E3DE] hover:shadow-[0_7px_16px_-7px_rgba(143,75,64,0.28)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4A096]"
             >
-              <Gift className="w-3.5 h-3.5 text-white" />
-              <span className="text-white text-[11px] font-semibold">교환소</span>
+              <Gift className="w-3.5 h-3.5" />
+              <span className="text-[11px] font-semibold">교환소</span>
             </button>
           </div>
         </div>
 
         {/* 스탯 바 */}
-        <div className="relative grid grid-cols-3 gap-2">
+        <div className="relative z-10 grid grid-cols-3 gap-2">
           {[
-            { label: "방문 가게", value: user.visitedStores, unit: "곳", emoji: "🏪", bg: "bg-white", border: "border-[#E9E8DF]" },
-            { label: "스탬프", value: `${collectedCount}/${totalStamps}`, unit: "", emoji: "⭐", bg: "bg-white", border: "border-[#E9E8DF]" },
-            { label: "이동거리", value: (user.totalDistance / 1000).toFixed(1), unit: "km", emoji: "👟", bg: "bg-white", border: "border-[#E9E8DF]" },
+            { label: "방문 가게", value: user.visitedStores, unit: "곳", emoji: "🏪", bg: "bg-white", border: "border-[#D8C6B8]" },
+            { label: "스탬프", value: `${collectedCount}/${totalStamps}`, unit: "", emoji: "⭐", bg: "bg-white", border: "border-[#D8C6B8]" },
+            { label: "이동거리", value: (user.totalDistance / 1000).toFixed(1), unit: "km", emoji: "👟", bg: "bg-white", border: "border-[#D8C6B8]" },
           ].map(stat => (
             <div key={stat.label} className={`${stat.bg} border ${stat.border} rounded-2xl px-2 py-3 text-center shadow-[0_6px_18px_-16px_rgba(47,61,43,0.5)]`}>
               <span className="text-[16px]">{stat.emoji}</span>
-              <p className="text-gray-800 text-[16px] font-bold mt-0.5 leading-none">
-                {stat.value}<span className="text-[10px] text-gray-400 ml-0.5">{stat.unit}</span>
+              <p className="text-[#46352C] text-[16px] font-bold mt-0.5 leading-none">
+                {stat.value}<span className="text-[10px] text-[#9A897F] ml-0.5">{stat.unit}</span>
               </p>
-              <p className="text-gray-400 text-[10px] mt-0.5">{stat.label}</p>
+              <p className="text-[#9A897F] text-[10px] mt-0.5">{stat.label}</p>
             </div>
           ))}
         </div>
       </div>
 
       {/* ── 탭 바 ── */}
-      <div className="sticky top-[53px] z-10 flex border-b border-[#EAE8DF] bg-[#F7F6F1]/95 backdrop-blur-md">
+      <div className="sticky top-[53px] z-10 flex border-b border-[#EEEAE4] bg-white">
         {([
           { key: "stamps" as TabType, label: "🗺 스탬프" },
           { key: "events" as TabType, label: "🎯 이벤트" },
@@ -204,8 +209,8 @@ export function ProfilePage() {
             }}
             className={`flex-1 py-3 text-center text-[13px] transition-colors border-b-2 ${
               activeTab === key
-                ? "text-[#394333] border-[#81916A] font-semibold"
-                : "text-[#85877E] border-transparent"
+                ? "text-[#46352C] border-[#A55345] font-semibold"
+                : "text-[#8A776B] border-transparent"
             }`}
           >
             {label}
@@ -218,8 +223,8 @@ export function ProfilePage() {
         <div className="space-y-3 px-4 py-4">
 
           {/* 만보기 */}
-          <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
-            <div className="bg-gradient-to-r from-emerald-400 to-teal-400 px-4 py-3 flex items-center justify-between">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-[#D8C6B8]">
+            <div className="profile-challenge-glint relative overflow-hidden bg-gradient-to-r from-emerald-400 to-teal-400 px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-[20px]">👟</span>
                 <div>
@@ -231,40 +236,40 @@ export function ProfilePage() {
             </div>
             <div className="px-4 py-3">
               <div className="flex items-center justify-between text-[12px] mb-2">
-                <span className="text-gray-400">오늘 걸음 수</span>
+                <span className="text-[#9A897F]">오늘 걸음 수</span>
                 <span className="text-emerald-600 font-semibold">8,500 / 10,000보</span>
               </div>
               <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
                 <div key={progressAnimationKey} className="profile-progress-fill h-2.5 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full" style={{ width: "85%" }} />
               </div>
-              <p className="text-[11px] text-gray-400 mt-1.5">🏃 1,500보만 더!</p>
+              <p className="text-[11px] text-[#9A897F] mt-1.5">🏃 1,500보만 더!</p>
             </div>
           </div>
 
           {/* 진행 중 챌린지 */}
           <div>
             <div className="flex items-center justify-between px-1 mb-2">
-              <h3 className="text-[13px] font-semibold text-gray-800">진행 중인 챌린지</h3>
-              <span className="text-[11px] text-gray-400">{uncollectedStamps.length}개</span>
+              <h3 className="text-[13px] font-semibold text-[#46352C]">진행 중인 챌린지</h3>
+              <span className="text-[11px] text-[#9A897F]">{uncollectedStamps.length}개</span>
             </div>
             <div className="grid grid-cols-2 gap-2">
               {uncollectedStamps.map((stamp, i) => {
                 const pct = Math.round((stamp.progress / stamp.maxProgress) * 100);
                 const color = PROGRESS_COLORS[i % PROGRESS_COLORS.length];
                 return (
-                  <div key={stamp.id} className="bg-white rounded-2xl p-3.5 shadow-sm border border-gray-100">
+                  <div key={stamp.id} className="bg-white rounded-2xl p-3.5 shadow-sm border border-[#D8C6B8]">
                     <div className="flex items-start justify-between mb-2.5">
                       <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-[20px]">{stamp.icon}</div>
-                      <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">{stamp.reward}</span>
+                      <span className="text-[10px] bg-gray-100 text-[#8A776B] px-2 py-0.5 rounded-full font-medium">{stamp.reward}</span>
                     </div>
-                    <p className="text-[13px] font-semibold text-gray-800 mb-0.5">{stamp.name}</p>
-                    <p className="text-[10px] text-gray-400 mb-2.5 leading-snug">{stamp.description}</p>
+                    <p className="text-[13px] font-semibold text-[#46352C] mb-0.5">{stamp.name}</p>
+                    <p className="text-[10px] text-[#9A897F] mb-2.5 leading-snug">{stamp.description}</p>
                     <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden mb-1">
                       <div key={progressAnimationKey} className={`profile-progress-fill h-1.5 ${color} rounded-full`} style={{ width: `${pct}%` }} />
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-gray-400">{stamp.score}/{stamp.maxProgress} {stamp.unit}</span>
-                      <span className="text-[10px] font-semibold text-gray-500">{pct}%</span>
+                      <span className="text-[10px] text-[#9A897F]">{stamp.score}/{stamp.maxProgress} {stamp.unit}</span>
+                      <span className="text-[10px] font-semibold text-[#8A776B]">{pct}%</span>
                     </div>
                   </div>
                 );
@@ -275,7 +280,7 @@ export function ProfilePage() {
           {/* 칭호 배너 */}
           <button
             onClick={() => { setSheetDetail(null); setShowTitleSheet(true); }}
-            className="w-full bg-gradient-to-r from-[#C9813A] to-[#E8A855] rounded-2xl px-4 py-3.5 flex items-center gap-3 active:opacity-90 transition-opacity shadow-sm"
+            className="profile-challenge-glint relative w-full overflow-hidden rounded-2xl border border-[#D8C6B8] bg-gradient-to-r from-[#C9813A] to-[#E8A855] px-4 py-3.5 flex items-center gap-3 active:opacity-90 transition-opacity shadow-sm"
           >
             <div className="w-10 h-10 bg-white/25 rounded-xl flex items-center justify-center text-[20px]">{currentTitle.emoji}</div>
             <div className="flex-1 text-left">
@@ -293,8 +298,8 @@ export function ProfilePage() {
       {/* ── 이벤트 탭 ── */}
       {activeTab === "events" && (
         <div className="px-4 py-4 space-y-3">
-          <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
-            <div className="bg-gradient-to-r from-sky-400 to-blue-400 px-4 py-3 flex items-center justify-between">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-[#D8C6B8]">
+            <div className="profile-challenge-glint relative overflow-hidden bg-gradient-to-r from-sky-400 to-blue-400 px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Camera className="w-5 h-5 text-white" />
                 <div>
@@ -305,12 +310,12 @@ export function ProfilePage() {
               <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full">진행중</span>
             </div>
             <div className="px-4 py-3">
-              <p className="text-[12px] text-gray-400 mb-3 leading-relaxed">시장 가게의 가격표나 메뉴판을 찍어 업로드하면 마일리지를 드려요. 하루 최대 5장(250P)!</p>
+              <p className="text-[12px] text-[#9A897F] mb-3 leading-relaxed">시장 가게의 가격표나 메뉴판을 찍어 업로드하면 마일리지를 드려요. 하루 최대 5장(250P)!</p>
               <div className="flex items-center gap-2 mb-3">
                 <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
                   <div key={progressAnimationKey} className="profile-progress-fill h-2 bg-gradient-to-r from-sky-400 to-blue-400 rounded-full" style={{ width: "40%" }} />
                 </div>
-                <span className="text-[12px] font-semibold text-gray-600">2/5장</span>
+                <span className="text-[12px] font-semibold text-[#76645A]">2/5장</span>
               </div>
               {photoUploaded ? (
                 <div className="flex items-center justify-center gap-2 w-full py-2.5 bg-emerald-50 rounded-xl text-emerald-600 text-[13px] font-medium">
@@ -324,8 +329,8 @@ export function ProfilePage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
-            <div className="bg-gradient-to-r from-amber-400 to-orange-400 px-4 py-3 flex items-center justify-between">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-[#D8C6B8]">
+            <div className="profile-challenge-glint relative overflow-hidden bg-gradient-to-r from-amber-400 to-orange-400 px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Clock className="w-5 h-5 text-white" />
                 <div>
@@ -336,9 +341,9 @@ export function ProfilePage() {
               <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full">진행중</span>
             </div>
             <div className="px-4 py-3">
-              <p className="text-[12px] text-gray-400 mb-3 leading-relaxed">시장 반경 내에서 1시간 이상 GPS 체류가 확인되면 자동으로 쿠폰을 드려요.</p>
+              <p className="text-[12px] text-[#9A897F] mb-3 leading-relaxed">시장 반경 내에서 1시간 이상 GPS 체류가 확인되면 자동으로 쿠폰을 드려요.</p>
               <div className="flex items-center justify-between text-[12px] mb-1.5">
-                <span className="text-gray-400">오늘 체류 시간</span>
+                <span className="text-[#9A897F]">오늘 체류 시간</span>
                 <span className="font-semibold text-amber-600">32분 / 60분</span>
               </div>
               <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden mb-2">
@@ -351,8 +356,8 @@ export function ProfilePage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
-            <div className="bg-gradient-to-r from-violet-400 to-purple-400 px-4 py-3 flex items-center justify-between">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-[#D8C6B8]">
+            <div className="profile-challenge-glint relative overflow-hidden bg-gradient-to-r from-violet-400 to-purple-400 px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-[20px]">🤝</span>
                 <div>
@@ -363,7 +368,7 @@ export function ProfilePage() {
               <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full">상시</span>
             </div>
             <div className="px-4 py-3">
-              <p className="text-[12px] text-gray-400 mb-3 leading-relaxed">시장 상품의 가격 정보를 직접 등록하고 마일리지를 받아요. 채택되면 추가 포인트도!</p>
+              <p className="text-[12px] text-[#9A897F] mb-3 leading-relaxed">시장 상품의 가격 정보를 직접 등록하고 마일리지를 받아요. 채택되면 추가 포인트도!</p>
               <button className="flex items-center justify-center gap-2 w-full py-2.5 bg-gray-900 text-white rounded-xl text-[13px] font-medium active:bg-gray-800 transition-colors">
                 <Tag className="w-4 h-4" />가격 정보 등록
               </button>
@@ -375,38 +380,36 @@ export function ProfilePage() {
       {/* ── 쿠폰 탭 ── */}
       {activeTab === "coupons" && (
         <div className="px-4 py-4 space-y-3">
-          <div className="bg-[#FAF4EC] border border-[#EDE5D8] rounded-2xl px-4 py-4 relative overflow-hidden shadow-sm">
-            <div className="absolute inset-0 opacity-[0.05]"
-              style={{ backgroundImage: "radial-gradient(circle, #8B5E3C 1px, transparent 1px)", backgroundSize: "18px 18px" }} />
+          <div className="bg-gradient-to-br from-[#F1F7F8] to-[#E7F0F4] border border-[#D9E7EC] rounded-2xl px-4 py-4 relative overflow-hidden shadow-sm">
             <div className="relative flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-1.5 mb-1">
                   <span className="text-[14px]">🪙</span>
-                  <span className="text-[12px] text-gray-400">보유 마일리지</span>
+                  <span className="text-[12px] text-[#6C8790]">보유 마일리지</span>
                 </div>
-                <p className="text-[32px] font-bold text-gray-800 leading-none">
-                  {mileage.toLocaleString()}<span className="text-[16px] text-gray-400 ml-1">P</span>
+                <p className="text-[32px] font-bold text-[#3B271D] leading-none">
+                  {mileage.toLocaleString()}<span className="text-[16px] text-[#8AA0A6] ml-1">P</span>
                 </p>
               </div>
               <button
                 onClick={() => { setExchangeResult(null); setShowGiftShop(true); }}
-                className="flex flex-col items-center gap-1 bg-[#C9813A] rounded-2xl px-4 py-3 active:bg-[#B57030] transition-colors shadow-sm"
+                className="flex flex-col items-center gap-1 rounded-2xl border border-[#E8C9C1] bg-[#F9EEEA] px-4 py-3 text-[#934F43] shadow-[0_4px_12px_-9px_rgba(143,75,64,0.35)] transition-all duration-300 hover:border-[#D4A096] hover:bg-[#F4E3DE] hover:shadow-[0_7px_16px_-7px_rgba(143,75,64,0.28)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4A096]"
               >
-                <Gift className="w-5 h-5 text-white" />
-                <span className="text-white text-[11px] font-bold">교환소</span>
+                <Gift className="w-5 h-5" />
+                <span className="text-[11px] font-bold">교환소</span>
               </button>
             </div>
           </div>
 
           <div>
             <div className="flex items-center justify-between px-1 mb-2">
-              <h3 className="text-[13px] font-semibold text-gray-800">보유 쿠폰</h3>
-              <span className="text-[11px] text-gray-400">{coupons.length}장</span>
+              <h3 className="text-[13px] font-semibold text-[#46352C]">보유 쿠폰</h3>
+              <span className="text-[11px] text-[#9A897F]">{coupons.length}장</span>
             </div>
             <div className="space-y-2">
               {coupons.map((coupon) => (
-                <div key={coupon.id} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
-                  <div className={`${coupon.color} px-4 py-3 flex items-center justify-between`}>
+                <div key={coupon.id} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-[#D8C6B8]">
+                  <div className={`profile-challenge-glint relative overflow-hidden ${coupon.color} px-4 py-3 flex items-center justify-between`}>
                     <div>
                       <span className="text-white/60 text-[11px]">{coupon.market}</span>
                       <p className="text-white text-[22px] font-bold leading-tight">{coupon.discount}</p>
@@ -415,17 +418,17 @@ export function ProfilePage() {
                   </div>
                   <div className="flex items-center px-4">
                     <div className="w-3 h-3 rounded-full bg-gray-50 -ml-5 flex-shrink-0" />
-                    <div className="flex-1 border-t border-dashed border-gray-200 mx-1" />
+                    <div className="flex-1 border-t border-dashed border-[#D8C6B8] mx-1" />
                     <div className="w-3 h-3 rounded-full bg-gray-50 -mr-5 flex-shrink-0" />
                   </div>
                   <div className="px-4 py-3">
-                    <p className="text-[13px] font-medium text-gray-800 mb-0.5">{coupon.title}</p>
-                    <p className="text-[11px] text-gray-400 mb-2">{coupon.description}</p>
+                    <p className="text-[13px] font-medium text-[#46352C] mb-0.5">{coupon.title}</p>
+                    <p className="text-[11px] text-[#9A897F] mb-2">{coupon.description}</p>
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-gray-400">~ {coupon.expiry}</span>
+                      <span className="text-[11px] text-[#9A897F]">~ {coupon.expiry}</span>
                       <button
                         onClick={() => handleUseCoupon(coupon)}
-                        className="text-[12px] font-medium text-gray-800 bg-gray-100 px-3 py-1.5 rounded-xl active:bg-gray-200 transition-colors"
+                        className="text-[12px] font-medium text-[#46352C] bg-gray-100 px-3 py-1.5 rounded-xl active:bg-gray-200 transition-colors"
                       >
                         사용하기
                       </button>
@@ -453,14 +456,14 @@ export function ProfilePage() {
                   </div>
                   <div className="flex items-center gap-1.5 mb-2">
                     <Sparkles className="w-4 h-4 text-amber-500" />
-                    <p className="text-[17px] font-bold text-gray-800">교환 완료!</p>
+                    <p className="text-[17px] font-bold text-[#46352C]">교환 완료!</p>
                     <Sparkles className="w-4 h-4 text-amber-500" />
                   </div>
-                  <p className="text-[14px] text-gray-600 mb-1">{exchangeResult.name}</p>
-                  <p className="text-[12px] text-gray-400 mb-6">쿠폰함에 추가되었어요 🎉</p>
+                  <p className="text-[14px] text-[#76645A] mb-1">{exchangeResult.name}</p>
+                  <p className="text-[12px] text-[#9A897F] mb-6">쿠폰함에 추가되었어요 🎉</p>
                   <div className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 mb-4 flex items-center justify-between">
-                    <span className="text-[12px] text-gray-400">남은 마일리지</span>
-                    <span className="text-[16px] font-bold text-gray-800">{mileage.toLocaleString()} P</span>
+                    <span className="text-[12px] text-[#9A897F]">남은 마일리지</span>
+                    <span className="text-[16px] font-bold text-[#46352C]">{mileage.toLocaleString()} P</span>
                   </div>
                   <button
                     onClick={() => setExchangeResult(null)}
@@ -474,20 +477,20 @@ export function ProfilePage() {
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
                       <Gift className="w-5 h-5 text-[#C9813A]" />
-                      <p className="text-[16px] font-bold text-gray-800">선물 교환소</p>
+                      <p className="text-[16px] font-bold text-[#46352C]">선물 교환소</p>
                     </div>
-                    <button onClick={() => setShowGiftShop(false)} className="p-1 text-gray-400">
+                    <button onClick={() => setShowGiftShop(false)} className="p-1 text-[#9A897F]">
                       <X className="w-5 h-5" />
                     </button>
                   </div>
-                  <p className="text-[12px] text-gray-400 mb-1">마일리지로 할인권을 교환해요</p>
+                  <p className="text-[12px] text-[#9A897F] mb-1">마일리지로 할인권을 교환해요</p>
 
                   <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 flex items-center justify-between mb-4">
                     <div className="flex items-center gap-1.5">
                       <span className="text-[16px]">🪙</span>
-                      <span className="text-[12px] text-gray-500">보유 마일리지</span>
+                      <span className="text-[12px] text-[#8A776B]">보유 마일리지</span>
                     </div>
-                    <span className="text-[16px] font-bold text-gray-800">{mileage.toLocaleString()} P</span>
+                    <span className="text-[16px] font-bold text-[#46352C]">{mileage.toLocaleString()} P</span>
                   </div>
 
                   <div className="space-y-2">
@@ -503,12 +506,12 @@ export function ProfilePage() {
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center gap-1.5 mb-0.5">
-                              <p className="text-[14px] font-bold text-gray-800">{item.name}</p>
+                              <p className="text-[14px] font-bold text-[#46352C]">{item.name}</p>
                               {item.rare && (
                                 <span className="text-[9px] bg-orange-400 text-white px-1.5 py-0.5 rounded-full font-bold">인기</span>
                               )}
                             </div>
-                            <p className="text-[11px] text-gray-500">{item.desc}</p>
+                            <p className="text-[11px] text-[#8A776B]">{item.desc}</p>
                           </div>
                           <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
                             <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${item.badge}`}>
@@ -520,7 +523,7 @@ export function ProfilePage() {
                               className={`text-[11px] font-semibold px-3 py-1.5 rounded-xl transition-colors ${
                                 canAfford
                                   ? "bg-gray-900 text-white active:bg-gray-700"
-                                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                                  : "bg-gray-200 text-[#9A897F] cursor-not-allowed"
                               }`}
                             >
                               {canAfford ? "교환" : "부족"}
@@ -531,7 +534,7 @@ export function ProfilePage() {
                     })}
                   </div>
 
-                  <p className="text-[11px] text-gray-400 text-center mt-4">
+                  <p className="text-[11px] text-[#9A897F] text-center mt-4">
                     교환된 쿠폰은 쿠폰함에서 확인할 수 있어요
                   </p>
                 </>
@@ -551,7 +554,7 @@ export function ProfilePage() {
 
               {sheetDetail ? (
                 <>
-                  <button onClick={() => setSheetDetail(null)} className="flex items-center gap-1 text-[12px] text-gray-400 mb-5">
+                  <button onClick={() => setSheetDetail(null)} className="flex items-center gap-1 text-[12px] text-[#9A897F] mb-5">
                     <ChevronLeft className="w-4 h-4" /> 전체 칭호
                   </button>
                   <div className="flex flex-col items-center text-center mb-6">
@@ -563,16 +566,16 @@ export function ProfilePage() {
                         ✨ 10% 이하의 사용자가 획득했어요!
                       </span>
                     )}
-                    <p className="text-[19px] font-bold text-gray-800 mb-1">{sheetDetail.name}</p>
-                    <p className="text-[13px] text-gray-500 mb-4">{sheetDetail.description}</p>
+                    <p className="text-[19px] font-bold text-[#46352C] mb-1">{sheetDetail.name}</p>
+                    <p className="text-[13px] text-[#8A776B] mb-4">{sheetDetail.description}</p>
                     <div className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-left">
-                      <p className="text-[10px] text-gray-400 mb-1 uppercase tracking-wider">획득 조건</p>
-                      <p className="text-[13px] text-gray-700 font-medium">{sheetDetail.condition}</p>
+                      <p className="text-[10px] text-[#9A897F] mb-1 uppercase tracking-wider">획득 조건</p>
+                      <p className="text-[13px] text-[#5A453B] font-medium">{sheetDetail.condition}</p>
                     </div>
                   </div>
                   {sheetDetail.unlocked ? (
                     currentTitle.id === sheetDetail.id ? (
-                      <div className="w-full py-3.5 rounded-2xl bg-gray-100 border border-gray-200 text-gray-500 text-[14px] font-semibold text-center flex items-center justify-center gap-2">
+                      <div className="w-full py-3.5 rounded-2xl bg-gray-100 border border-gray-200 text-[#8A776B] text-[14px] font-semibold text-center flex items-center justify-center gap-2">
                         <Check className="w-4 h-4" />현재 적용 중
                       </div>
                     ) : (
@@ -581,7 +584,7 @@ export function ProfilePage() {
                       </button>
                     )
                   ) : (
-                    <button disabled className="w-full py-3.5 rounded-2xl bg-gray-100 text-gray-400 text-[15px] font-semibold cursor-not-allowed">
+                    <button disabled className="w-full py-3.5 rounded-2xl bg-gray-100 text-[#9A897F] text-[15px] font-semibold cursor-not-allowed">
                       아직 잠겨있어요 🔒
                     </button>
                   )}
@@ -589,10 +592,10 @@ export function ProfilePage() {
               ) : (
                 <>
                   <div className="flex items-center justify-between mb-1">
-                    <p className="text-[16px] font-bold text-gray-800">나의 칭호</p>
-                    <span className="text-[12px] text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">{unlockedCount} / {titles.length} 획득</span>
+                    <p className="text-[16px] font-bold text-[#46352C]">나의 칭호</p>
+                    <span className="text-[12px] text-[#9A897F] bg-gray-100 px-2.5 py-1 rounded-full">{unlockedCount} / {titles.length} 획득</span>
                   </div>
-                  <p className="text-[12px] text-gray-400 mb-4">스탬프를 모아 새로운 칭호를 해금하세요</p>
+                  <p className="text-[12px] text-[#9A897F] mb-4">스탬프를 모아 새로운 칭호를 해금하세요</p>
 
                   <div className="grid grid-cols-3 gap-2.5 mb-4">
                     {titles.map((title) => {
@@ -620,10 +623,10 @@ export function ProfilePage() {
                           <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-[24px] mb-2 ${title.unlocked ? "bg-gray-100" : "bg-gray-100"}`}>
                             {title.unlocked ? title.emoji : <Lock className="w-5 h-5 text-gray-300" />}
                           </div>
-                          <p className={`text-[10px] font-semibold text-center leading-tight mb-0.5 ${isActive ? "text-[#C9813A]" : title.unlocked ? "text-gray-700" : "text-gray-400"}`}>
+                          <p className={`text-[10px] font-semibold text-center leading-tight mb-0.5 ${isActive ? "text-[#C9813A]" : title.unlocked ? "text-[#5A453B]" : "text-[#9A897F]"}`}>
                             {title.name}
                           </p>
-                          <p className="text-[9px] text-gray-400 text-center leading-tight">
+                          <p className="text-[9px] text-[#9A897F] text-center leading-tight">
                             {title.unlocked ? acquiredDate ?? "획득 완료" : `스탬프 ${title.unlockAt}개`}
                           </p>
                         </button>
@@ -631,7 +634,7 @@ export function ProfilePage() {
                     })}
                   </div>
 
-                  <button onClick={() => setShowTitleSheet(false)} className="w-full py-3 text-[14px] text-gray-400 active:text-gray-600">
+                  <button onClick={() => setShowTitleSheet(false)} className="w-full py-3 text-[14px] text-[#9A897F] active:text-[#76645A]">
                     닫기
                   </button>
                 </>
@@ -652,10 +655,10 @@ export function ProfilePage() {
               {/* 헤더 */}
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <p className="text-[11px] text-gray-400">{selectedCoupon.market}</p>
-                  <p className="text-[16px] font-bold text-gray-800">{selectedCoupon.title}</p>
+                  <p className="text-[11px] text-[#9A897F]">{selectedCoupon.market}</p>
+                  <p className="text-[16px] font-bold text-[#46352C]">{selectedCoupon.title}</p>
                 </div>
-                <button onClick={() => setSelectedCoupon(null)} className="p-1 text-gray-400">
+                <button onClick={() => setSelectedCoupon(null)} className="p-1 text-[#9A897F]">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -665,7 +668,7 @@ export function ProfilePage() {
                 <button
                   onClick={() => setCouponViewMode("qr")}
                   className={`flex-1 py-2 rounded-lg text-[13px] font-semibold transition-colors ${
-                    couponViewMode === "qr" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400"
+                    couponViewMode === "qr" ? "bg-white text-[#34251F] shadow-sm" : "text-[#9A897F]"
                   }`}
                 >
                   QR 코드
@@ -673,7 +676,7 @@ export function ProfilePage() {
                 <button
                   onClick={() => setCouponViewMode("number")}
                   className={`flex-1 py-2 rounded-lg text-[13px] font-semibold transition-colors ${
-                    couponViewMode === "number" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400"
+                    couponViewMode === "number" ? "bg-white text-[#34251F] shadow-sm" : "text-[#9A897F]"
                   }`}
                 >
                   쿠폰 번호
@@ -691,9 +694,9 @@ export function ProfilePage() {
                       className="rounded-lg"
                     />
                   </div>
-                  <p className="text-[11px] text-gray-400 text-center">점원에게 이 QR을 스캔해 달라고 하세요</p>
+                  <p className="text-[11px] text-[#9A897F] text-center">점원에게 이 QR을 스캔해 달라고 하세요</p>
                   <div className="bg-gray-50 rounded-xl px-4 py-2 w-full text-center">
-                    <span className="text-[11px] text-gray-400 tracking-widest font-mono">{couponCode}</span>
+                    <span className="text-[11px] text-[#9A897F] tracking-widest font-mono">{couponCode}</span>
                   </div>
                 </div>
               ) : (
@@ -702,17 +705,17 @@ export function ProfilePage() {
                     🎟
                   </div>
                   <div className="bg-gray-50 border border-dashed border-gray-300 rounded-2xl px-6 py-5 w-full text-center">
-                    <p className="text-[11px] text-gray-400 mb-2">쿠폰 번호</p>
-                    <p className="text-[22px] font-bold text-gray-800 tracking-widest font-mono">{couponCode}</p>
+                    <p className="text-[11px] text-[#9A897F] mb-2">쿠폰 번호</p>
+                    <p className="text-[22px] font-bold text-[#46352C] tracking-widest font-mono">{couponCode}</p>
                   </div>
-                  <p className="text-[11px] text-gray-400 text-center">이 번호를 점원에게 보여주세요</p>
+                  <p className="text-[11px] text-[#9A897F] text-center">이 번호를 점원에게 보여주세요</p>
                 </div>
               )}
 
               {/* 만료일 */}
               <div className="mt-5 flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
-                <span className="text-[12px] text-gray-400">사용 가능 기한</span>
-                <span className="text-[12px] font-semibold text-gray-700">~ {selectedCoupon.expiry}</span>
+                <span className="text-[12px] text-[#9A897F]">사용 가능 기한</span>
+                <span className="text-[12px] font-semibold text-[#5A453B]">~ {selectedCoupon.expiry}</span>
               </div>
             </div>
           </div>
