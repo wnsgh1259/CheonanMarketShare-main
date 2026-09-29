@@ -96,39 +96,39 @@ export function HomePage() {
   const courses = coursesByMarket[selectedMarketId];
 
   return (
-    <div className="min-h-screen bg-[#F7F8FA] pb-20">
+    <div className="min-h-screen bg-[#FFFBF6] pb-20">
       {/* Header */}
-      <div className="sticky top-0 bg-white z-10 px-4 py-3 border-b border-gray-100">
+      <div className="sticky top-0 bg-[#FFFBF6] z-10 px-4 py-3 border-b border-[#EDE5D8]">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-[11px] text-gray-400 tracking-wide">천안 스마트 장보기</p>
-            <h1 className="text-[17px] text-gray-900 tracking-tight">{selectedMarket.name}</h1>
+            <p className="text-[11px] text-[#85715F] tracking-wide">천안 스마트 장보기</p>
+            <h1 className="text-[17px] text-[#3F342B] tracking-tight">{selectedMarket.name}</h1>
           </div>
           <div className="flex items-center gap-1">
             {ownerMode ? (
               <>
                 <OwnerBackToStoreButton />
                 <button className="w-10 h-10 flex items-center justify-center relative">
-                  <Bell className="w-[20px] h-[20px] text-gray-600" />
-                  <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-red-500 rounded-full" />
+                  <Bell className="w-[20px] h-[20px] text-[#6F5B4B]" />
+                  <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-[#C9813A] rounded-full" />
                 </button>
                 <Link to={getSettingsPath()} className="w-10 h-10 flex items-center justify-center">
-                  <Settings className="w-[20px] h-[20px] text-gray-600" />
+                  <Settings className="w-[20px] h-[20px] text-[#6F5B4B]" />
                 </Link>
               </>
             ) : (
               <>
                 <Link to="/cart" className="w-10 h-10 flex items-center justify-center relative">
-                  <ShoppingCart className="w-[20px] h-[20px] text-gray-600" />
+                  <ShoppingCart className="w-[20px] h-[20px] text-[#6F5B4B]" />
                   {totalCount > 0 && (
-                    <span className="absolute top-1 right-0.5 bg-[#0EA5E9] text-white text-[10px] min-w-[16px] h-4 rounded-full flex items-center justify-center px-1">
+                    <span className="absolute top-1 right-0.5 bg-[#A9652D] text-white text-[10px] min-w-[16px] h-4 rounded-full flex items-center justify-center px-1">
                       {totalCount}
                     </span>
                   )}
                 </Link>
                 <button className="w-10 h-10 flex items-center justify-center relative">
-                  <Bell className="w-[20px] h-[20px] text-gray-600" />
-                  <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-red-500 rounded-full" />
+                  <Bell className="w-[20px] h-[20px] text-[#6F5B4B]" />
+                  <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-[#C9813A] rounded-full" />
                 </button>
               </>
             )}
@@ -137,7 +137,7 @@ export function HomePage() {
       </div>
 
       {/* Market Selector */}
-      <div className="bg-white px-4 pt-4 pb-4">
+      <div className="bg-[#FAF4EC] px-4 pt-4 pb-4">
         <div className="flex gap-2">
           {markets.map((market) => (
             <button
@@ -145,7 +145,7 @@ export function HomePage() {
               onClick={() => setSelectedMarketId(market.id)}
               className={`flex-1 relative rounded-xl overflow-hidden h-[88px] transition-all ${
                 selectedMarketId === market.id
-                  ? "ring-2 ring-gray-900 ring-offset-1"
+                  ? "ring-2 ring-[#C9813A] ring-offset-1 ring-offset-[#FAF4EC]"
                   : "opacity-60"
               }`}
             >
@@ -161,30 +161,30 @@ export function HomePage() {
       </div>
 
       {/* Selected Market Info */}
-      <div className="mx-4 mt-3 bg-white rounded-xl p-4">
+      <div className="mx-4 mt-3 bg-white rounded-xl p-4 ring-1 ring-inset ring-[#EDE5D8]">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Store className="w-5 h-5 text-gray-600" />
+          <div className="w-10 h-10 bg-[#FAF0E3] rounded-xl flex items-center justify-center flex-shrink-0">
+            <Store className="w-5 h-5 text-[#6F5B4B]" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
-              <h3 className="text-[15px] text-gray-900">{selectedMarket.name}</h3>
-              <span className="text-[11px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">
+              <h3 className="text-[15px] text-[#3F342B]">{selectedMarket.name}</h3>
+              <span className="text-[11px] text-[#786553] bg-[#FAF0E3] px-2 py-0.5 rounded-md">
                 {selectedMarket.tag}
               </span>
             </div>
-            <div className="flex items-center gap-1 text-[12px] text-gray-400 mb-0.5">
+            <div className="flex items-center gap-1 text-[12px] text-[#85715F] mb-0.5">
               <MapPin className="w-3 h-3" />{selectedMarket.location}
             </div>
-            <div className="flex items-center gap-1 text-[12px] text-gray-400 mb-2">
+            <div className="flex items-center gap-1 text-[12px] text-[#85715F] mb-2">
               <Clock className="w-3 h-3" />{selectedMarket.openDays}
             </div>
-            <p className="text-[13px] text-gray-500 leading-relaxed">{selectedMarket.description}</p>
+            <p className="text-[13px] text-[#786553] leading-relaxed">{selectedMarket.description}</p>
           </div>
         </div>
         <Link
           to={`/map?market=${selectedMarketId}`}
-          className="mt-3 flex items-center justify-center gap-1.5 w-full py-2.5 bg-gray-900 text-white rounded-xl text-[14px] active:bg-gray-800 transition-colors"
+          className="mt-3 flex items-center justify-center gap-1.5 w-full py-2.5 bg-[#A9652D] text-white rounded-xl text-[14px] hover:bg-[#985A28] active:bg-[#874E22] transition-colors"
         >
           <MapPin className="w-4 h-4" />
           지도 보기
@@ -196,8 +196,8 @@ export function HomePage() {
         {/* Spots */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-[15px] text-gray-900">인기 명소</h2>
-            <button className="flex items-center text-[13px] text-gray-400">
+            <h2 className="text-[15px] text-[#3F342B]">인기 명소</h2>
+            <button className="flex items-center text-[13px] text-[#85715F]">
               모두보기 <ChevronRight className="w-4 h-4" />
             </button>
           </div>
@@ -220,17 +220,17 @@ export function HomePage() {
         </div>
 
         {/* Flash Sale */}
-        <div className="bg-gray-900 rounded-xl p-4 mb-6">
+        <div className="bg-[#FAF0E3] rounded-xl p-4 mb-6">
           <div className="flex items-center gap-2 mb-1">
-            <Tag className="w-4 h-4 text-[#0EA5E9]" />
-            <span className="text-[14px] text-white">마감 할인 알림</span>
+            <Tag className="w-4 h-4 text-[#A9652D]" />
+            <span className="text-[14px] text-[#3F342B]">마감 할인 알림</span>
           </div>
-          <p className="text-[12px] text-gray-400 mb-3">
+          <p className="text-[12px] text-[#85715F] mb-3">
             {selectedMarket.name} 상인들의 오늘 마감 특가를 확인하세요
           </p>
           <Link
             to="/map"
-            className="inline-flex items-center gap-1 bg-white/10 text-white text-[12px] px-3 py-1.5 rounded-lg active:bg-white/20 transition-colors"
+            className="inline-flex items-center gap-1 bg-[#F0DFC9] text-[#804A23] text-[12px] px-3 py-1.5 rounded-lg hover:bg-[#EAD3B7] active:bg-[#E2C6A4] transition-colors"
           >
             할인 상품 보기 <ChevronRight className="w-3 h-3" />
           </Link>
@@ -238,7 +238,7 @@ export function HomePage() {
 
         {/* Courses */}
         <div className="mb-4">
-          <h2 className="text-[15px] text-gray-900 mb-3">추천 코스</h2>
+          <h2 className="text-[15px] text-[#3F342B] mb-3">추천 코스</h2>
           <div className="space-y-2.5">
             {courses.map((course) => (
               <Link key={course.id} to="/map" className="block relative h-[130px] rounded-xl overflow-hidden">
