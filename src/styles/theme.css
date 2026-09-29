@@ -214,3 +214,19 @@ body.app-modal-open .map_naver_logo {
 .app-modal-content {
   z-index: 10001 !important;
 }
+
+@keyframes profile-progress-fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+.profile-progress-fill {
+  transform-origin: left center;
+  animation: profile-progress-fill 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-progress-fill {
+    animation-duration: 1ms;
+  }
+}

@@ -32,6 +32,7 @@ const GIFT_ITEMS = [
 
 export function ProfilePage() {
   const [activeTab, setActiveTab] = useState<TabType>("stamps");
+  const [progressAnimationKey, setProgressAnimationKey] = useState(0);
   const [photoUploaded, setPhotoUploaded] = useState(false);
 
   const [showTitleSheet, setShowTitleSheet] = useState(false);
@@ -107,62 +108,62 @@ export function ProfilePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-white pb-20">
+    <div className="min-h-screen bg-[#F7F6F1] pb-20">
 
       {/* ── 헤더 ── */}
-      <div className="sticky top-0 bg-white z-10 border-b border-gray-100">
+      <div className="sticky top-0 bg-white z-10 border-b border-[#EEEAE4]">
         <div className="flex items-center justify-between px-4 py-3">
-          <Link to="/home" className="p-1"><ChevronLeft className="w-5 h-5 text-gray-500" /></Link>
-          <h1 className="text-[15px] text-gray-800 font-semibold">마이페이지</h1>
-          <Link to="/settings" className="p-1"><Settings className="w-5 h-5 text-gray-500" /></Link>
+          <Link to="/home" className="p-1"><ChevronLeft className="w-5 h-5 text-[#5A453B]" /></Link>
+          <h1 className="text-[15px] text-[#46352C] font-semibold">마이페이지</h1>
+          <Link to="/settings" className="p-1"><Settings className="w-5 h-5 text-[#5A453B]" /></Link>
         </div>
       </div>
 
       {/* ── 프로필 히어로 카드 ── */}
-      <div className="bg-[#FAF4EC] px-5 pt-6 pb-5 relative overflow-hidden border-b border-[#EDE5D8]">
-        <div className="absolute inset-0 opacity-[0.05]"
-          style={{ backgroundImage: "radial-gradient(circle, #8B5E3C 1px, transparent 1px)", backgroundSize: "20px 20px" }} />
-        <div className="absolute top-3 right-4 text-[40px] opacity-10 select-none">🌾</div>
+      <div className="relative overflow-hidden bg-gradient-to-br from-[#E9EDDF] via-[#F3F0E5] to-[#F4E9D8] px-5 pb-5 pt-6">
+        <div className="pointer-events-none absolute -right-10 -top-14 h-44 w-44 rounded-full bg-[#B8C5A2]/25 blur-2xl" />
+        <div className="pointer-events-none absolute -bottom-20 -left-10 h-40 w-40 rounded-full bg-[#E7BC78]/20 blur-2xl" />
+        <div className="relative mb-4 flex items-center gap-2 text-[11px] font-semibold tracking-wide text-[#718064]"><Sparkles className="h-3.5 w-3.5" /> 나의 시장 기록</div>
 
-        <div className="relative flex items-center gap-4 mb-5">
+        <div className="relative mb-5 flex items-center gap-4 rounded-[24px] border border-white/80 bg-white/75 p-4 shadow-[0_10px_30px_-24px_rgba(47,61,43,0.55)] backdrop-blur-sm">
           <button
             onClick={() => { setSheetDetail(null); setShowTitleSheet(true); }}
             className="relative flex-shrink-0"
           >
-            <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center text-[32px] border border-gray-200 shadow-sm active:scale-95 transition-transform">
+            <div className="flex h-[68px] w-[68px] items-center justify-center rounded-[22px] border border-[#E3E6D9] bg-gradient-to-br from-[#F5E6C9] to-[#DCE7D0] text-[34px] shadow-inner active:scale-95 transition-transform">
               {currentTitle.emoji}
             </div>
             {currentTitle.rare && (
-              <span className="absolute -top-1.5 -right-1.5 text-[9px] bg-orange-400 text-white px-1.5 py-0.5 rounded-full font-bold leading-tight shadow-sm">
+              <span className="absolute -top-1.5 -right-1.5 text-[9px] bg-[#D98A4D] text-white px-1.5 py-0.5 rounded-full font-bold leading-tight shadow-sm">
                 희귀
               </span>
             )}
-            <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 text-[9px] bg-black/10 text-gray-500 px-2 py-0.5 rounded-full whitespace-nowrap">
+            <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 text-[9px] bg-white text-[#7F8378] border border-[#ECEBE4] px-2 py-0.5 rounded-full whitespace-nowrap">
               탭해서 변경
             </span>
           </button>
 
           <div className="flex-1">
-            <p className="text-gray-400 text-[11px] mb-0.5">탐험가</p>
-            <h2 className="text-gray-800 text-[20px] font-bold leading-tight">{user.name}</h2>
+            <p className="text-[#858A7C] text-[11px] mb-0.5">오늘도 시장을 둘러본</p>
+            <h2 className="text-[#343B32] text-[21px] font-bold leading-tight">{user.name}</h2>
             <button
               onClick={() => { setSheetDetail(null); setShowTitleSheet(true); }}
-              className="mt-1 inline-flex items-center gap-1 bg-white/70 border border-gray-200 rounded-full px-2.5 py-1 active:bg-gray-50 transition-colors"
+              className="mt-1 inline-flex items-center gap-1 bg-[#EFF2E8] border border-[#E1E6D8] rounded-full px-2.5 py-1 active:bg-gray-50 transition-colors"
             >
-              <span className="text-gray-600 text-[11px] font-semibold">{currentTitle.name}</span>
+              <span className="text-[#59684C] text-[11px] font-semibold">{currentTitle.name}</span>
             </button>
           </div>
 
           <div className="flex-shrink-0 flex flex-col items-end gap-1.5">
-            <div className="bg-white/70 border border-gray-200 rounded-xl px-3 pt-2 pb-3 text-center">
-              <p className="text-gray-400 text-[10px]">마일리지</p>
-              <p className="text-gray-800 text-[16px] font-bold leading-none">
+            <div className="bg-[#F7F4E9] border border-[#E7E1D0] rounded-xl px-3 pt-2 pb-3 text-center">
+              <p className="text-[#8C8878] text-[10px]">마일리지</p>
+              <p className="text-[#343B32] text-[16px] font-bold leading-none">
                 {mileage.toLocaleString()}<span className="text-[10px] text-gray-400 font-normal ml-0.5">P</span>
               </p>
             </div>
             <button
               onClick={() => { setExchangeResult(null); setShowGiftShop(true); }}
-              className="flex items-center gap-1 bg-[#C9813A] rounded-xl px-2.5 py-1.5 active:bg-[#B57030] transition-colors shadow-sm"
+              className="flex items-center gap-1 bg-[#75845F] rounded-xl px-2.5 py-1.5 active:bg-[#64734F] transition-colors shadow-sm"
             >
               <Gift className="w-3.5 h-3.5 text-white" />
               <span className="text-white text-[11px] font-semibold">교환소</span>
@@ -173,11 +174,11 @@ export function ProfilePage() {
         {/* 스탯 바 */}
         <div className="relative grid grid-cols-3 gap-2">
           {[
-            { label: "방문 가게", value: user.visitedStores, unit: "곳", emoji: "🏪", bg: "bg-white/60", border: "border-gray-200" },
-            { label: "스탬프", value: `${collectedCount}/${totalStamps}`, unit: "", emoji: "⭐", bg: "bg-white/60", border: "border-gray-200" },
-            { label: "이동거리", value: (user.totalDistance / 1000).toFixed(1), unit: "km", emoji: "👟", bg: "bg-white/60", border: "border-gray-200" },
+            { label: "방문 가게", value: user.visitedStores, unit: "곳", emoji: "🏪", bg: "bg-white", border: "border-[#E9E8DF]" },
+            { label: "스탬프", value: `${collectedCount}/${totalStamps}`, unit: "", emoji: "⭐", bg: "bg-white", border: "border-[#E9E8DF]" },
+            { label: "이동거리", value: (user.totalDistance / 1000).toFixed(1), unit: "km", emoji: "👟", bg: "bg-white", border: "border-[#E9E8DF]" },
           ].map(stat => (
-            <div key={stat.label} className={`${stat.bg} border ${stat.border} rounded-xl px-2 py-2.5 text-center`}>
+            <div key={stat.label} className={`${stat.bg} border ${stat.border} rounded-2xl px-2 py-3 text-center shadow-[0_6px_18px_-16px_rgba(47,61,43,0.5)]`}>
               <span className="text-[16px]">{stat.emoji}</span>
               <p className="text-gray-800 text-[16px] font-bold mt-0.5 leading-none">
                 {stat.value}<span className="text-[10px] text-gray-400 ml-0.5">{stat.unit}</span>
@@ -189,7 +190,7 @@ export function ProfilePage() {
       </div>
 
       {/* ── 탭 바 ── */}
-      <div className="flex bg-white border-b border-gray-100 sticky top-[53px] z-10">
+      <div className="sticky top-[53px] z-10 flex border-b border-[#EAE8DF] bg-[#F7F6F1]/95 backdrop-blur-md">
         {([
           { key: "stamps" as TabType, label: "🗺 스탬프" },
           { key: "events" as TabType, label: "🎯 이벤트" },
@@ -197,11 +198,14 @@ export function ProfilePage() {
         ]).map(({ key, label }) => (
           <button
             key={key}
-            onClick={() => setActiveTab(key)}
+            onClick={() => {
+              setActiveTab(key);
+              setProgressAnimationKey((current) => current + 1);
+            }}
             className={`flex-1 py-3 text-center text-[13px] transition-colors border-b-2 ${
               activeTab === key
-                ? "text-gray-800 border-[#C9813A] font-semibold"
-                : "text-gray-400 border-transparent"
+                ? "text-[#394333] border-[#81916A] font-semibold"
+                : "text-[#85877E] border-transparent"
             }`}
           >
             {label}
@@ -211,7 +215,7 @@ export function ProfilePage() {
 
       {/* ── 스탬프 탭 ── */}
       {activeTab === "stamps" && (
-        <div className="px-4 py-4 space-y-3">
+        <div className="space-y-3 px-4 py-4">
 
           {/* 만보기 */}
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
@@ -231,7 +235,7 @@ export function ProfilePage() {
                 <span className="text-emerald-600 font-semibold">8,500 / 10,000보</span>
               </div>
               <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
-                <div className="h-2.5 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full" style={{ width: "85%" }} />
+                <div key={progressAnimationKey} className="profile-progress-fill h-2.5 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full" style={{ width: "85%" }} />
               </div>
               <p className="text-[11px] text-gray-400 mt-1.5">🏃 1,500보만 더!</p>
             </div>
@@ -256,7 +260,7 @@ export function ProfilePage() {
                     <p className="text-[13px] font-semibold text-gray-800 mb-0.5">{stamp.name}</p>
                     <p className="text-[10px] text-gray-400 mb-2.5 leading-snug">{stamp.description}</p>
                     <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden mb-1">
-                      <div className={`h-1.5 ${color} rounded-full`} style={{ width: `${pct}%` }} />
+                      <div key={progressAnimationKey} className={`profile-progress-fill h-1.5 ${color} rounded-full`} style={{ width: `${pct}%` }} />
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] text-gray-400">{stamp.score}/{stamp.maxProgress} {stamp.unit}</span>
@@ -304,7 +308,7 @@ export function ProfilePage() {
               <p className="text-[12px] text-gray-400 mb-3 leading-relaxed">시장 가게의 가격표나 메뉴판을 찍어 업로드하면 마일리지를 드려요. 하루 최대 5장(250P)!</p>
               <div className="flex items-center gap-2 mb-3">
                 <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-2 bg-gradient-to-r from-sky-400 to-blue-400 rounded-full" style={{ width: "40%" }} />
+                  <div key={progressAnimationKey} className="profile-progress-fill h-2 bg-gradient-to-r from-sky-400 to-blue-400 rounded-full" style={{ width: "40%" }} />
                 </div>
                 <span className="text-[12px] font-semibold text-gray-600">2/5장</span>
               </div>
@@ -338,7 +342,7 @@ export function ProfilePage() {
                 <span className="font-semibold text-amber-600">32분 / 60분</span>
               </div>
               <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden mb-2">
-                <div className="h-2 bg-gradient-to-r from-amber-400 to-orange-400 rounded-full" style={{ width: "53%" }} />
+                <div key={progressAnimationKey} className="profile-progress-fill h-2 bg-gradient-to-r from-amber-400 to-orange-400 rounded-full" style={{ width: "53%" }} />
               </div>
               <div className="flex items-center gap-1.5 bg-amber-50 rounded-xl px-3 py-2">
                 <MapPin className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />

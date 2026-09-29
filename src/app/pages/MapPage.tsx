@@ -27,6 +27,45 @@ const CATEGORIES: CategoryKey[] = [
   "전체", "먹거리·분식", "정육·계란", "채소", "과일", "채소·과일", "수산물", "반찬·건어물", "기타·생활",
 ];
 
+const CATEGORY_BUTTON_STYLE: Record<CategoryKey, { active: string; hover: string }> = {
+  "전체": {
+    active: "bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-200",
+    hover: "hover:bg-sky-50 hover:text-sky-700 hover:ring-1 hover:ring-inset hover:ring-sky-200",
+  },
+  "먹거리·분식": {
+    active: "bg-orange-50 text-orange-800 ring-1 ring-inset ring-orange-200",
+    hover: "hover:bg-orange-50 hover:text-orange-800 hover:ring-1 hover:ring-inset hover:ring-orange-200",
+  },
+  "정육·계란": {
+    active: "bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200",
+    hover: "hover:bg-rose-50 hover:text-rose-700 hover:ring-1 hover:ring-inset hover:ring-rose-200",
+  },
+  "채소": {
+    active: "bg-[#EDF1E7] text-[#63734F] ring-1 ring-inset ring-[#DCE5D2]",
+    hover: "hover:bg-[#EDF1E7] hover:text-[#63734F] hover:ring-1 hover:ring-inset hover:ring-[#DCE5D2]",
+  },
+  "과일": {
+    active: "bg-purple-50 text-purple-700 ring-1 ring-inset ring-purple-200",
+    hover: "hover:bg-purple-50 hover:text-purple-700 hover:ring-1 hover:ring-inset hover:ring-purple-200",
+  },
+  "채소·과일": {
+    active: "bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-200",
+    hover: "hover:bg-emerald-50 hover:text-emerald-800 hover:ring-1 hover:ring-inset hover:ring-emerald-200",
+  },
+  "수산물": {
+    active: "bg-cyan-50 text-cyan-800 ring-1 ring-inset ring-cyan-200",
+    hover: "hover:bg-cyan-50 hover:text-cyan-800 hover:ring-1 hover:ring-inset hover:ring-cyan-200",
+  },
+  "반찬·건어물": {
+    active: "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200",
+    hover: "hover:bg-amber-50 hover:text-amber-800 hover:ring-1 hover:ring-inset hover:ring-amber-200",
+  },
+  "기타·생활": {
+    active: "bg-stone-100 text-stone-700 ring-1 ring-inset ring-stone-200",
+    hover: "hover:bg-stone-100 hover:text-stone-700 hover:ring-1 hover:ring-inset hover:ring-stone-200",
+  },
+};
+
 /** BottomNav 상단과 동일 선상 — 상점바 `fixed` 하단을 여기에 두면 탭에 가리지 않음 (BottomNav: bottom-0 + h-14 + safe-area) */
 const STORE_SHEET_BOTTOM_CLASS = "bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))]";
 
@@ -707,6 +746,8 @@ export function MapPage() {
   /** 드래그 중 실시간 시트 높이(px). null이면 스냅 기반 높이 사용 */
   const [sheetDragH, setSheetDragH] = useState<number | null>(null);
   const listScrollRef = useRef<HTMLDivElement | null>(null);
+  const categoryStripDragRef = useRef<{ pointerId: number; startX: number; startScrollLeft: number; dragging: boolean } | null>(null);
+  const suppressCategoryClickUntilRef = useRef(0);
   const listActiveSnapRef = useRef<number | null>(LIST_SNAP_MIN_FALLBACK);
   const listSnapMinRef = useRef(LIST_SNAP_MIN_FALLBACK);
   const listSnapMaxRef = useRef(0.9);
@@ -1123,7 +1164,7 @@ export function MapPage() {
 
   return (
     <div
-      className="relative flex flex-col overflow-hidden bg-white"
+      className="relative flex flex-col overflow-hidden bg-[#F7F6F1]"
       style={{ height: "calc(100dvh - 3.5rem - env(safe-area-inset-bottom, 0px))" }}
     >
       <MarketConflictModal
@@ -1133,26 +1174,26 @@ export function MapPage() {
       />
 
       {/* Header */}
-      <div ref={pageHeaderRef} className="z-30 shrink-0 border-b border-[#EDE5D8] bg-white shadow-[0_1px_0_rgba(0,0,0,0.04)]">
+      <div ref={pageHeaderRef} className="z-30 shrink-0 border-b border-[#EEEAE4] bg-white shadow-[0_1px_0_rgba(70,53,44,0.05)]">
         <div className="flex items-center gap-2 px-4 py-2.5">
-          <Link to="/home" className="p-1"><ChevronLeft className="w-5 h-5 text-gray-700" /></Link>
+          <Link to="/home" className="p-1"><ChevronLeft className="w-5 h-5 text-[#5A453B]" /></Link>
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8A776B]" />
             <input
               type="text"
               placeholder={`${marketInfo.name}에서 검색`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-9 h-9 rounded-lg bg-[#FAF4EC] text-[14px] focus:outline-none focus:ring-1 focus:ring-[#C9813A]"
+              className="w-full pl-9 pr-9 h-10 rounded-xl bg-[#F7F5F1] text-[14px] text-[#46352C] placeholder:text-[#9A897F] focus:outline-none focus:ring-2 focus:ring-[#D4A096]"
             />
             {searchQuery && (
               <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2">
-                <X className="w-4 h-4 text-gray-600" />
+                <X className="w-4 h-4 text-[#8A776B]" />
               </button>
             )}
           </div>
           <Link to="/cart" className="p-1 relative">
-            <ShoppingCart className="w-5 h-5 text-gray-700" />
+            <ShoppingCart className="w-5 h-5 text-[#5A453B]" />
             {totalCount > 0 && (
               <span className="absolute -top-1 -right-1 bg-[#A9652D] text-white text-[10px] min-w-[16px] h-4 rounded-full flex items-center justify-center px-1">
                 {totalCount}
@@ -1167,7 +1208,7 @@ export function MapPage() {
               key={id}
               onClick={() => handleMarketChange(id)}
               className={`flex-1 py-2.5 text-[13px] transition-all border-b-2 ${
-                selectedMarket === id ? "border-[#C9813A] text-gray-800" : "border-transparent text-gray-600"
+                selectedMarket === id ? "border-[#A55345] text-[#46352C] font-semibold" : "border-transparent text-[#8A776B]"
               }`}
             >
               {info.name}
@@ -1175,17 +1216,60 @@ export function MapPage() {
           ))}
         </div>
         {/* Category chips */}
-        <div className="flex gap-1.5 overflow-x-auto px-4 py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div
+          className="flex cursor-grab select-none gap-1.5 overflow-x-auto px-4 py-2 active:cursor-grabbing touch-pan-x [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          onPointerDown={(event) => {
+            if (event.pointerType !== "mouse" || event.button !== 0) return;
+            suppressCategoryClickUntilRef.current = 0;
+            categoryStripDragRef.current = {
+              pointerId: event.pointerId,
+              startX: event.clientX,
+              startScrollLeft: event.currentTarget.scrollLeft,
+              dragging: false,
+            };
+          }}
+          onPointerMove={(event) => {
+            const drag = categoryStripDragRef.current;
+            if (!drag || drag.pointerId !== event.pointerId) return;
+            const deltaX = event.clientX - drag.startX;
+            if (!drag.dragging && Math.abs(deltaX) > 5) {
+              drag.dragging = true;
+              event.currentTarget.setPointerCapture(event.pointerId);
+            }
+            if (drag.dragging) {
+              event.preventDefault();
+              event.currentTarget.scrollLeft = drag.startScrollLeft - deltaX;
+            }
+          }}
+          onPointerUp={(event) => {
+            const drag = categoryStripDragRef.current;
+            if (!drag || drag.pointerId !== event.pointerId) return;
+            if (drag.dragging) {
+              suppressCategoryClickUntilRef.current = Date.now() + 350;
+              if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                event.currentTarget.releasePointerCapture(event.pointerId);
+              }
+            }
+            categoryStripDragRef.current = null;
+          }}
+          onPointerCancel={() => { categoryStripDragRef.current = null; }}
+          onClickCapture={(event) => {
+            if (Date.now() < suppressCategoryClickUntilRef.current) {
+              event.preventDefault();
+              event.stopPropagation();
+            }
+          }}
+        >
           <button
             onClick={() => { setShowFavoritesOnly((v) => !v); setSelectedStore(null); setBarPreviewStore(null); setStoreSheetOpen(false); }}
-            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg whitespace-nowrap text-[12px] transition-all flex-shrink-0 ${
-              showFavoritesOnly ? "bg-[#A9652D] text-white" : "bg-[#FAF4EC] text-gray-600"
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg whitespace-nowrap text-[12px] transition-all duration-300 flex-shrink-0 active:scale-[0.97] hover:shadow-[0_5px_14px_-8px_rgba(70,53,44,0.24)] ${
+              showFavoritesOnly ? "bg-[#F7F5F0] text-[#6E6257] ring-1 ring-inset ring-[#D8D1C7]" : "bg-white text-[#666A60] ring-1 ring-inset ring-[#EAE8DF]"
             }`}
           >
-            <Heart className={`w-3 h-3 ${showFavoritesOnly ? "fill-white" : "text-red-400"}`} />
+            <Heart className={`w-3 h-3 transition-colors duration-200 ${showFavoritesOnly ? "fill-[#C96560] text-[#C96560]" : "text-[#9A766D]"}`} />
             단골
             {likedStores.size > 0 && (
-              <span className={`text-[10px] ml-0.5 ${showFavoritesOnly ? "text-white" : "text-gray-600"}`}>
+              <span className="text-[10px] ml-0.5 text-[#81766C]">
                 {likedStores.size}
               </span>
             )}
@@ -1196,8 +1280,8 @@ export function MapPage() {
               <button
                 key={cat}
                 onClick={() => { setShowFavoritesOnly(false); setSelectedCategory(cat); setSelectedStore(null); setBarPreviewStore(null); setStoreSheetOpen(false); }}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg whitespace-nowrap text-[12px] transition-all flex-shrink-0 ${
-                  isActive ? "bg-[#A9652D] text-white" : "bg-[#FAF4EC] text-gray-600"
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg whitespace-nowrap text-[12px] transition-all duration-300 flex-shrink-0 active:scale-[0.97] ${
+                  isActive ? `${CATEGORY_BUTTON_STYLE[cat].active} shadow-[0_4px_12px_-7px_rgba(70,53,44,0.28)]` : `bg-white text-[#666A60] ring-1 ring-inset ring-[#EAE8DF] ${CATEGORY_BUTTON_STYLE[cat].hover} hover:shadow-[0_5px_14px_-8px_rgba(70,53,44,0.24)]`
                 }`}
               >
                 {cat}
@@ -1239,13 +1323,13 @@ export function MapPage() {
             onCustomPinClick={() => setCustomPinCardOpen(true)}
           />
           <div className="pointer-events-none absolute inset-x-0 bottom-0 top-0">
-            <div className="pointer-events-auto absolute bottom-3 left-3 rounded-md bg-white px-2 py-1 text-[11px] text-gray-600 shadow-md">
+            <div className="pointer-events-auto absolute bottom-3 left-3 rounded-full bg-white/95 px-3 py-1.5 text-[11px] font-medium text-[#59634F] shadow-[0_4px_16px_-8px_rgba(30,40,25,0.35)] ring-1 ring-inset ring-white">
               {filteredStores.length}개 상점
             </div>
             <button
               type="button"
               onClick={moveToCurrentLocation}
-              className="pointer-events-auto absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-md"
+              className="pointer-events-auto absolute bottom-3 right-3 flex h-11 w-11 items-center justify-center rounded-full bg-white/95 shadow-[0_4px_16px_-8px_rgba(30,40,25,0.35)] ring-1 ring-inset ring-white"
               aria-label="현재 위치로 이동"
             >
               <MapPin className="h-4 w-4 text-gray-600" />
@@ -1354,7 +1438,7 @@ export function MapPage() {
       {/* Store list — custom snap bottom sheet */}
       <div
         className={cn(
-          "fixed left-0 right-0 z-[141] mx-auto max-w-md flex flex-col bg-white rounded-t-2xl border border-[#EDE5D8] shadow-[0_-4px_20px_rgba(0,0,0,0.12)] overflow-hidden",
+          "fixed left-0 right-0 z-[141] mx-auto max-w-md flex flex-col bg-[#FDFCF9] rounded-t-[26px] border border-[#EAE8DF] shadow-[0_-8px_30px_rgba(35,45,30,0.13)] overflow-hidden",
           STORE_SHEET_BOTTOM_CLASS,
           mapDragHideFullSheet && "pointer-events-none opacity-0",
         )}
@@ -1383,7 +1467,7 @@ export function MapPage() {
           )}
           <div className="flex items-center justify-between px-4 pb-3.5 pt-0.5">
             <span className="text-[14px] font-semibold leading-snug text-gray-800">{marketInfo.name}</span>
-            <span className="shrink-0 rounded-full bg-[#FAF4EC] px-2.5 py-0.5 text-[12px] leading-snug text-gray-600">{filteredStores.length}개</span>
+            <span className="shrink-0 rounded-full bg-[#EDF1E7] px-2.5 py-1 text-[12px] font-medium leading-snug text-[#63734F]">{filteredStores.length}개</span>
           </div>
         </div>
         {/* 목록 영역 — 최소 스냅일 때 CSS로 숨김(스크롤 위치 보존을 위해 언마운트 안 함) */}
@@ -1411,7 +1495,7 @@ export function MapPage() {
                 key={store.id}
                 data-store-id={store.id}
                 data-store-row="1"
-                className="bg-white ring-1 ring-inset ring-[#EDE5D8] rounded-xl overflow-hidden active:bg-[#FAF0E3] transition-colors cursor-pointer"
+                className="bg-white ring-1 ring-inset ring-[#EAE8DF] rounded-2xl overflow-hidden active:bg-[#F5F5EF] transition-colors cursor-pointer"
                 onClick={() => {
                   setSelectedStore(store);
                   setBarPreviewStore(null);
@@ -1458,7 +1542,7 @@ export function MapPage() {
                         <MessageCircle className="w-2.5 h-2.5" />채팅
                       </Link>
                       <button
-                        className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-[#A9652D] text-white active:bg-[#874E22] text-[10px]"
+                        className="flex items-center gap-0.5 px-2 py-1 rounded-lg bg-[#75845F] text-white active:bg-[#64734F] text-[10px]"
                         onClick={(e) => {
                           e.stopPropagation();
                           if (store.menus.length > 0) handleAddToCart(store.menus[0], store);
@@ -1564,7 +1648,7 @@ export function MapPage() {
                           <button
                             type="button"
                             onClick={() => handleAddToCart(menu, selectedStore)}
-                            className="flex items-center gap-1 rounded-lg px-3 py-2 text-[12px] bg-[#A9652D] text-white active:bg-[#874E22]"
+                            className="flex items-center gap-1 rounded-xl px-3.5 py-2.5 text-[12px] bg-[#75845F] text-white active:bg-[#64734F]"
                           >
                             <Plus className="h-3.5 w-3.5" />
                             담기
@@ -1580,7 +1664,7 @@ export function MapPage() {
                     </button>
                     <Link
                       to={`/chat?store=${encodeURIComponent(selectedStore.name)}`}
-                      className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#A9652D] py-3 text-[13px] text-white transition-colors active:bg-[#874E22]"
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-[#75845F] py-3 text-[13px] font-semibold text-white transition-colors active:bg-[#64734F]"
                       onClick={() => setStoreSheetOpen(false)}
                     >
                       <MessageCircle className="h-4 w-4" />
