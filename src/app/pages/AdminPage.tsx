@@ -21,6 +21,9 @@ import {
 import { refreshOwnerChangeRequestsFromRemote } from "../data/ownerChangeRequestsSync";
 import { refreshOwnerSignupApplicationsFromRemote } from "../data/ownerSignupApplicationsSync";
 import { refreshRegisteredUsersFromRemote } from "../data/registeredUsersSync";
+import { AdminRewardPanel } from "../components/AdminRewardPanel";
+import { refreshSubmissions } from "../data/rewards";
+import { refreshSnsPromos } from "../data/snsPromo";
 import { formatPhoneDisplay, formatPhoneInput } from "../utils/phoneFormat";
 import {
   backupAdminSessionForImpersonation,
@@ -180,7 +183,7 @@ declare global {
   }
 }
 
-type AdminPanelView = "market" | "applications" | "members";
+type AdminPanelView = "market" | "events" | "applications" | "members";
 type MembersListTab = "customers" | "stores";
 
 type LoginableStoreItem = {
@@ -235,6 +238,7 @@ export function AdminPage() {
       : "jungang";
   const [selectedMarket, setSelectedMarket] = useState<MarketId>(initialMarket);
   const [adminPanelView, setAdminPanelView] = useState<AdminPanelView>("market");
+  const [rewardPendingCount, setRewardPendingCount] = useState(0);
   const [membersListTab, setMembersListTab] = useState<MembersListTab>("customers");
   const [storeListSearchQuery, setStoreListSearchQuery] = useState("");
   const [storeListMarket, setStoreListMarket] = useState<MarketId>("jungang");
@@ -517,6 +521,15 @@ export function AdminPage() {
   );
 
   const signupPendingCount = pendingSignupApplications.length;
+
+  useEffect(() => {
+    void Promise.all([refreshSubmissions(), refreshSnsPromos()]).then(([items, promos]) => {
+      setRewardPendingCount(
+        items.filter((item) => item.status === "pending").length +
+          promos.filter((item) => item.status === "pending").length,
+      );
+    });
+  }, [adminPanelView]);
   const storeSettingsPendingCount = storeChangeRequests.length;
   const customerSettingsPendingCount = customerChangeRequests.length;
   const settingsPendingCount = storeSettingsPendingCount + customerSettingsPendingCount;
@@ -1676,6 +1689,21 @@ export function AdminPage() {
           })}
           <div className="w-px bg-gray-200 mx-1 self-stretch" />
           <button
+            onClick={() => openAdminPanel("events")}
+            className={`h-9 px-3 rounded-lg text-[12px] whitespace-nowrap transition-colors flex items-center gap-1.5 ${
+              adminPanelView === "events"
+                ? "bg-gray-900 text-white"
+                : "bg-gray-100 text-gray-700"
+            }`}
+          >
+            이벤트
+            {rewardPendingCount > 0 && (
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                adminPanelView === "events" ? "bg-white text-gray-800" : "bg-amber-500 text-white"
+              }`}>{rewardPendingCount}</span>
+            )}
+          </button>
+          <button
             onClick={() => openAdminPanel("applications")}
             className={`h-9 px-3 rounded-lg text-[12px] whitespace-nowrap transition-colors flex items-center gap-1.5 ${
               adminPanelView === "applications"
@@ -1730,6 +1758,8 @@ export function AdminPage() {
             </button>
           </div>
         )}
+
+        {adminPanelView === "events" && <AdminRewardPanel onPendingChange={setRewardPendingCount} />}
 
         {/* 신청 · 설정 패널 */}
         {adminPanelView === "applications" && (

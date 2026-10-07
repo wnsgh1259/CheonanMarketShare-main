@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
-import { Home, MapPin, ShoppingCart, MessageCircle, User, Ticket, Receipt, ChevronLeft } from "lucide-react";
+import { Home, MapPin, ShoppingCart, MessageCircle, User, Receipt, ChevronLeft } from "lucide-react";
 import { useCart } from "./CartContext";
 
 export const OWNER_MODE_KEY = "owner_mode";
@@ -58,7 +58,6 @@ const OWNER_NAV = [
   { to: "/home", icon: Home, label: "홈", exitOwnerMode: false },
   { to: "/map", icon: MapPin, label: "지도", exitOwnerMode: false },
   { to: "/chat", icon: MessageCircle, label: "커뮤니티", exitOwnerMode: false },
-  { to: "/coupon-use", icon: Ticket, label: "쿠폰사용", exitOwnerMode: false },
   { to: "/settlement", icon: Receipt, label: "정산", exitOwnerMode: false },
 ];
 

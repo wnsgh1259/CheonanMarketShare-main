@@ -52,6 +52,7 @@ export function SettingsPage() {
   const [eventAlarm, setEventAlarm] = useState(false);
   const [newAlarm, setNewAlarm] = useState(false);
 
+  const isGuestAccount = userPhone.startsWith("guest-");
   const changeRequestSource = ownerMode ? "store" : "customer";
   const changeRequestName = ownerMode ? ownerStoreName || nickname : nickname;
 
@@ -311,9 +312,9 @@ export function SettingsPage() {
               </div>
               <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2.5">
                 <span className="text-[15px] text-gray-800">
-                  {userPhone ? formatPhoneDisplay(userPhone) : "등록된 번호 없음"}
+                  {isGuestAccount ? "비회원 실험 계정" : userPhone ? formatPhoneDisplay(userPhone) : "등록된 번호 없음"}
                 </span>
-                {settingsModal !== "phone" && (
+                {settingsModal !== "phone" && !isGuestAccount && (
                   <button
                     type="button"
                     disabled={isPhonePending}

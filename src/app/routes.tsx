@@ -17,6 +17,8 @@ import { PostDetailPage } from "./pages/PostDetailPage";
 import { CouponUsePage } from "./pages/CouponUsePage";
 import { SettlementPage } from "./pages/SettlementPage";
 import { RegisterPage } from "./pages/RegisterPage";
+import { DealsPage } from "./pages/DealsPage";
+import { IdolEventPage } from "./pages/IdolEventPage";
 
 function AdminRoute() {
   return (
@@ -71,6 +73,8 @@ export const router = createBrowserRouter([
       { path: "coupon-use", Component: CouponUsePage },
       { path: "settlement", Component: OwnerSettlementRoute },
       { path: "register", Component: RegisterPage },
+      { path: "deals", Component: DealsPage },
+      { path: "idol", Component: IdolEventPage },
     ],
   },
 ]);

@@ -233,9 +233,40 @@ export function loginAsAdminShortcut(): LoginResult {
   return loginWithCredentials(ADMIN_PHONE, "0000");
 }
 
+const GUEST_ACCOUNT_KEY = "guest_customer_account";
+
+/** 비회원 손님 실험 계정. 한 번 만들면 이 기기에 저장하고, 버튼을 다시 눌러도 같은 아이디로 들어온다. */
+export function ensureGuestCustomer(): { id: string; name: string } {
+  try {
+    const raw = localStorage.getItem(GUEST_ACCOUNT_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as { id?: string; name?: string };
+      if (parsed.id) return { id: parsed.id, name: parsed.name || "손님" };
+    }
+  } catch {
+    // 저장된 값이 깨졌으면 새로 만든다.
+  }
+  const existing = localStorage.getItem("guest_reward_id");
+  const id = existing?.startsWith("guest-")
+    ? existing
+    : `guest-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  const account = { id, name: "손님" };
+  localStorage.setItem(GUEST_ACCOUNT_KEY, JSON.stringify(account));
+  return account;
+}
+
 export function loginAsGuest(): LoginResult {
-  clearAuthSession();
-  localStorage.setItem("user_role", "guest");
+  const account = ensureGuestCustomer();
+  writeAuthSession({
+    role: "customer",
+    phone: account.id,
+    name: account.name,
+    email: "",
+    status: "active",
+    storeId: null,
+    storeName: "",
+  });
+  localStorage.setItem("guest_reward_id", account.id);
   return { ok: true, redirect: "/home" };
 }
 

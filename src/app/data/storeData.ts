@@ -29,6 +29,11 @@ export interface StoreData {
   lng?: number;
   description: string;
   menus: MenuItem[];
+  activeDeal?: {
+    note: string;
+    startAt: string;
+    endAt: string;
+  };
 }
 
 // Shared image URLs

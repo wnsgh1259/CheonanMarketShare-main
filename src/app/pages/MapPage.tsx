@@ -8,6 +8,7 @@ import { useCart, type CartItem } from "../components/CartContext";
 import type { MarketId } from "../components/CartContext";
 import { MarketConflictModal } from "../components/MarketConflictModal";
 import { BottomNav } from "../components/BottomNav";
+import { PriceReportSheet } from "../components/PriceReportSheet";
 import { Drawer, DrawerContent, DrawerTitle } from "../components/ui/drawer";
 import { cn } from "../components/ui/utils";
 import {
@@ -22,6 +23,12 @@ import {
 import { syntheticSeedStoreId } from "../data/seedStoreIds";
 import { buildFacilityMarkerIcon, buildStoreMarkerIcon } from "../map/naverMarkerIcons";
 import { MARKET_VIEW_CONFIG, pickStoreDisplayLatLng, toStoreLatLng } from "../map/storeMapPlacement";
+import {
+  discountedPrice,
+  formatDealClock,
+  getActiveSlot,
+  type StorePromotion,
+} from "../data/storePromotion";
 
 const CATEGORIES: CategoryKey[] = [
   "전체", "먹거리·분식", "정육·계란", "채소", "과일", "채소·과일", "수산물", "반찬·건어물", "기타·생활",
@@ -74,6 +81,7 @@ type DraftStorePin = {
   phone?: string;
   category?: string;
   menus?: Array<{ id: number; name: string; price: string }>;
+  promotion?: StorePromotion;
 };
 
 type DraftFacilityPin = {
@@ -95,7 +103,13 @@ declare global {
 }
 
 function clearMarketPolygons(polygons: NaverPolygonRef[]) {
-  polygons.forEach((polygon) => polygon.setMap(null));
+  polygons.forEach((polygon) => {
+    try {
+      polygon.setMap(null);
+    } catch {
+      /* 지도가 이미 정리된 경우 네이버 SDK가 예외를 던짐 */
+    }
+  });
 }
 
 function createMarketPolygons(map: unknown, view: (typeof MARKET_VIEW_CONFIG)[MarketId]) {
@@ -117,7 +131,13 @@ function createMarketPolygons(map: unknown, view: (typeof MARKET_VIEW_CONFIG)[Ma
 }
 
 function clearStoreMarkers(markers: NaverMarkerRef[]) {
-  markers.forEach((marker) => marker.setMap(null));
+  markers.forEach((marker) => {
+    try {
+      marker.setMap(null);
+    } catch {
+      /* 지도가 이미 정리된 경우 네이버 SDK가 예외를 던짐 */
+    }
+  });
 }
 
 type DraftOverrides = {
@@ -204,12 +224,41 @@ function draftOnlyToStoreData(drafts: DraftStorePin[], marketId: MarketId): impo
       lat: d.lat,
       lng: d.lng,
       description: d.description || "",
-      menus: d.menus?.map((m) => ({
+      menus: uniqueMenuIds(d.menus?.map((m) => ({
         id: String(m.id),
         name: m.name,
         price: Number(m.price) || 0,
-      })) ?? [],
+      })) ?? []),
     }));
+}
+
+function uniqueMenuIds(menus: MenuItem[]): MenuItem[] {
+  const seen = new Set<string>();
+  return menus.map((menu, index) => {
+    let id = menu.id;
+    if (seen.has(id)) id = `${menu.id}-${index}`;
+    seen.add(id);
+    return id === menu.id ? menu : { ...menu, id };
+  });
+}
+
+function applyLiveDeal(store: StoreData, promotion: StorePromotion | undefined, now: number): StoreData {
+  const slot = getActiveSlot(promotion, now);
+  if (!slot || !promotion) return { ...store, activeDeal: undefined };
+  const menus = store.menus.map((menu) => {
+    const discount = promotion.menuDiscounts.find((item) => String(item.menuId) === String(menu.id));
+    if (!discount) return menu;
+    const base = menu.originalPrice ?? menu.price;
+    const next = discountedPrice(base, discount.mode, discount.value);
+    if (!(base > 0) || next >= base) return menu;
+    const percent = discount.mode === "percent" ? discount.value : Math.round((1 - next / base) * 100);
+    return { ...menu, price: next, originalPrice: base, discount: percent };
+  });
+  return {
+    ...store,
+    menus,
+    activeDeal: { note: promotion.note, startAt: slot.startAt, endAt: slot.endAt },
+  };
 }
 
 function resolveDraftOverride(
@@ -426,7 +475,11 @@ function NaverMarketMap({
       const point = getStoreLatLng(store, center);
       const isHighlighted = highlightedStore?.id === store.id;
       const circleSize = getScaledMarkerSize(isHighlighted ? 16 : 12);
-      const icon = buildStoreMarkerIcon(naver, store, { highlighted: isHighlighted, circleSize });
+      const icon = buildStoreMarkerIcon(naver, store, {
+        highlighted: isHighlighted,
+        circleSize,
+        onSale: Boolean(store.activeDeal),
+      });
       const marker = new naver.maps.Marker({
         map,
         position: new naver.maps.LatLng(point.lat, point.lng),
@@ -649,6 +702,7 @@ export function MapPage() {
     if (param === "jungang" || param === "byeongcheon" || param === "seonghwan") return param;
     return "byeongcheon";
   });
+  const [now, setNow] = useState(() => Date.now());
 
   /** URL ?store=<이름> 으로 진입 시 자동으로 해당 상점 상세를 열기 위한 초기값 */
   const initialStoreNameRef = useRef<string | null>(
@@ -685,6 +739,9 @@ export function MapPage() {
   const [barPreviewStore, setBarPreviewStore] = useState<StoreData | null>(null);
   const [selectedFacility, setSelectedFacility] = useState<DraftFacilityPin | null>(null);
   const [storeSheetOpen, setStoreSheetOpen] = useState(false);
+  const [priceReportOpen, setPriceReportOpen] = useState(false);
+  const [storeActionsReady, setStoreActionsReady] = useState(false);
+  const [storeScrolled, setStoreScrolled] = useState(false);
   const [facilitySheetOpen, setFacilitySheetOpen] = useState(false);
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [pendingCartItem, setPendingCartItem] = useState<CartItem | null>(null);
@@ -719,7 +776,24 @@ export function MapPage() {
     typeof window !== "undefined" ? window.visualViewport?.height ?? window.innerHeight : 640,
   );
 
-  const { addItem, switchMarketAndAdd, totalCount } = useCart();
+  useEffect(() => {
+    setStoreScrolled(false);
+    if (!storeSheetOpen) {
+      setStoreActionsReady(false);
+      setPriceReportOpen(false);
+      return;
+    }
+    setPriceReportOpen(false);
+    const timer = window.setTimeout(() => setStoreActionsReady(true), 450);
+    return () => window.clearTimeout(timer);
+  }, [storeSheetOpen]);
+
+  useEffect(() => {
+    const timerId = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timerId);
+  }, []);
+
+  const { items, addItem, switchMarketAndAdd, totalCount } = useCart();
 
   useLayoutEffect(() => {
     const readVh = () => window.visualViewport?.height ?? window.innerHeight;
@@ -782,7 +856,7 @@ export function MapPage() {
       }
       const nextName = override.name?.trim();
       const pos = pickStoreDisplayLatLng(selectedMarket, store, override);
-      return {
+      return applyLiveDeal({
         ...store,
         name: nextName || store.name,
         lat: pos.lat,
@@ -795,20 +869,23 @@ export function MapPage() {
         category: (override.category as CategoryKey) || store.category,
         menus:
           override.menus?.length
-            ? override.menus.map((menu) => ({
+            ? uniqueMenuIds(override.menus.map((menu) => ({
                 id: String(menu.id),
                 name: menu.name,
                 price: Number(menu.price) || 0,
-              }))
+              })))
             : store.menus,
-      };
+      }, override.promotion, now);
     });
 
     // 관리자에서 새로 추가한 상점 (시드에 없는 상점) 추가
-    const newStores = draftOnlyToStoreData(rawDrafts, selectedMarket);
+    const newStores = draftOnlyToStoreData(rawDrafts, selectedMarket).map((store) => {
+      const draft = rawDrafts.find((item) => item.id === store.id);
+      return applyLiveDeal(store, draft?.promotion, now);
+    });
 
     return [...seedStores, ...newStores];
-  }, [selectedMarket, sharedStores]);
+  }, [selectedMarket, sharedStores, now]);
   const marketInfo = MARKET_INFO[selectedMarket];
   const facilities = useMemo(() => {
     return sharedFacilities.filter(
@@ -1282,12 +1359,19 @@ export function MapPage() {
                   <span className="text-[11px] text-gray-500 truncate">{barPreviewStore.location}</span>
                 </div>
                 <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                  {barPreviewStore.activeDeal && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500 text-white">할인</span>
+                  )}
                   {barPreviewStore.badge && (
                     <span className={`text-[10px] px-1.5 py-0.5 rounded ${badgeStyle(barPreviewStore.badge)}`}>{barPreviewStore.badge}</span>
                   )}
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">{barPreviewStore.category}</span>
                 </div>
-                <p className="text-[10px] text-gray-400 mt-2">카드를 눌러 상세·메뉴 보기</p>
+                {barPreviewStore.activeDeal ? (
+                  <p className="text-[12px] text-gray-700 mt-2 line-clamp-2">{barPreviewStore.activeDeal.note}</p>
+                ) : (
+                  <p className="text-[10px] text-gray-400 mt-2">카드를 눌러 상세·메뉴 보기</p>
+                )}
               </div>
               {/* 오른쪽: 대표 이미지 */}
               <div className="flex-none py-2 flex items-center">
@@ -1427,6 +1511,9 @@ export function MapPage() {
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <h3 className="text-[13px] font-medium text-gray-900">{store.name}</h3>
+                        {store.activeDeal && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-orange-500 text-white">할인</span>
+                        )}
                         {store.badge && (
                           <span className={`text-[9px] px-1.5 py-0.5 rounded ${badgeStyle(store.badge)}`}>{store.badge}</span>
                         )}
@@ -1498,105 +1585,213 @@ export function MapPage() {
           >
             <DrawerTitle className="sr-only">{selectedStore.name}</DrawerTitle>
             <div className="flex h-[96dvh] flex-col overflow-hidden rounded-t-2xl bg-white">
-              <div className="flex flex-shrink-0 justify-center pb-1 pt-3">
-                <div className="h-1 w-10 rounded-full bg-gray-300" />
-              </div>
-              <div className="relative h-40 flex-shrink-0">
-                <img src={selectedStore.image} alt={selectedStore.name} draggable={false} className="h-full w-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                <button
-                  type="button"
-                  onClick={() => setStoreSheetOpen(false)}
-                  className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-md text-gray-800"
-                >
-                  <X className="h-4 w-4 stroke-[2.5]" />
-                </button>
-                {selectedStore.badge && (
-                  <span className={`absolute left-3 top-3 rounded px-2 py-0.5 text-[11px] ${badgeStyle(selectedStore.badge)}`}>
-                    {selectedStore.badge}
-                  </span>
-                )}
-                <div className="absolute bottom-3 left-4 right-4">
-                  <h2 className="text-[17px] text-white">{selectedStore.name}</h2>
-                  <div className="mt-0.5 flex items-center gap-2">
-                    <span className="text-[11px] text-white/70">{selectedStore.category}</span>
-                    <div className="flex items-center gap-0.5">
-                      <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                      <span className="text-[12px] text-white">{selectedStore.rating}</span>
+              <div
+                className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain bg-white", !storeActionsReady && "pointer-events-none")}
+                onScroll={(event) => setStoreScrolled(event.currentTarget.scrollTop > 60)}
+              >
+                <div className="sticky top-0 z-20 h-0">
+                  <div className={cn("flex h-12 items-center justify-between gap-2 px-3 transition-colors", storeScrolled && "bg-white shadow-[0_1px_0_rgba(0,0,0,0.06)]")}>
+                    <button
+                      type="button"
+                      onClick={() => setStoreSheetOpen(false)}
+                      aria-label="닫기"
+                      className={cn(
+                        "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full",
+                        storeScrolled ? "text-gray-900" : "bg-black/35 text-white backdrop-blur-sm",
+                      )}
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
+                    <p className={cn("min-w-0 flex-1 truncate text-[15px] font-semibold text-gray-900 transition-opacity", storeScrolled ? "opacity-100" : "opacity-0")}>
+                      {selectedStore.name}
+                    </p>
+                    <div className="flex flex-shrink-0 items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(event) => toggleLike(selectedStore.id, event)}
+                        aria-label="단골 등록"
+                        className={cn(
+                          "flex h-9 w-9 items-center justify-center rounded-full",
+                          storeScrolled ? "text-gray-900" : "bg-black/35 text-white backdrop-blur-sm",
+                        )}
+                      >
+                        <Heart className={cn("h-[18px] w-[18px]", likedStores.has(selectedStore.id) && "fill-red-500 text-red-500")} />
+                      </button>
+                      <Link
+                        to="/cart"
+                        aria-label="장바구니"
+                        className={cn(
+                          "relative flex h-9 w-9 items-center justify-center rounded-full",
+                          storeScrolled ? "text-gray-900" : "bg-black/35 text-white backdrop-blur-sm",
+                        )}
+                      >
+                        <ShoppingCart className="h-[18px] w-[18px]" />
+                        {totalCount > 0 && (
+                          <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-pink-500 px-1 text-[10px] font-bold text-white">
+                            {totalCount}
+                          </span>
+                        )}
+                      </Link>
                     </div>
                   </div>
                 </div>
-              </div>
-              <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-                <div className="space-y-1.5 border-b border-gray-100 py-3">
-                  <p className="text-[13px] leading-relaxed text-gray-500">{selectedStore.description}</p>
-                  <div className="flex items-center gap-2 text-[12px] text-gray-400">
-                    <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span>{selectedStore.location}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-[12px] text-gray-400">
-                    <Clock className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span>{selectedStore.hours}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-[12px] text-gray-400">
-                    <Phone className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span>{selectedStore.phone}</span>
-                  </div>
+
+                <div className="relative h-56">
+                  <img src={selectedStore.image} alt={selectedStore.name} draggable={false} className="h-full w-full object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/25" />
+                  <div className="absolute left-1/2 top-2 h-1 w-10 -translate-x-1/2 rounded-full bg-white/70" />
+                  {selectedStore.badge && (
+                    <span className={`absolute bottom-3 left-4 rounded-full px-2.5 py-1 text-[11px] font-semibold ${badgeStyle(selectedStore.badge)}`}>
+                      {selectedStore.badge}
+                    </span>
+                  )}
                 </div>
-                <div className="pt-3">
-                  <h3 className="mb-2.5 text-[14px] text-gray-900">메뉴 / 상품</h3>
-                  <div className="space-y-2">
+
+                <div className="px-5 pb-5 pt-4">
+                  <h2 className="text-[22px] font-bold leading-tight text-gray-900">{selectedStore.name}</h2>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <Star className="h-4 w-4 flex-shrink-0 fill-amber-400 text-amber-400" />
+                      <span className="text-[15px] font-bold text-gray-900">{selectedStore.rating}</span>
+                      <span className="truncate text-[13px] text-gray-500">· {selectedStore.category}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!storeActionsReady) return;
+                        setPriceReportOpen(true);
+                      }}
+                      className="flex-shrink-0 rounded-full bg-amber-400 px-3 py-1.5 text-[12px] font-semibold text-gray-900 active:bg-amber-500"
+                    >
+                      가격 제보
+                    </button>
+                  </div>
+                  {selectedStore.description && (
+                    <p className="mt-3 text-[14px] leading-relaxed text-gray-600">{selectedStore.description}</p>
+                  )}
+                  <div className="mt-4 space-y-3 rounded-xl border border-gray-200 px-4 py-4 text-[13px]">
+                    <div className="flex gap-4">
+                      <span className="w-14 flex-shrink-0 text-gray-500">위치</span>
+                      <span className="min-w-0 text-gray-900">{selectedStore.location}</span>
+                    </div>
+                    <div className="flex gap-4">
+                      <span className="w-14 flex-shrink-0 text-gray-500">운영시간</span>
+                      <span className="min-w-0 text-gray-900">{selectedStore.hours}</span>
+                    </div>
+                    <div className="flex gap-4">
+                      <span className="w-14 flex-shrink-0 text-gray-500">연락처</span>
+                      <a href={`tel:${selectedStore.phone}`} className="min-w-0 text-gray-900 underline decoration-gray-300 underline-offset-2">
+                        {selectedStore.phone}
+                      </a>
+                    </div>
+                  </div>
+                  {selectedStore.activeDeal && (
+                    <div className="mt-3 rounded-xl bg-gray-900 px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="rounded bg-orange-500 px-1.5 py-0.5 text-[11px] font-bold text-white">할인·이벤트</span>
+                        <span className="text-[11px] text-gray-400">
+                          {formatDealClock(selectedStore.activeDeal.startAt)} – {formatDealClock(selectedStore.activeDeal.endAt)}
+                        </span>
+                      </div>
+                      <p className="mt-1.5 whitespace-pre-wrap text-[13px] leading-relaxed text-white">{selectedStore.activeDeal.note}</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="h-2 bg-[#F4F4F5]" />
+
+                <div className="pb-6">
+                  <div className="flex items-baseline gap-1.5 px-5 pb-1 pt-5">
+                    <h3 className="text-[18px] font-bold text-gray-900">메뉴</h3>
+                    <span className="text-[13px] text-gray-400">{selectedStore.menus.length}</span>
+                  </div>
+                  <div>
                     {selectedStore.menus.map((menu) => {
+                      const qty = items.find((item) => item.storeId === selectedStore.id && item.id === menu.id)?.quantity ?? 0;
                       return (
-                        <div key={menu.id} className="flex items-center justify-between rounded-lg bg-gray-50 p-3">
-                          <div className="flex-1">
-                            <p className="text-[14px] text-gray-800">{menu.name}</p>
-                            <div className="mt-0.5 flex items-center gap-2">
-                              <span className="text-[14px] text-gray-900">{menu.price.toLocaleString()}원</span>
+                        <div key={menu.id} className="flex items-center gap-3 border-b border-gray-100 px-5 py-4 last:border-b-0">
+                          <div className="min-w-0 flex-1">
+                            {menu.originalPrice && (
+                              <span className="mb-1.5 inline-block rounded bg-gray-100 px-1.5 py-0.5 text-[11px] font-medium text-gray-600">
+                                할인
+                              </span>
+                            )}
+                            <p className="text-[16px] font-medium leading-snug text-gray-900">{menu.name}</p>
+                            <div className="mt-1 flex items-baseline gap-1.5">
+                              {menu.originalPrice && <span className="text-[14px] font-bold text-rose-500">{menu.discount}%</span>}
+                              <span className="text-[16px] font-bold text-gray-900">{menu.price.toLocaleString()}원</span>
                               {menu.originalPrice && (
-                                <>
-                                  <span className="text-[11px] text-gray-400 line-through">{menu.originalPrice.toLocaleString()}원</span>
-                                  <span className="text-[11px] text-red-500">-{menu.discount}%</span>
-                                </>
+                                <span className="text-[12px] text-gray-400 line-through">{menu.originalPrice.toLocaleString()}원</span>
                               )}
                             </div>
                           </div>
                           <button
                             type="button"
                             onClick={() => handleAddToCart(menu, selectedStore)}
-                            className="flex items-center gap-1 rounded-lg px-3 py-2 text-[12px] bg-gray-900 text-white active:bg-gray-700"
+                            aria-label={`${menu.name} 담기`}
+                            className="relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-900 shadow-md active:bg-gray-50"
                           >
-                            <Plus className="h-3.5 w-3.5" />
-                            담기
+                            <Plus className="h-5 w-5" />
+                            {qty > 0 && (
+                              <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-gray-900 px-1 text-[11px] font-bold text-white">
+                                {qty}
+                              </span>
+                            )}
                           </button>
                         </div>
                       );
                     })}
                   </div>
-                  <div className="mt-4 flex gap-2">
-                    <button type="button" className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-white border-2 border-gray-400 py-3 text-[13px] font-semibold text-gray-800 transition-colors active:bg-gray-50">
-                      <Phone className="h-4 w-4" />
-                      전화하기
-                    </button>
-                    <Link
-                      to={`/chat?store=${encodeURIComponent(selectedStore.name)}`}
-                      className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-gray-900 py-3 text-[13px] text-white transition-colors active:bg-gray-800"
-                      onClick={() => setStoreSheetOpen(false)}
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                      채팅하기
-                    </Link>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setStoreSheetOpen(false)}
-                    className="mt-2 w-full py-3 text-[13px] font-semibold text-gray-800 border-2 border-gray-400 rounded-xl transition-colors active:bg-gray-50"
-                  >
-                    닫기
-                  </button>
                 </div>
               </div>
+
+              <div className={cn("flex flex-shrink-0 gap-2 border-t border-gray-100 bg-white px-4 py-3", !storeActionsReady && "pointer-events-none")}>
+                <a
+                  href={`tel:${selectedStore.phone}`}
+                  aria-label="전화하기"
+                  className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl border border-gray-200 text-gray-700 active:bg-gray-50"
+                >
+                  <Phone className="h-[18px] w-[18px]" />
+                </a>
+                {totalCount > 0 ? (
+                  <>
+                    <Link
+                      to={`/chat?store=${encodeURIComponent(selectedStore.name)}`}
+                      aria-label="채팅하기"
+                      className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl border border-gray-200 text-gray-700 active:bg-gray-50"
+                      onClick={() => setStoreSheetOpen(false)}
+                    >
+                      <MessageCircle className="h-[18px] w-[18px]" />
+                    </Link>
+                    <Link
+                      to="/cart"
+                      className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-gray-900 text-[15px] font-semibold text-white active:bg-gray-800"
+                    >
+                      장바구니 보기
+                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1 text-[12px] font-bold text-gray-900">
+                        {totalCount}
+                      </span>
+                    </Link>
+                  </>
+                ) : (
+                  <Link
+                    to={`/chat?store=${encodeURIComponent(selectedStore.name)}`}
+                    className="flex h-12 flex-1 items-center justify-center gap-1.5 rounded-xl bg-gray-900 text-[15px] font-semibold text-white active:bg-gray-800"
+                    onClick={() => setStoreSheetOpen(false)}
+                  >
+                    <MessageCircle className="h-[18px] w-[18px]" />
+                    채팅하기
+                  </Link>
+                )}
+              </div>
             </div>
+            {priceReportOpen && (
+              <PriceReportSheet
+                storeName={selectedStore.name}
+                menus={selectedStore.menus}
+                onClose={() => setPriceReportOpen(false)}
+              />
+            )}
           </DrawerContent>
         </Drawer>
       )}
