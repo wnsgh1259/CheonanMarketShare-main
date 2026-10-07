@@ -176,7 +176,7 @@ export function CartPage() {
 
       <main className="relative z-10">
       {/* Cart Items */}
-      <div className="bg-white mx-4 mt-4 rounded-2xl p-4 ring-1 ring-inset ring-[#EAE8DF] shadow-[0_8px_24px_-22px_rgba(47,61,43,0.45)]">
+      <div className="bg-white mx-4 mt-4 rounded-2xl p-4 ring-1 ring-inset ring-[#EAE8DF] shadow-[0_8px_24px_-22px_rgba(70,53,44,0.28)]">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-[14px] text-gray-800">담은 상품 ({totalCount})</h2>
           {items.length > 0 && (
@@ -222,7 +222,7 @@ export function CartPage() {
               <div>
                 {directItems.length > 0 && (
                   <div className="border-t border-[#EDE5D8] pt-3 mt-1 mb-2">
-                    <span className="text-[11px] text-[#71845D]">빠른 장보기로 담은 상품</span>
+                    <span className="text-[11px] text-[#8A6A52]">빠른 장보기로 담은 상품</span>
                   </div>
                 )}
                 {quickItems.map((item) => (
@@ -261,9 +261,9 @@ export function CartPage() {
       </div>
 
       {/* Quick Shopping */}
-      <div className="bg-white mx-4 mt-3 rounded-2xl p-4 ring-1 ring-inset ring-[#EAE8DF] shadow-[0_8px_24px_-22px_rgba(47,61,43,0.45)]">
+      <div className="bg-white mx-4 mt-3 rounded-2xl p-4 ring-1 ring-inset ring-[#EAE8DF] shadow-[0_8px_24px_-22px_rgba(70,53,44,0.28)]">
         <div className="flex items-center gap-2 mb-1">
-          <Zap className="w-4 h-4 text-[#71845D]" />
+          <Zap className="w-4 h-4 text-[#8A6A52]" />
           <h2 className="text-[14px] text-gray-800">빠른 장보기</h2>
         </div>
         <p className="text-[12px] text-gray-600 mb-3">요리명을 검색하면 재료를 자동 추가해요</p>
@@ -273,11 +273,11 @@ export function CartPage() {
             onChange={(e) => setRecipeQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleRecipeSearch()}
             placeholder="요리명을 입력하세요"
-            className="flex-1 px-3 py-2.5 bg-[#F4F3ED] rounded-xl text-[14px] focus:outline-none focus:ring-2 focus:ring-[#A8B394] placeholder:text-gray-500"
+            className="flex-1 px-3 py-2.5 bg-[#F7F2E8] rounded-xl text-[14px] focus:outline-none focus:ring-2 focus:ring-[#B89A7D] placeholder:text-gray-500"
           />
           <button
             onClick={handleRecipeSearch}
-            className="px-4 py-2.5 bg-[#75845F] text-white rounded-xl text-[13px] active:bg-[#64734F] transition-colors flex items-center gap-1"
+            className="px-4 py-2.5 bg-[#5B4335] text-white rounded-xl text-[13px] active:bg-[#46352C] transition-colors flex items-center gap-1"
           >
             <Search className="w-3.5 h-3.5" />검색
           </button>
@@ -295,7 +295,7 @@ export function CartPage() {
                 setConflictMsg("");
                 setResultsCollapsed(false);
               }}
-              className="px-3 py-1.5 bg-[#F1F1EA] text-[#646A5D] rounded-full text-[12px] active:bg-[#E7EBDD] transition-colors"
+              className="px-3 py-1.5 bg-[#F5F0E7] text-[#6B5142] rounded-full text-[12px] active:bg-[#EDE1D5] transition-colors"
             >
               {name}
             </button>
@@ -313,13 +313,13 @@ export function CartPage() {
               <div className="flex items-center justify-between px-3 py-2.5 bg-gray-50 border-b border-[#EDE5D8]">
                 <div className="flex items-center gap-2">
                   <span className="text-[13px] text-gray-800">{recipeTitle} 재료</span>
-                  <span className="text-[11px] text-[#71845D]">{addedIds.size}/{recipeResults.length}</span>
+                  <span className="text-[11px] text-[#8A6A52]">{addedIds.size}/{recipeResults.length}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   {!resultsCollapsed && (
                     <button
                       onClick={handleAddAll}
-                      className="text-[11px] px-3 py-1.5 bg-[#75845F] text-white rounded-full active:bg-[#64734F] transition-colors"
+                      className="text-[11px] px-3 py-1.5 bg-[#5B4335] text-white rounded-full active:bg-[#46352C] transition-colors"
                     >
                       전체 담기
                     </button>
@@ -346,7 +346,7 @@ export function CartPage() {
                       <span
                         key={ing.id}
                         className={`text-[11px] px-2 py-0.5 rounded ${
-                          addedIds.has(ing.id) ? "bg-[#EDF1E7] text-[#63734F]" : "bg-[#F1F1EA] text-gray-600"
+                          addedIds.has(ing.id) ? "bg-[#EFE4D8] text-[#6B5142]" : "bg-[#F5F0E7] text-gray-600"
                         }`}
                       >
                         {ing.name}
@@ -382,7 +382,7 @@ export function CartPage() {
                           <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
                             <span className="text-[13px] text-gray-800">{ing.price.toLocaleString()}원</span>
                             {isAdded ? (
-                              <span className="flex items-center gap-0.5 text-[10px] text-[#71845D]">
+                              <span className="flex items-center gap-0.5 text-[10px] text-[#8A6A52]">
                                 <CheckCircle2 className="w-3 h-3" />담김
                               </span>
                             ) : (
@@ -410,7 +410,7 @@ export function CartPage() {
       </div>
 
       {/* Route Recommendation */}
-      <div className="bg-white mx-4 mt-3 rounded-2xl p-4 ring-1 ring-inset ring-[#EAE8DF] shadow-[0_8px_24px_-22px_rgba(47,61,43,0.45)]">
+      <div className="bg-white mx-4 mt-3 rounded-2xl p-4 ring-1 ring-inset ring-[#EAE8DF] shadow-[0_8px_24px_-22px_rgba(70,53,44,0.28)]">
         <div className="flex items-center gap-2 mb-1">
           <Route className="w-4 h-4 text-[#A9652D]" />
           <h2 className="text-[14px] text-gray-800">맞춤형 경로 추천</h2>

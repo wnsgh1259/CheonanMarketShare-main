@@ -4,7 +4,7 @@ import {
   Upload, CheckCircle2, Ticket, Tag, Camera, MapPin, Lock, Check, Gift,
   ShoppingBag, X, Sparkles,
 } from "lucide-react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { useState, useEffect } from "react";
 import { BottomNav } from "../components/BottomNav";
 import {
@@ -20,18 +20,19 @@ function generateCouponCode() {
   return Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
 
-const PROGRESS_COLORS = ["bg-rose-400", "bg-amber-400", "bg-emerald-400", "bg-sky-400", "bg-violet-400"];
+const PROGRESS_COLORS = ["bg-[#A67B50]", "bg-[#7B8873]", "bg-[#C69A67]", "bg-[#8A9A7D]", "bg-[#B48A62]"];
 
 const GIFT_ITEMS = [
-  { id: 1, emoji: "🎫", name: "500원 할인권", desc: "전 시장 공통", cost: 500,  color: "from-rose-50 to-pink-50",    border: "border-rose-100",   badge: "bg-rose-100 text-rose-600" },
-  { id: 2, emoji: "🎟", name: "1,000원 할인권", desc: "전 시장 공통", cost: 900,  color: "from-amber-50 to-yellow-50", border: "border-amber-100",  badge: "bg-amber-100 text-amber-600" },
-  { id: 3, emoji: "🏷", name: "2,000원 할인권", desc: "전 시장 공통", cost: 1700, color: "from-emerald-50 to-teal-50",  border: "border-emerald-100", badge: "bg-emerald-100 text-emerald-600" },
-  { id: 4, emoji: "💝", name: "5,000원 할인권", desc: "전 시장 공통", cost: 4000, color: "from-sky-50 to-blue-50",      border: "border-sky-100",    badge: "bg-sky-100 text-sky-600" },
-  { id: 5, emoji: "👑", name: "10,000원 할인권", desc: "전 시장 공통", cost: 7500, color: "from-violet-50 to-purple-50", border: "border-violet-100", badge: "bg-violet-100 text-violet-600", rare: true },
+  { id: 1, emoji: "🎫", name: "500원 할인권", desc: "전 시장 공통", cost: 500,  color: "from-[#F9F5E9] to-[#F3E7D1]", border: "border-[#E8DCC5]", badge: "bg-[#F3E7D1] text-[#795B3D]" },
+  { id: 2, emoji: "🎟", name: "1,000원 할인권", desc: "전 시장 공통", cost: 900,  color: "from-[#F5F0E7] to-[#EFE4D8]", border: "border-[#E5D9CB]", badge: "bg-[#EFE4D8] text-[#6B5142]" },
+  { id: 3, emoji: "🏷", name: "2,000원 할인권", desc: "전 시장 공통", cost: 1700, color: "from-[#F5F8E9] to-[#EAF0DF]", border: "border-[#DFE8D5]", badge: "bg-[#EAF0DF] text-[#65765E]" },
+  { id: 4, emoji: "💝", name: "5,000원 할인권", desc: "전 시장 공통", cost: 4000, color: "from-[#F9F5E9] to-[#F3E7D1]", border: "border-[#E8DCC5]", badge: "bg-[#F3E7D1] text-[#795B3D]" },
+  { id: 5, emoji: "👑", name: "10,000원 할인권", desc: "전 시장 공통", cost: 7500, color: "from-[#F5F8E9] to-[#EAF0DF]", border: "border-[#DFE8D5]", badge: "bg-[#EAF0DF] text-[#65765E]", rare: true },
 ];
 
 export function ProfilePage() {
-  const [activeTab, setActiveTab] = useState<TabType>("stamps");
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<TabType>(() => searchParams.get("tab") === "coupons" ? "coupons" : "stamps");
   const [progressAnimationKey, setProgressAnimationKey] = useState(0);
   const [photoUploaded, setPhotoUploaded] = useState(false);
 
@@ -100,15 +101,15 @@ export function ProfilePage() {
   };
 
   const coupons = [
-    { id: 1, title: "천안중앙시장 5,000원 할인", description: "2만원 이상 구매 시", discount: "5,000원", market: "천안중앙시장", expiry: "2026.04.30", color: "bg-gray-800" },
-    { id: 2, title: "성환전통시장 10% 할인", description: "1만원 이상 구매 시", discount: "10%", market: "성환전통시장", expiry: "2026.05.15", color: "bg-emerald-700" },
-    { id: 3, title: "천안역전시장 무료 시음권", description: "방문 시 1회 무료", discount: "무료", market: "천안역전시장", expiry: "2026.04.20", color: "bg-orange-600" },
-    { id: 4, title: "만보기 달성 특별 쿠폰", description: "5천원 이상 구매 시 3,000원", discount: "3,000원", market: "전 시장 공통", expiry: "2026.05.01", color: "bg-purple-700" },
-    { id: 5, title: "1시간 체류 달성 쿠폰", description: "시장 1시간 이상 체류", discount: "2,000원", market: "전 시장 공통", expiry: "2026.04.25", color: "bg-rose-700" },
+    { id: 1, title: "천안중앙시장 5,000원 할인", description: "2만원 이상 구매 시", discount: "5,000원", market: "천안중앙시장", expiry: "2026.04.30", color: "bg-[#A67B50]" },
+    { id: 2, title: "성환전통시장 10% 할인", description: "1만원 이상 구매 시", discount: "10%", market: "성환전통시장", expiry: "2026.05.15", color: "bg-[#7B8873]" },
+    { id: 3, title: "천안역전시장 무료 시음권", description: "방문 시 1회 무료", discount: "무료", market: "천안역전시장", expiry: "2026.04.20", color: "bg-[#C69A67]" },
+    { id: 4, title: "만보기 달성 특별 쿠폰", description: "5천원 이상 구매 시 3,000원", discount: "3,000원", market: "전 시장 공통", expiry: "2026.05.01", color: "bg-[#8A9A7D]" },
+    { id: 5, title: "1시간 체류 달성 쿠폰", description: "시장 1시간 이상 체류", discount: "2,000원", market: "전 시장 공통", expiry: "2026.04.25", color: "bg-[#B48A62]" },
   ];
 
   return (
-    <div className="min-h-screen bg-[#F7F6F1] pb-20">
+    <div className="min-h-screen bg-[#F8F7F3] pb-20">
 
       {/* ── 헤더 ── */}
       <div className="sticky top-0 bg-white z-10 border-b border-[#EEEAE4]">
@@ -120,9 +121,9 @@ export function ProfilePage() {
       </div>
 
       {/* ── 프로필 히어로 카드 ── */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-[#E5F0F4] via-[#EEF4F2] to-[#F4EAE0] px-5 pb-5 pt-6">
-        <div className="pointer-events-none absolute -right-10 -top-14 h-44 w-44 rounded-full bg-[#B9D7E1]/35 blur-2xl" />
-        <div className="pointer-events-none absolute -bottom-20 -left-10 h-40 w-40 rounded-full bg-[#E8C9AA]/25 blur-2xl" />
+      <div className="relative overflow-hidden bg-gradient-to-br from-[#EAF3F6] via-[#F3F6F3] to-[#F8F7F3] px-5 pb-5 pt-6">
+        <div className="pointer-events-none absolute -right-10 -top-14 h-44 w-44 rounded-full bg-[#D8C6B8]/25 blur-2xl" />
+        <div className="pointer-events-none absolute -bottom-20 -left-10 h-40 w-40 rounded-full bg-[#C4A88F]/20 blur-2xl" />
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
           <span className="profile-leaf profile-leaf-one">🍁</span>
           <span className="profile-leaf profile-leaf-two">🍂</span>
@@ -130,16 +131,16 @@ export function ProfilePage() {
         </div>
         <div className="relative z-10 mb-4 flex items-center gap-2 text-[11px] font-semibold tracking-wide text-[#8A776B]"><Sparkles className="h-3.5 w-3.5" /> 나의 시장 기록</div>
 
-        <div className="relative z-10 mb-5 flex items-center gap-4 rounded-[24px] border border-[#D8C6B8] bg-white/75 p-4 shadow-[0_10px_30px_-24px_rgba(47,61,43,0.55)] backdrop-blur-sm">
+        <div className="relative z-10 mb-5 flex items-center gap-4 rounded-[24px] border border-[#E5D9CB] bg-white/80 p-4 shadow-[0_10px_30px_-24px_rgba(70,53,44,0.28)] backdrop-blur-sm">
           <button
             onClick={() => { setSheetDetail(null); setShowTitleSheet(true); }}
             className="relative flex-shrink-0"
           >
-            <div className="flex h-[68px] w-[68px] items-center justify-center rounded-[22px] border border-[#E3E6D9] bg-gradient-to-br from-[#F5E6C9] to-[#DCE7D0] text-[34px] shadow-inner active:scale-95 transition-transform">
+            <div className="flex h-[68px] w-[68px] items-center justify-center rounded-[22px] border border-[#E5D9CB] bg-gradient-to-br from-[#F5EBDD] to-[#E9DDCE] text-[34px] shadow-inner active:scale-95 transition-transform">
               {currentTitle.emoji}
             </div>
             {currentTitle.rare && (
-              <span className="absolute -top-1.5 -right-1.5 text-[9px] bg-[#D98A4D] text-white px-1.5 py-0.5 rounded-full font-bold leading-tight shadow-sm">
+              <span className="absolute -top-1.5 -right-1.5 text-[9px] bg-[#8A6A52] text-white px-1.5 py-0.5 rounded-full font-bold leading-tight shadow-sm">
                 희귀
               </span>
             )}
@@ -153,22 +154,22 @@ export function ProfilePage() {
             <h2 className="text-[#46352C] text-[21px] font-bold leading-tight">{user.name}</h2>
             <button
               onClick={() => { setSheetDetail(null); setShowTitleSheet(true); }}
-              className="profile-title-glint relative mt-1 inline-flex items-center gap-1 overflow-hidden rounded-full border border-[#EEDC9C] bg-[#FFF6D9] px-2.5 py-1 text-[#8B6828] transition-colors active:bg-[#F8EDC8]"
+              className="profile-title-glint relative mt-1 inline-flex items-center gap-1 overflow-hidden rounded-full border border-[#E5D9CB] bg-[#F5F0E7] px-2.5 py-1 text-[#6B5142] transition-colors active:bg-[#EFE4D8]"
             >
               <span className="text-[11px] font-semibold">{currentTitle.name}</span>
             </button>
           </div>
 
           <div className="flex-shrink-0 flex flex-col items-end gap-1.5">
-            <div className="rounded-xl border border-[#D9E7EC] bg-gradient-to-br from-[#F1F7F8] to-[#E7F0F4] px-3 pb-3 pt-2 text-center shadow-[0_6px_16px_-14px_rgba(61,104,120,0.45)]">
-              <p className="text-[#6C8790] text-[10px]">마일리지</p>
-              <p className="text-[#3F5962] text-[16px] font-bold leading-none">
-                {mileage.toLocaleString()}<span className="text-[10px] text-[#8AA0A6] font-normal ml-0.5">P</span>
+            <div className="rounded-xl border border-[#E5D9CB] bg-gradient-to-br from-[#FBF8F2] to-[#F0E8DD] px-3 pb-3 pt-2 text-center shadow-[0_6px_16px_-14px_rgba(70,53,44,0.28)]">
+              <p className="text-[#8A6A52] text-[10px]">마일리지</p>
+              <p className="text-[#5B4335] text-[16px] font-bold leading-none">
+                {mileage.toLocaleString()}<span className="text-[10px] text-[#9A897F] font-normal ml-0.5">P</span>
               </p>
             </div>
             <button
               onClick={() => { setExchangeResult(null); setShowGiftShop(true); }}
-              className="flex items-center gap-1 rounded-xl border border-[#E8C9C1] bg-[#F9EEEA] px-2.5 py-1.5 text-[#934F43] shadow-[0_4px_12px_-9px_rgba(143,75,64,0.35)] transition-all duration-300 hover:border-[#D4A096] hover:bg-[#F4E3DE] hover:shadow-[0_7px_16px_-7px_rgba(143,75,64,0.28)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4A096]"
+              className="flex items-center gap-1 rounded-xl bg-[#5B4335] px-2.5 py-1.5 text-white shadow-[0_4px_12px_-9px_rgba(91,67,53,0.3)] transition-all duration-300 hover:bg-[#6B5142] hover:shadow-[0_7px_16px_-7px_rgba(91,67,53,0.28)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B89A7D]"
             >
               <Gift className="w-3.5 h-3.5" />
               <span className="text-[11px] font-semibold">교환소</span>
@@ -183,7 +184,7 @@ export function ProfilePage() {
             { label: "스탬프", value: `${collectedCount}/${totalStamps}`, unit: "", emoji: "⭐", bg: "bg-white", border: "border-[#D8C6B8]" },
             { label: "이동거리", value: (user.totalDistance / 1000).toFixed(1), unit: "km", emoji: "👟", bg: "bg-white", border: "border-[#D8C6B8]" },
           ].map(stat => (
-            <div key={stat.label} className={`${stat.bg} border ${stat.border} rounded-2xl px-2 py-3 text-center shadow-[0_6px_18px_-16px_rgba(47,61,43,0.5)]`}>
+            <div key={stat.label} className={`${stat.bg} border ${stat.border} rounded-2xl px-2 py-3 text-center shadow-[0_6px_18px_-16px_rgba(70,53,44,0.28)]`}>
               <span className="text-[16px]">{stat.emoji}</span>
               <p className="text-[#46352C] text-[16px] font-bold mt-0.5 leading-none">
                 {stat.value}<span className="text-[10px] text-[#9A897F] ml-0.5">{stat.unit}</span>
@@ -209,7 +210,7 @@ export function ProfilePage() {
             }}
             className={`flex-1 py-3 text-center text-[13px] transition-colors border-b-2 ${
               activeTab === key
-                ? "text-[#46352C] border-[#A55345] font-semibold"
+                ? "text-[#46352C] border-[#5B4335] font-semibold"
                 : "text-[#8A776B] border-transparent"
             }`}
           >
@@ -224,23 +225,23 @@ export function ProfilePage() {
 
           {/* 만보기 */}
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-[#D8C6B8]">
-            <div className="profile-challenge-glint relative overflow-hidden bg-gradient-to-r from-emerald-400 to-teal-400 px-4 py-3 flex items-center justify-between">
+            <div className="profile-challenge-glint relative overflow-hidden bg-gradient-to-r from-[#F5F8E9] to-[#EAF0DF] px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-[20px]">👟</span>
                 <div>
-                  <p className="text-white text-[13px] font-semibold">만보기 챌린지</p>
-                  <p className="text-white/70 text-[10px]">달성 시 100P 지급</p>
+                  <p className="text-[#465541] text-[13px] font-semibold">만보기 챌린지</p>
+                  <p className="text-[#75836C] text-[10px]">달성 시 100P 지급</p>
                 </div>
               </div>
-              <TrendingUp className="w-5 h-5 text-white/70" />
+              <TrendingUp className="w-5 h-5 text-[#7B8873]" />
             </div>
             <div className="px-4 py-3">
               <div className="flex items-center justify-between text-[12px] mb-2">
                 <span className="text-[#9A897F]">오늘 걸음 수</span>
-                <span className="text-emerald-600 font-semibold">8,500 / 10,000보</span>
+                <span className="text-[#65765E] font-semibold">8,500 / 10,000보</span>
               </div>
               <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
-                <div key={progressAnimationKey} className="profile-progress-fill h-2.5 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full" style={{ width: "85%" }} />
+                <div key={progressAnimationKey} className="profile-progress-fill h-2.5 bg-gradient-to-r from-[#7B8873] to-[#A3AF91] rounded-full" style={{ width: "85%" }} />
               </div>
               <p className="text-[11px] text-[#9A897F] mt-1.5">🏃 1,500보만 더!</p>
             </div>
@@ -280,16 +281,16 @@ export function ProfilePage() {
           {/* 칭호 배너 */}
           <button
             onClick={() => { setSheetDetail(null); setShowTitleSheet(true); }}
-            className="profile-challenge-glint relative w-full overflow-hidden rounded-2xl border border-[#D8C6B8] bg-gradient-to-r from-[#C9813A] to-[#E8A855] px-4 py-3.5 flex items-center gap-3 active:opacity-90 transition-opacity shadow-sm"
+            className="profile-challenge-glint relative w-full overflow-hidden rounded-2xl border border-[#E8D6B7] bg-gradient-to-r from-[#F9F5E9] to-[#F3E7D1] px-4 py-3.5 flex items-center gap-3 active:opacity-90 transition-opacity shadow-sm"
           >
-            <div className="w-10 h-10 bg-white/25 rounded-xl flex items-center justify-center text-[20px]">{currentTitle.emoji}</div>
+            <div className="w-10 h-10 bg-white/75 rounded-xl flex items-center justify-center text-[20px]">{currentTitle.emoji}</div>
             <div className="flex-1 text-left">
-              <p className="text-white/70 text-[11px]">현재 칭호</p>
-              <p className="text-white text-[14px] font-bold">{currentTitle.name}</p>
+              <p className="text-[#9B784D] text-[11px]">현재 칭호</p>
+              <p className="text-[#46352C] text-[14px] font-bold">{currentTitle.name}</p>
             </div>
             <div className="text-right">
-              <p className="text-white/70 text-[11px]">{unlockedCount}/{titles.length} 획득</p>
-              <p className="text-white text-[11px] font-medium mt-0.5">전체 보기 →</p>
+              <p className="text-[#9B784D] text-[11px]">{unlockedCount}/{titles.length} 획득</p>
+              <p className="text-[#795B3D] text-[11px] font-medium mt-0.5">전체 보기 →</p>
             </div>
           </button>
         </div>
@@ -299,30 +300,30 @@ export function ProfilePage() {
       {activeTab === "events" && (
         <div className="px-4 py-4 space-y-3">
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-[#D8C6B8]">
-            <div className="profile-challenge-glint relative overflow-hidden bg-gradient-to-r from-sky-400 to-blue-400 px-4 py-3 flex items-center justify-between">
+            <div className="profile-challenge-glint relative overflow-hidden bg-gradient-to-r from-[#F5F8E9] to-[#EAF0DF] px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Camera className="w-5 h-5 text-white" />
+                <Camera className="w-5 h-5 text-[#65765E]" />
                 <div>
-                  <p className="text-white text-[13px] font-semibold">가격표 촬영 인증</p>
-                  <p className="text-white/70 text-[10px]">사진 1장당 50P</p>
+                  <p className="text-[#465541] text-[13px] font-semibold">가격표 촬영 인증</p>
+                  <p className="text-[#75836C] text-[10px]">사진 1장당 50P</p>
                 </div>
               </div>
-              <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full">진행중</span>
+              <span className="text-[10px] bg-white/75 text-[#65765E] px-2 py-0.5 rounded-full">진행중</span>
             </div>
             <div className="px-4 py-3">
               <p className="text-[12px] text-[#9A897F] mb-3 leading-relaxed">시장 가게의 가격표나 메뉴판을 찍어 업로드하면 마일리지를 드려요. 하루 최대 5장(250P)!</p>
               <div className="flex items-center gap-2 mb-3">
                 <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div key={progressAnimationKey} className="profile-progress-fill h-2 bg-gradient-to-r from-sky-400 to-blue-400 rounded-full" style={{ width: "40%" }} />
+                  <div key={progressAnimationKey} className="profile-progress-fill h-2 bg-gradient-to-r from-[#7B8873] to-[#A3AF91] rounded-full" style={{ width: "40%" }} />
                 </div>
                 <span className="text-[12px] font-semibold text-[#76645A]">2/5장</span>
               </div>
               {photoUploaded ? (
-                <div className="flex items-center justify-center gap-2 w-full py-2.5 bg-emerald-50 rounded-xl text-emerald-600 text-[13px] font-medium">
+                <div className="flex items-center justify-center gap-2 w-full py-2.5 bg-[#EEF1EC] rounded-xl text-[#65765E] text-[13px] font-medium">
                   <CheckCircle2 className="w-4 h-4" />업로드 완료! +50P
                 </div>
               ) : (
-                <button onClick={() => setPhotoUploaded(true)} className="flex items-center justify-center gap-2 w-full py-2.5 bg-gray-900 text-white rounded-xl text-[13px] font-medium active:bg-gray-800 transition-colors">
+                <button onClick={() => setPhotoUploaded(true)} className="flex items-center justify-center gap-2 w-full py-2.5 bg-[#5B4335] text-white rounded-xl text-[13px] font-medium active:bg-[#46352C] transition-colors">
                   <Upload className="w-4 h-4" />사진 업로드
                 </button>
               )}
@@ -330,46 +331,46 @@ export function ProfilePage() {
           </div>
 
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-[#D8C6B8]">
-            <div className="profile-challenge-glint relative overflow-hidden bg-gradient-to-r from-amber-400 to-orange-400 px-4 py-3 flex items-center justify-between">
+            <div className="profile-challenge-glint relative overflow-hidden bg-gradient-to-r from-[#F9F5E9] to-[#F3E7D1] px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Clock className="w-5 h-5 text-white" />
+                <Clock className="w-5 h-5 text-[#A67B50]" />
                 <div>
-                  <p className="text-white text-[13px] font-semibold">1시간 체류 이벤트</p>
-                  <p className="text-white/70 text-[10px]">달성 시 2,000원 쿠폰</p>
+                  <p className="text-[#46352C] text-[13px] font-semibold">1시간 체류 이벤트</p>
+                  <p className="text-[#9B784D] text-[10px]">달성 시 2,000원 쿠폰</p>
                 </div>
               </div>
-              <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full">진행중</span>
+              <span className="text-[10px] bg-white/75 text-[#9B784D] px-2 py-0.5 rounded-full">진행중</span>
             </div>
             <div className="px-4 py-3">
               <p className="text-[12px] text-[#9A897F] mb-3 leading-relaxed">시장 반경 내에서 1시간 이상 GPS 체류가 확인되면 자동으로 쿠폰을 드려요.</p>
               <div className="flex items-center justify-between text-[12px] mb-1.5">
                 <span className="text-[#9A897F]">오늘 체류 시간</span>
-                <span className="font-semibold text-amber-600">32분 / 60분</span>
+                <span className="font-semibold text-[#A67B50]">32분 / 60분</span>
               </div>
-              <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden mb-2">
-                <div key={progressAnimationKey} className="profile-progress-fill h-2 bg-gradient-to-r from-amber-400 to-orange-400 rounded-full" style={{ width: "53%" }} />
+              <div className="w-full bg-[#F1EBDD] rounded-full h-2 overflow-hidden mb-2">
+                <div key={progressAnimationKey} className="profile-progress-fill h-2 bg-gradient-to-r from-[#C69A67] to-[#D9B983] rounded-full" style={{ width: "53%" }} />
               </div>
-              <div className="flex items-center gap-1.5 bg-amber-50 rounded-xl px-3 py-2">
-                <MapPin className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
-                <span className="text-[11px] text-amber-700">28분 더 머물면 쿠폰이 자동 발급돼요!</span>
+              <div className="flex items-center gap-1.5 bg-[#F5F0E7] rounded-xl px-3 py-2">
+                <MapPin className="w-3.5 h-3.5 text-[#A67B50] flex-shrink-0" />
+                <span className="text-[11px] text-[#6B5142]">28분 더 머물면 쿠폰이 자동 발급돼요!</span>
               </div>
             </div>
           </div>
 
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-[#D8C6B8]">
-            <div className="profile-challenge-glint relative overflow-hidden bg-gradient-to-r from-violet-400 to-purple-400 px-4 py-3 flex items-center justify-between">
+            <div className="profile-challenge-glint relative overflow-hidden bg-gradient-to-r from-[#F5F0E7] to-[#EFE4D8] px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-[20px]">🤝</span>
                 <div>
-                  <p className="text-white text-[13px] font-semibold">가격 정보 제보</p>
-                  <p className="text-white/70 text-[10px]">1건당 30P · 채택 시 +50P</p>
+                  <p className="text-[#46352C] text-[13px] font-semibold">가격 정보 제보</p>
+                  <p className="text-[#8A6A52] text-[10px]">1건당 30P · 채택 시 +50P</p>
                 </div>
               </div>
-              <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full">상시</span>
+              <span className="text-[10px] bg-white/75 text-[#8A6A52] px-2 py-0.5 rounded-full">상시</span>
             </div>
             <div className="px-4 py-3">
               <p className="text-[12px] text-[#9A897F] mb-3 leading-relaxed">시장 상품의 가격 정보를 직접 등록하고 마일리지를 받아요. 채택되면 추가 포인트도!</p>
-              <button className="flex items-center justify-center gap-2 w-full py-2.5 bg-gray-900 text-white rounded-xl text-[13px] font-medium active:bg-gray-800 transition-colors">
+              <button className="flex items-center justify-center gap-2 w-full py-2.5 bg-[#5B4335] text-white rounded-xl text-[13px] font-medium active:bg-[#46352C] transition-colors">
                 <Tag className="w-4 h-4" />가격 정보 등록
               </button>
             </div>
@@ -380,20 +381,20 @@ export function ProfilePage() {
       {/* ── 쿠폰 탭 ── */}
       {activeTab === "coupons" && (
         <div className="px-4 py-4 space-y-3">
-          <div className="bg-gradient-to-br from-[#F1F7F8] to-[#E7F0F4] border border-[#D9E7EC] rounded-2xl px-4 py-4 relative overflow-hidden shadow-sm">
+          <div className="bg-gradient-to-br from-[#FBF8F2] to-[#F0E8DD] border border-[#E5D9CB] rounded-2xl px-4 py-4 relative overflow-hidden shadow-sm">
             <div className="relative flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-1.5 mb-1">
                   <span className="text-[14px]">🪙</span>
-                  <span className="text-[12px] text-[#6C8790]">보유 마일리지</span>
+                  <span className="text-[12px] text-[#8A6A52]">보유 마일리지</span>
                 </div>
-                <p className="text-[32px] font-bold text-[#3B271D] leading-none">
-                  {mileage.toLocaleString()}<span className="text-[16px] text-[#8AA0A6] ml-1">P</span>
+                <p className="text-[32px] font-bold text-[#5B4335] leading-none">
+                  {mileage.toLocaleString()}<span className="text-[16px] text-[#9A897F] ml-1">P</span>
                 </p>
               </div>
               <button
                 onClick={() => { setExchangeResult(null); setShowGiftShop(true); }}
-                className="flex flex-col items-center gap-1 rounded-2xl border border-[#E8C9C1] bg-[#F9EEEA] px-4 py-3 text-[#934F43] shadow-[0_4px_12px_-9px_rgba(143,75,64,0.35)] transition-all duration-300 hover:border-[#D4A096] hover:bg-[#F4E3DE] hover:shadow-[0_7px_16px_-7px_rgba(143,75,64,0.28)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4A096]"
+                className="flex flex-col items-center gap-1 rounded-2xl bg-[#5B4335] px-4 py-3 text-white shadow-[0_4px_12px_-9px_rgba(91,67,53,0.3)] transition-all duration-300 hover:bg-[#6B5142] hover:shadow-[0_7px_16px_-7px_rgba(91,67,53,0.28)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B89A7D]"
               >
                 <Gift className="w-5 h-5" />
                 <span className="text-[11px] font-bold">교환소</span>
@@ -428,7 +429,7 @@ export function ProfilePage() {
                       <span className="text-[11px] text-[#9A897F]">~ {coupon.expiry}</span>
                       <button
                         onClick={() => handleUseCoupon(coupon)}
-                        className="text-[12px] font-medium text-[#46352C] bg-gray-100 px-3 py-1.5 rounded-xl active:bg-gray-200 transition-colors"
+                        className="text-[12px] font-medium text-[#6B5142] bg-[#F5F0E7] px-3 py-1.5 rounded-xl active:bg-[#EFE4D8] transition-colors"
                       >
                         사용하기
                       </button>
@@ -467,7 +468,7 @@ export function ProfilePage() {
                   </div>
                   <button
                     onClick={() => setExchangeResult(null)}
-                    className="w-full py-3 bg-[#C9813A] text-white rounded-2xl text-[14px] font-semibold active:bg-[#B57030] transition-colors"
+                    className="w-full py-3 bg-[#5B4335] text-white rounded-2xl text-[14px] font-semibold active:bg-[#46352C] transition-colors"
                   >
                     계속 교환하기
                   </button>
@@ -476,7 +477,7 @@ export function ProfilePage() {
                 <>
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
-                      <Gift className="w-5 h-5 text-[#C9813A]" />
+                      <Gift className="w-5 h-5 text-[#8A6A52]" />
                       <p className="text-[16px] font-bold text-[#46352C]">선물 교환소</p>
                     </div>
                     <button onClick={() => setShowGiftShop(false)} className="p-1 text-[#9A897F]">
@@ -508,7 +509,7 @@ export function ProfilePage() {
                             <div className="flex items-center gap-1.5 mb-0.5">
                               <p className="text-[14px] font-bold text-[#46352C]">{item.name}</p>
                               {item.rare && (
-                                <span className="text-[9px] bg-orange-400 text-white px-1.5 py-0.5 rounded-full font-bold">인기</span>
+                                <span className="text-[9px] bg-[#8A6A52] text-white px-1.5 py-0.5 rounded-full font-bold">인기</span>
                               )}
                             </div>
                             <p className="text-[11px] text-[#8A776B]">{item.desc}</p>
@@ -562,7 +563,7 @@ export function ProfilePage() {
                       {sheetDetail.unlocked ? sheetDetail.emoji : <Lock className="w-10 h-10 text-gray-300" />}
                     </div>
                     {sheetDetail.rare && sheetDetail.unlocked && (
-                      <span className="text-[11px] text-orange-500 font-semibold bg-orange-50 border border-orange-100 px-3 py-1 rounded-full mb-2">
+                      <span className="text-[11px] text-[#6B5142] font-semibold bg-[#F5F0E7] border border-[#E5D9CB] px-3 py-1 rounded-full mb-2">
                         ✨ 10% 이하의 사용자가 획득했어요!
                       </span>
                     )}
@@ -579,7 +580,7 @@ export function ProfilePage() {
                         <Check className="w-4 h-4" />현재 적용 중
                       </div>
                     ) : (
-                      <button onClick={() => handleApplyTitle(sheetDetail.id)} className="w-full py-3.5 rounded-2xl bg-[#C9813A] text-white text-[15px] font-semibold active:bg-[#B57030] transition-colors">
+                      <button onClick={() => handleApplyTitle(sheetDetail.id)} className="w-full py-3.5 rounded-2xl bg-[#5B4335] text-white text-[15px] font-semibold active:bg-[#46352C] transition-colors">
                         이 칭호 사용하기
                       </button>
                     )
@@ -607,23 +608,23 @@ export function ProfilePage() {
                           key={title.id}
                           onClick={() => setSheetDetail(title)}
                           className={`flex flex-col items-center py-3.5 px-2 rounded-2xl border-2 transition-all relative ${
-                            isActive ? "border-[#C9813A] bg-orange-50"
+                            isActive ? "border-[#8A6A52] bg-[#F5F0E7]"
                             : title.unlocked ? "border-gray-100 bg-white active:bg-gray-50"
                             : "border-gray-100 bg-gray-50 opacity-50"
                           }`}
                         >
                           {isActive && (
-                            <span className="absolute -top-1.5 -left-1.5 w-5 h-5 bg-[#C9813A] rounded-full flex items-center justify-center shadow-sm">
+                            <span className="absolute -top-1.5 -left-1.5 w-5 h-5 bg-[#8A6A52] rounded-full flex items-center justify-center shadow-sm">
                               <Check className="w-3 h-3 text-white" />
                             </span>
                           )}
                           {title.rare && title.unlocked && (
-                            <span className="absolute -top-1.5 -right-1.5 text-[9px] bg-orange-400 text-white px-1.5 py-0.5 rounded-full font-bold">희귀</span>
+                            <span className="absolute -top-1.5 -right-1.5 text-[9px] bg-[#A88B6B] text-white px-1.5 py-0.5 rounded-full font-bold">희귀</span>
                           )}
                           <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-[24px] mb-2 ${title.unlocked ? "bg-gray-100" : "bg-gray-100"}`}>
                             {title.unlocked ? title.emoji : <Lock className="w-5 h-5 text-gray-300" />}
                           </div>
-                          <p className={`text-[10px] font-semibold text-center leading-tight mb-0.5 ${isActive ? "text-[#C9813A]" : title.unlocked ? "text-[#5A453B]" : "text-[#9A897F]"}`}>
+                          <p className={`text-[10px] font-semibold text-center leading-tight mb-0.5 ${isActive ? "text-[#5B4335]" : title.unlocked ? "text-[#5A453B]" : "text-[#9A897F]"}`}>
                             {title.name}
                           </p>
                           <p className="text-[9px] text-[#9A897F] text-center leading-tight">

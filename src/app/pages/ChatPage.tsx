@@ -64,26 +64,26 @@ type ChatFilter = "전체" | "읽음" | "안읽음";
 
 const CHAT_FILTER_STYLE: Record<ChatFilter, { active: string; hover: string }> = {
   전체: {
-    active: "border-[#D4DEC9] bg-[#E8EEE1] text-[#586B4B]",
-    hover: "hover:border-[#C8D5BB] hover:bg-[#F0F4EC] hover:text-[#586B4B]",
+    active: "border-[#5B4335] bg-[#5B4335] text-white",
+    hover: "hover:border-[#B89A7D] hover:bg-[#F7F2E8] hover:text-[#6B5142]",
   },
   읽음: {
-    active: "border-[#E8D6BF] bg-[#F5EBDD] text-[#896239]",
-    hover: "hover:border-[#D9B58E] hover:bg-[#FBF3E9] hover:text-[#8F5A32]",
+    active: "border-[#5B4335] bg-[#5B4335] text-white",
+    hover: "hover:border-[#B89A7D] hover:bg-[#F7F2E8] hover:text-[#6B5142]",
   },
   안읽음: {
-    active: "border-[#E7CFC8] bg-[#F6E8E4] text-[#934F43]",
-    hover: "hover:border-[#D4A096] hover:bg-[#F8EAE6] hover:text-[#8F4B40]",
+    active: "border-[#5B4335] bg-[#5B4335] text-white",
+    hover: "hover:border-[#B89A7D] hover:bg-[#F7F2E8] hover:text-[#6B5142]",
   },
 };
 
 const COMMUNITY_FILTER_ACTIVE_STYLE: Record<CommunityFilter, string> = {
-  전체: "border-sky-200 bg-sky-100 text-sky-700",
-  인기글: "border-rose-200 bg-rose-100 text-rose-700",
-  사장님: "border-[#77716D] bg-[#E8E6E4] text-[#5E5955]",
-  질문: "border-amber-200 bg-amber-100 text-amber-700",
-  정보: "border-emerald-200 bg-emerald-100 text-emerald-700",
-  후기: "border-purple-200 bg-purple-100 text-purple-700",
+  전체: "border-[#5B4335] bg-[#5B4335] text-white",
+  인기글: "border-[#5B4335] bg-[#5B4335] text-white",
+  사장님: "border-[#5B4335] bg-[#5B4335] text-white",
+  질문: "border-[#5B4335] bg-[#5B4335] text-white",
+  정보: "border-[#5B4335] bg-[#5B4335] text-white",
+  후기: "border-[#5B4335] bg-[#5B4335] text-white",
 };
 
 const CATEGORY_STYLE: Record<PostItem["category"], string> = {
@@ -320,7 +320,7 @@ export function ChatPage() {
                     className="flex items-center gap-3 px-4 py-3 active:bg-[#F5F5EF] transition-colors"
                     onClick={() => setPhonePopupOpen(false)}
                   >
-                    <div className="w-8 h-8 bg-[#75845F] rounded-full flex items-center justify-center flex-shrink-0">
+                    <div className="w-8 h-8 bg-[#5B4335] rounded-full flex items-center justify-center flex-shrink-0">
                       <Phone className="w-4 h-4 text-white" />
                     </div>
                     <span className="text-[14px] text-gray-800 font-medium">{activePhone}</span>
@@ -346,7 +346,7 @@ export function ChatPage() {
                     <img src={msg.imageUrl} alt="전송된 이미지" className="max-w-[220px] max-h-[220px] object-cover" />
                   </div>
                 ) : (
-                  <div className={`px-3.5 py-2.5 rounded-2xl text-[14px] whitespace-pre-line ${msg.sender === "user" ? "bg-[#A55345] text-white rounded-br-sm" : "bg-white text-[#5A4C43] ring-1 ring-inset ring-[#EAE8DF] rounded-bl-sm"}`}>
+                  <div className={`px-3.5 py-2.5 rounded-2xl text-[14px] whitespace-pre-line ${msg.sender === "user" ? "bg-[#5B4335] text-white rounded-br-sm" : "bg-white text-[#5A4C43] ring-1 ring-inset ring-[#EAE8DF] rounded-bl-sm"}`}>
                     {msg.text}
                   </div>
                 )}
@@ -363,26 +363,26 @@ export function ChatPage() {
             <div className="border-t border-[#F0ECE7] px-4 py-4">
               <div className="grid grid-cols-4 gap-3">
                 <button onClick={handleAlbum} className="flex flex-col items-center gap-1.5">
-                  <div className="w-12 h-12 rounded-2xl bg-[#F6E8E4] flex items-center justify-center active:scale-95 transition-transform">
-                    <Image className="w-5 h-5 text-[#A55345]" />
+                  <div className="w-12 h-12 rounded-2xl bg-[#F5F0E7] flex items-center justify-center active:scale-95 transition-transform">
+                    <Image className="w-5 h-5 text-[#8A6A52]" />
                   </div>
                   <span className="text-[10px] text-gray-600">앨범</span>
                 </button>
                 <button onClick={handleCamera} className="flex flex-col items-center gap-1.5">
-                  <div className="w-12 h-12 rounded-2xl bg-[#E8EEE1] flex items-center justify-center active:scale-95 transition-transform">
-                    <Camera className="w-5 h-5 text-[#63734F]" />
+                  <div className="w-12 h-12 rounded-2xl bg-[#F5F0E7] flex items-center justify-center active:scale-95 transition-transform">
+                    <Camera className="w-5 h-5 text-[#8A6A52]" />
                   </div>
                   <span className="text-[10px] text-gray-600">카메라</span>
                 </button>
                 <button onClick={() => setPhrasePopupOpen(true)} className="flex flex-col items-center gap-1.5">
-                  <div className="w-12 h-12 rounded-2xl bg-[#F5EBDD] flex items-center justify-center active:scale-95 transition-transform">
-                    <AlignLeft className="w-5 h-5 text-[#A6763E]" />
+                  <div className="w-12 h-12 rounded-2xl bg-[#F7F2E8] flex items-center justify-center active:scale-95 transition-transform">
+                    <AlignLeft className="w-5 h-5 text-[#6B5142]" />
                   </div>
                   <span className="text-[10px] text-gray-600">자주쓰는문구</span>
                 </button>
                 <button onClick={() => setAppointmentPopupOpen(true)} className="flex flex-col items-center gap-1.5">
-                  <div className="w-12 h-12 rounded-2xl bg-[#F6E8E4] flex items-center justify-center active:scale-95 transition-transform">
-                    <CalendarClock className="w-5 h-5 text-[#A55345]" />
+                  <div className="w-12 h-12 rounded-2xl bg-[#F5F0E7] flex items-center justify-center active:scale-95 transition-transform">
+                    <CalendarClock className="w-5 h-5 text-[#8A6A52]" />
                   </div>
                   <span className="text-[10px] text-gray-600">약속</span>
                 </button>
@@ -393,7 +393,7 @@ export function ChatPage() {
           <div className="flex items-center gap-2 px-4 py-3">
             <button
               onClick={() => { setPlusMenuOpen((v) => !v); setPhrasePopupOpen(false); setAppointmentPopupOpen(false); }}
-              className={`w-9 h-9 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${plusMenuOpen ? "bg-[#A55345] text-white rotate-45" : "bg-[#F3EEE9] text-[#765F53]"}`}
+              className={`w-9 h-9 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${plusMenuOpen ? "bg-[#5B4335] text-white rotate-45" : "bg-[#F3EEE9] text-[#765F53]"}`}
             >
               <Plus className="w-5 h-5" />
             </button>
@@ -405,12 +405,12 @@ export function ChatPage() {
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
               onFocus={() => setPlusMenuOpen(false)}
               placeholder="메시지..."
-              className="flex-1 px-4 py-2.5 bg-[#F7F5F1] rounded-full text-[14px] text-[#5A4C43] focus:outline-none focus:ring-2 focus:ring-[#E2C1B7] placeholder:text-[#A1948B]"
+              className="flex-1 px-4 py-2.5 bg-[#F7F5F1] rounded-full text-[14px] text-[#5A4C43] focus:outline-none focus:ring-2 focus:ring-[#B89A7D] placeholder:text-[#A1948B]"
             />
             <button
               onClick={handleSend}
               disabled={!inputText.trim()}
-              className="w-9 h-9 bg-[#A55345] text-white rounded-full flex items-center justify-center disabled:opacity-30 active:bg-[#8E463B] transition-colors flex-shrink-0"
+              className="w-9 h-9 bg-[#5B4335] text-white rounded-full flex items-center justify-center disabled:opacity-30 active:bg-[#46352C] transition-colors flex-shrink-0"
             >
               <Send className="w-4 h-4" />
             </button>
@@ -471,7 +471,7 @@ export function ChatPage() {
                     type="date"
                     value={appointmentDate}
                     onChange={(e) => setAppointmentDate(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-[#F7F5F1] rounded-xl text-[14px] text-[#5A4C43] focus:outline-none focus:ring-2 focus:ring-[#E2C1B7]"
+                    className="w-full px-3 py-2.5 bg-[#F7F5F1] rounded-xl text-[14px] text-[#5A4C43] focus:outline-none focus:ring-2 focus:ring-[#B89A7D]"
                   />
                 </div>
                 <div>
@@ -480,7 +480,7 @@ export function ChatPage() {
                     type="time"
                     value={appointmentTime}
                     onChange={(e) => setAppointmentTime(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-[#F7F5F1] rounded-xl text-[14px] text-[#5A4C43] focus:outline-none focus:ring-2 focus:ring-[#E2C1B7]"
+                    className="w-full px-3 py-2.5 bg-[#F7F5F1] rounded-xl text-[14px] text-[#5A4C43] focus:outline-none focus:ring-2 focus:ring-[#B89A7D]"
                   />
                 </div>
                 <div>
@@ -490,14 +490,14 @@ export function ChatPage() {
                     value={appointmentNote}
                     onChange={(e) => setAppointmentNote(e.target.value)}
                     placeholder="예) 배추 2포기 픽업"
-                    className="w-full px-3 py-2.5 bg-[#F7F5F1] rounded-xl text-[14px] text-[#5A4C43] focus:outline-none focus:ring-2 focus:ring-[#E2C1B7] placeholder:text-[#A1948B]"
+                    className="w-full px-3 py-2.5 bg-[#F7F5F1] rounded-xl text-[14px] text-[#5A4C43] focus:outline-none focus:ring-2 focus:ring-[#B89A7D] placeholder:text-[#A1948B]"
                   />
                 </div>
               </div>
               <button
                 onClick={handleSendAppointment}
                 disabled={!appointmentDate || !appointmentTime}
-                className="w-full py-3 bg-[#A55345] text-white rounded-xl text-[14px] font-medium disabled:opacity-30 active:bg-[#8E463B] transition-colors"
+                className="w-full py-3 bg-[#5B4335] text-white rounded-xl text-[14px] font-medium disabled:opacity-30 active:bg-[#46352C] transition-colors"
               >
                 약속 보내기
               </button>
@@ -526,8 +526,8 @@ export function ChatPage() {
       <div className="sticky top-0 bg-white z-20 border-b border-[#EEEAE4]">
         <div className="flex items-center justify-between px-4 pt-3 pb-1">
           <div className="flex gap-4">
-            <button onClick={() => setMainTab("community")} className={`text-[16px] pb-1 transition-colors ${mainTab === "community" ? "text-[#46352C] border-b-2 border-[#A55345] font-semibold" : "text-[#8A776B]"}`}>커뮤니티</button>
-            <button onClick={() => setMainTab("chat")} className={`text-[16px] pb-1 transition-colors relative ${mainTab === "chat" ? "text-[#46352C] border-b-2 border-[#A55345] font-semibold" : "text-[#8A776B]"}`}>
+          <button onClick={() => setMainTab("community")} className={`text-[16px] pb-1 transition-colors ${mainTab === "community" ? "text-[#46352C] border-b-2 border-[#5B4335] font-semibold" : "text-[#8A776B]"}`}>커뮤니티</button>
+            <button onClick={() => setMainTab("chat")} className={`text-[16px] pb-1 transition-colors relative ${mainTab === "chat" ? "text-[#46352C] border-b-2 border-[#5B4335] font-semibold" : "text-[#8A776B]"}`}>
               채팅
               {chatRooms.some((r) => r.unread > 0) && <span className={`absolute -top-0.5 -right-1.5 h-1.5 w-1.5 rounded-full bg-red-500 ${mainTab === "chat" ? "" : "chat-unread-pulse"}`} />}
             </button>
@@ -550,7 +550,7 @@ export function ChatPage() {
 
         {mainTab === "community" && searchOpen && (
           <div className="px-4 pb-2">
-            <div className="flex items-center gap-2 bg-[#EFEEE7] rounded-xl px-3 py-2">
+            <div className="flex items-center gap-2 bg-[#F7F2E8] rounded-xl px-3 py-2">
               <Search className="w-4 h-4 text-gray-600 flex-shrink-0" />
               <input ref={searchInputRef} type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="제목, 내용, 태그 검색..." className="flex-1 bg-transparent text-[13px] text-gray-700 placeholder:text-gray-500 focus:outline-none" />
               {searchQuery && <button onClick={() => setSearchQuery("")}><X className="w-4 h-4 text-gray-600" /></button>}
@@ -561,7 +561,7 @@ export function ChatPage() {
         {mainTab === "community" && (
           <div className="flex px-4 border-b border-[#F0ECE7] bg-white">
             {(Object.entries(MARKET_LABELS) as [MarketKey, string][]).map(([key, label]) => (
-              <button key={key} onClick={() => setCommunityMarket(key)} className={`mr-4 py-2 text-[13px] transition-colors border-b-2 ${communityMarket === key ? "border-[#A55345] text-[#46352C] font-semibold" : "border-transparent text-[#8A776B]"}`}>{label}</button>
+              <button key={key} onClick={() => setCommunityMarket(key)} className={`mr-4 py-2 text-[13px] transition-colors border-b-2 ${communityMarket === key ? "border-[#5B4335] text-[#46352C] font-semibold" : "border-transparent text-[#8A776B]"}`}>{label}</button>
             ))}
           </div>
         )}
@@ -581,7 +581,7 @@ export function ChatPage() {
           {!searchOpen && (
             <div className="flex gap-1.5 px-4 py-3 overflow-x-auto scrollbar-hide">
               {(["전체", "인기글", "사장님", "질문", "정보", "후기"] as const).map((f) => (
-                <button key={f} onClick={() => setCommunityFilter(f)} className={`flex-shrink-0 rounded-full border px-3.5 py-2 text-[12px] whitespace-nowrap transition-all duration-300 active:scale-[0.97] ${communityFilter === f ? `${COMMUNITY_FILTER_ACTIVE_STYLE[f]} shadow-[0_4px_12px_-7px_rgba(70,53,44,0.38)]` : "border-[#EAE8DF] bg-white text-[#76645A] hover:border-[#D9B58E] hover:bg-[#FBF3E9] hover:text-[#8F5A32] hover:shadow-[0_5px_14px_-8px_rgba(166,111,61,0.32)]"}`}>{f}</button>
+              <button key={f} onClick={() => setCommunityFilter(f)} className={`flex-shrink-0 rounded-full border px-3.5 py-2 text-[12px] whitespace-nowrap transition-all duration-300 active:scale-[0.97] ${communityFilter === f ? `${COMMUNITY_FILTER_ACTIVE_STYLE[f]} shadow-[0_4px_12px_-7px_rgba(70,53,44,0.38)]` : "border-[#EAE8DF] bg-white text-[#76645A] hover:border-[#B89A7D] hover:bg-[#F7F2E8] hover:text-[#6B5142] hover:shadow-[0_5px_14px_-8px_rgba(91,67,53,0.24)]"}`}>{f}</button>
               ))}
             </div>
           )}
@@ -684,7 +684,7 @@ export function ChatPage() {
 
           <Link
             to="/write"
-            className="fixed bottom-24 right-[max(16px,calc(50%-208px))] z-10 flex items-center gap-1.5 rounded-full border border-[#E8DDD2] bg-[#FFFDF8] px-5 py-3.5 font-semibold text-[#5A453B] shadow-[0_8px_22px_-12px_rgba(70,53,44,0.34)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#D8C5B3] hover:bg-[#F8F1E8] hover:shadow-[0_12px_24px_-12px_rgba(70,53,44,0.38)] active:translate-y-0 active:scale-[0.97]"
+            className="fixed bottom-24 right-[max(16px,calc(50%-208px))] z-10 flex cursor-pointer items-center gap-1.5 rounded-full bg-[#5B4335] px-5 py-3.5 font-semibold text-white shadow-[0_8px_22px_-10px_rgba(45,54,39,0.38)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#6B5142] hover:shadow-[0_12px_24px_-12px_rgba(70,53,44,0.38)] active:translate-y-0 active:scale-[0.97]"
           >
             <Plus className="w-4 h-4" /><span className="text-[13px]">글쓰기</span>
           </Link>
@@ -696,7 +696,7 @@ export function ChatPage() {
         <div>
           <div className="flex border-b border-[#EEEAE4] bg-white">
             {(Object.entries(MARKET_LABELS) as [MarketKey, string][]).map(([key, label]) => (
-              <button key={key} className="flex-1 py-3 text-[12px] text-[#8A776B] border-b-2 border-transparent first:border-[#A55345] first:text-[#46352C] first:font-semibold">{label}</button>
+              <button key={key} className="flex-1 py-3 text-[12px] text-[#8A776B] border-b-2 border-transparent first:border-[#5B4335] first:text-[#46352C] first:font-semibold">{label}</button>
             ))}
           </div>
           {filteredRooms.length === 0 ? (
@@ -704,7 +704,7 @@ export function ChatPage() {
               <MessageCircle className="w-12 h-12 mb-4 text-gray-300" />
               <p className="text-[14px] mb-1">{chatFilter === "읽음" ? "읽은 채팅이 없어요" : chatFilter === "안읽음" ? "안읽은 채팅이 없어요" : "채팅방이 없어요"}</p>
               <p className="text-[12px] text-gray-600 mb-4">지도에서 상점의 채팅 버튼을 눌러보세요</p>
-              <Link to="/map" className="px-4 py-2.5 bg-[#75845F] text-white rounded-full text-[13px]">지도로 이동</Link>
+              <Link to="/map" className="px-4 py-2.5 bg-[#5B4335] text-white rounded-full text-[13px]">지도로 이동</Link>
             </div>
           ) : (
             <div className="bg-white">

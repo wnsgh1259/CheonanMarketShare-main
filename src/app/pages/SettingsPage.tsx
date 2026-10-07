@@ -221,14 +221,14 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F7F8FA]">
+    <div className="min-h-screen bg-[#F8F7F3]">
       {/* 헤더 */}
-      <div className="sticky top-0 bg-white z-10 border-b border-gray-100">
+      <div className="sticky top-0 bg-white/95 z-10 border-b border-[#EEEAE4]">
         <div className="flex items-center justify-between px-4 py-3">
           <button onClick={() => navigate(-1)} className="p-1">
-            <ChevronLeft className="w-5 h-5 text-gray-700" />
+            <ChevronLeft className="w-5 h-5 text-[#6B5142]" />
           </button>
-          <h1 className="text-[15px] text-gray-900">설정</h1>
+          <h1 className="text-[15px] font-semibold text-[#46352C]">설정</h1>
           <div className="w-7" />
         </div>
       </div>
@@ -238,15 +238,15 @@ export function SettingsPage() {
         {/* 로그아웃 */}
         <button
           onClick={handleLogout}
-          className="w-full bg-white rounded-xl px-4 py-3.5 flex items-center justify-center gap-2 text-red-500 active:bg-red-50 transition-colors"
+          className="w-full bg-white rounded-xl border border-[#EDE5D8] px-4 py-3.5 flex items-center justify-center gap-2 text-red-500 shadow-sm active:bg-red-50 transition-colors"
         >
           <LogOut className="w-4 h-4" />
           <span className="text-[14px]">로그아웃</span>
         </button>
 
         {/* 계정 */}
-        <div className="bg-white rounded-xl overflow-hidden">
-          <p className="text-[12px] text-gray-400 px-4 pt-4 pb-2">계정</p>
+        <div className="bg-white rounded-xl overflow-hidden border border-[#EDE5D8] shadow-sm">
+          <p className="text-[12px] font-semibold text-[#8A6A52] px-4 pt-4 pb-2">계정</p>
           {settingsNotice && !settingsModal && (
             <div className="mx-4 mb-3 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-100 text-[13px] px-3 py-2">
               {settingsNotice}
@@ -256,14 +256,14 @@ export function SettingsPage() {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 {ownerMode
-                  ? <Store className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                  : <User className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  ? <Store className="w-4 h-4 text-[#8A6A52] flex-shrink-0" />
+                  : <User className="w-4 h-4 text-[#8A6A52] flex-shrink-0" />
                 }
-                <span className="text-[12px] text-gray-400">{ownerMode ? "상점명" : "닉네임"}</span>
+                <span className="text-[12px] text-[#9A897F]">{ownerMode ? "상점명" : "닉네임"}</span>
               </div>
               {ownerMode ? (
-                <div className="bg-gray-50 rounded-lg px-3 py-2.5">
-                  <span className="text-[15px] text-gray-800">{ownerStoreName || "상점명 없음"}</span>
+                <div className="bg-[#F8F5F0] rounded-lg px-3 py-2.5">
+                  <span className="text-[15px] text-[#46352C]">{ownerStoreName || "상점명 없음"}</span>
                 </div>
               ) : isEditingNickname ? (
                 <div className="flex items-center gap-2">
@@ -274,27 +274,27 @@ export function SettingsPage() {
                     onKeyDown={(e) => e.key === "Enter" && handleSaveNickname()}
                     maxLength={12}
                     autoFocus
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-[14px] text-gray-800 focus:outline-none focus:border-gray-500"
+                    className="flex-1 px-3 py-2 border border-[#E5D9CB] rounded-lg text-[14px] text-[#46352C] focus:outline-none focus:border-[#B89A7D]"
                   />
                   <button
                     onClick={handleSaveNickname}
-                    className="px-3 py-2 bg-gray-900 text-white text-[13px] rounded-lg active:bg-gray-700 transition-colors"
+                    className="px-3 py-2 bg-[#5B4335] text-white text-[13px] rounded-lg active:bg-[#46352C] transition-colors"
                   >
                     저장
                   </button>
                   <button
                     onClick={() => { setIsEditingNickname(false); setNicknameInput(nickname); }}
-                    className="px-3 py-2 bg-gray-100 text-gray-500 text-[13px] rounded-lg active:bg-gray-200 transition-colors"
+                    className="px-3 py-2 bg-[#F5F0E7] text-[#6B5142] text-[13px] rounded-lg active:bg-[#EFE4D8] transition-colors"
                   >
                     취소
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2.5">
-                  <span className="text-[15px] text-gray-800">{nickname}</span>
+                <div className="flex items-center justify-between bg-[#F8F5F0] rounded-lg px-3 py-2.5">
+                  <span className="text-[15px] text-[#46352C]">{nickname}</span>
                   <button
                     onClick={() => { setIsEditingNickname(true); setNicknameInput(nickname); }}
-                    className="flex items-center gap-1 text-[13px] text-gray-500 active:text-gray-800 transition-colors"
+                    className="flex items-center gap-1 text-[13px] text-[#8A6A52] active:text-[#46352C] transition-colors"
                   >
                     <span>✏️</span>
                     <span>변경</span>
@@ -306,11 +306,11 @@ export function SettingsPage() {
             {/* 휴대폰 번호 */}
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                <span className="text-[12px] text-gray-400">휴대폰 번호</span>
+                <Phone className="w-4 h-4 text-[#8A6A52] flex-shrink-0" />
+                <span className="text-[12px] text-[#9A897F]">휴대폰 번호</span>
               </div>
-              <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2.5">
-                <span className="text-[15px] text-gray-800">
+              <div className="flex items-center justify-between bg-[#F8F5F0] rounded-lg px-3 py-2.5">
+                <span className="text-[15px] text-[#46352C]">
                   {userPhone ? formatPhoneDisplay(userPhone) : "등록된 번호 없음"}
                 </span>
                 {settingsModal !== "phone" && (
@@ -326,7 +326,7 @@ export function SettingsPage() {
                     className={`flex items-center gap-1 text-[13px] transition-colors ${
                       isPhonePending
                         ? "text-gray-400 cursor-not-allowed"
-                        : "text-gray-500 active:text-gray-800"
+                        : "text-[#8A6A52] active:text-[#46352C]"
                     }`}
                   >
                     {!isPhonePending && <span>✏️</span>}
@@ -335,8 +335,8 @@ export function SettingsPage() {
                 )}
               </div>
               {settingsModal === "phone" && (
-                <div className="mt-2 space-y-2 pt-2 border-t border-gray-100">
-                  <p className="text-[12px] text-gray-500">변경하실 휴대폰 번호로 입력해주세요.</p>
+                <div className="mt-2 space-y-2 pt-2 border-t border-[#EEE5D9]">
+                  <p className="text-[12px] text-[#8A776B]">변경하실 휴대폰 번호로 입력해주세요.</p>
                   <input
                     type="tel"
                     value={settingsInput}
@@ -347,7 +347,7 @@ export function SettingsPage() {
                     maxLength={13}
                     placeholder="010-0000-0000"
                     autoFocus
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] text-gray-800 focus:outline-none focus:border-gray-500"
+                    className="w-full px-3 py-2 border border-[#E5D9CB] rounded-lg text-[14px] text-[#46352C] focus:outline-none focus:border-[#B89A7D]"
                   />
                   {settingsNotice && (
                     <p className="text-[11px] text-red-400">{settingsNotice}</p>
@@ -355,13 +355,13 @@ export function SettingsPage() {
                   <div className="flex gap-2">
                     <button
                       onClick={closeSettingsModal}
-                      className="flex-1 px-3 py-2 bg-gray-100 text-gray-500 text-[13px] rounded-lg active:bg-gray-200 transition-colors"
+                      className="flex-1 px-3 py-2 bg-[#F5F0E7] text-[#6B5142] text-[13px] rounded-lg active:bg-[#EFE4D8] transition-colors"
                     >
                       취소
                     </button>
                     <button
                       onClick={submitPhoneChangeRequest}
-                      className="flex-1 px-3 py-2 bg-gray-900 text-white text-[13px] rounded-lg active:bg-gray-700 transition-colors"
+                      className="flex-1 px-3 py-2 bg-[#5B4335] text-white text-[13px] rounded-lg active:bg-[#46352C] transition-colors"
                     >
                       신청하기
                     </button>
@@ -373,15 +373,15 @@ export function SettingsPage() {
             {/* 이메일 */}
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <Mail className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                <span className="text-[12px] text-gray-400">이메일</span>
+                <Mail className="w-4 h-4 text-[#8A6A52] flex-shrink-0" />
+                <span className="text-[12px] text-[#9A897F]">이메일</span>
               </div>
               {settingsModal !== "email" ? (
-                <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2.5 gap-2">
-                  <span className="text-[14px] text-gray-800 truncate">{userEmail || "등록된 이메일 없음"}</span>
+                <div className="flex items-center justify-between bg-[#F8F5F0] rounded-lg px-3 py-2.5 gap-2">
+                  <span className="text-[14px] text-[#46352C] truncate">{userEmail || "등록된 이메일 없음"}</span>
                   <button
                     onClick={() => { setSettingsModal("email"); setSettingsInput(userEmail); setSettingsNotice(""); }}
-                    className="flex items-center gap-1 text-[13px] text-gray-500 active:text-gray-800 transition-colors flex-shrink-0"
+                    className="flex items-center gap-1 text-[13px] text-[#8A6A52] active:text-[#46352C] transition-colors flex-shrink-0"
                   >
                     <span>✏️</span>
                     <span>변경</span>
@@ -395,7 +395,7 @@ export function SettingsPage() {
                     onChange={(e) => setSettingsInput(e.target.value)}
                     placeholder="example@email.com"
                     autoFocus
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] text-gray-800 focus:outline-none focus:border-gray-500"
+                    className="w-full px-3 py-2 border border-[#E5D9CB] rounded-lg text-[14px] text-[#46352C] focus:outline-none focus:border-[#B89A7D]"
                   />
                   {settingsNotice && (
                     <p className="text-[11px] text-red-400">{settingsNotice}</p>
@@ -403,13 +403,13 @@ export function SettingsPage() {
                   <div className="flex gap-2">
                     <button
                       onClick={closeSettingsModal}
-                      className="flex-1 px-3 py-2 bg-gray-100 text-gray-500 text-[13px] rounded-lg active:bg-gray-200 transition-colors"
+                      className="flex-1 px-3 py-2 bg-[#F5F0E7] text-[#6B5142] text-[13px] rounded-lg active:bg-[#EFE4D8] transition-colors"
                     >
                       취소
                     </button>
                     <button
                       onClick={handleEmailChange}
-                      className="flex-1 px-3 py-2 bg-gray-900 text-white text-[13px] rounded-lg active:bg-gray-700 transition-colors"
+                      className="flex-1 px-3 py-2 bg-[#5B4335] text-white text-[13px] rounded-lg active:bg-[#46352C] transition-colors"
                     >
                       변경하기
                     </button>
@@ -421,15 +421,15 @@ export function SettingsPage() {
             {/* PIN 번호 */}
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <Lock className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                <span className="text-[12px] text-gray-400">PIN 번호</span>
+                <Lock className="w-4 h-4 text-[#8A6A52] flex-shrink-0" />
+                <span className="text-[12px] text-[#9A897F]">PIN 번호</span>
               </div>
               {settingsModal !== "pin" ? (
-                <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2.5">
-                  <span className="text-[15px] text-gray-800 tracking-widest">••••</span>
+                <div className="flex items-center justify-between bg-[#F8F5F0] rounded-lg px-3 py-2.5">
+                  <span className="text-[15px] text-[#46352C] tracking-widest">••••</span>
                   <button
                     onClick={() => { setSettingsModal("pin"); setSettingsInput(""); setSettingsPinConfirm(""); setSettingsNotice(""); }}
-                    className="flex items-center gap-1 text-[13px] text-gray-500 active:text-gray-800 transition-colors"
+                    className="flex items-center gap-1 text-[13px] text-[#8A6A52] active:text-[#46352C] transition-colors"
                   >
                     <span>✏️</span>
                     <span>변경</span>
@@ -445,7 +445,7 @@ export function SettingsPage() {
                     maxLength={6}
                     placeholder="새 PIN (4~6자리)"
                     autoFocus
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] text-gray-800 tracking-widest focus:outline-none focus:border-gray-500"
+                    className="w-full px-3 py-2 border border-[#E5D9CB] rounded-lg text-[14px] text-[#46352C] tracking-widest focus:outline-none focus:border-[#B89A7D]"
                   />
                   <input
                     type="password"
@@ -454,7 +454,7 @@ export function SettingsPage() {
                     onChange={(e) => setSettingsPinConfirm(e.target.value.replace(/\D/g, "").slice(0, 6))}
                     maxLength={6}
                     placeholder="새 PIN 확인"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] text-gray-800 tracking-widest focus:outline-none focus:border-gray-500"
+                    className="w-full px-3 py-2 border border-[#E5D9CB] rounded-lg text-[14px] text-[#46352C] tracking-widest focus:outline-none focus:border-[#B89A7D]"
                   />
                   {settingsNotice && (
                     <p className="text-[11px] text-red-400">{settingsNotice}</p>
@@ -462,13 +462,13 @@ export function SettingsPage() {
                   <div className="flex gap-2">
                     <button
                       onClick={closeSettingsModal}
-                      className="flex-1 px-3 py-2 bg-gray-100 text-gray-500 text-[13px] rounded-lg active:bg-gray-200 transition-colors"
+                      className="flex-1 px-3 py-2 bg-[#F5F0E7] text-[#6B5142] text-[13px] rounded-lg active:bg-[#EFE4D8] transition-colors"
                     >
                       취소
                     </button>
                     <button
                       onClick={handlePinChange}
-                      className="flex-1 px-3 py-2 bg-gray-900 text-white text-[13px] rounded-lg active:bg-gray-700 transition-colors"
+                      className="flex-1 px-3 py-2 bg-[#5B4335] text-white text-[13px] rounded-lg active:bg-[#46352C] transition-colors"
                     >
                       변경하기
                     </button>
@@ -480,35 +480,35 @@ export function SettingsPage() {
         </div>
 
         {/* 푸시 알림 */}
-        <div className="bg-white rounded-xl overflow-hidden">
-          <p className="text-[12px] text-gray-400 px-4 pt-4 pb-2">푸시 알림</p>
+        <div className="bg-white rounded-xl overflow-hidden border border-[#EDE5D8] shadow-sm">
+          <p className="text-[12px] font-semibold text-[#8A6A52] px-4 pt-4 pb-2">푸시 알림</p>
           <div className="divide-y divide-gray-50">
             <div className="flex items-center justify-between px-4 py-3.5">
               <div className="flex items-center gap-3">
-                <Bell className="w-4 h-4 text-gray-400" />
+                <Bell className="w-4 h-4 text-[#8A6A52]" />
                 <div>
-                  <p className="text-[14px] text-gray-800">이벤트 알림</p>
-                  <p className="text-[11px] text-gray-400 mt-0.5">시장 이벤트·혜택 소식을 받아요</p>
+                  <p className="text-[14px] text-[#46352C]">이벤트 알림</p>
+                  <p className="text-[11px] text-[#9A897F] mt-0.5">시장 이벤트·혜택 소식을 받아요</p>
                 </div>
               </div>
               <button
                 onClick={() => setEventAlarm((v) => !v)}
-                className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${eventAlarm ? "bg-gray-900" : "bg-gray-200"}`}
+                className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${eventAlarm ? "bg-[#5B4335]" : "bg-gray-200"}`}
               >
                 <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${eventAlarm ? "translate-x-5" : "translate-x-0"}`} />
               </button>
             </div>
             <div className="flex items-center justify-between px-4 py-3.5">
               <div className="flex items-center gap-3">
-                <Bell className="w-4 h-4 text-gray-400" />
+                <Bell className="w-4 h-4 text-[#8A6A52]" />
                 <div>
-                  <p className="text-[14px] text-gray-800">새로운 알림</p>
-                  <p className="text-[11px] text-gray-400 mt-0.5">댓글·좋아요 등 새 알림을 받아요</p>
+                  <p className="text-[14px] text-[#46352C]">새로운 알림</p>
+                  <p className="text-[11px] text-[#9A897F] mt-0.5">댓글·좋아요 등 새 알림을 받아요</p>
                 </div>
               </div>
               <button
                 onClick={() => setNewAlarm((v) => !v)}
-                className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${newAlarm ? "bg-gray-900" : "bg-gray-200"}`}
+                className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${newAlarm ? "bg-[#5B4335]" : "bg-gray-200"}`}
               >
                 <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${newAlarm ? "translate-x-5" : "translate-x-0"}`} />
               </button>
@@ -517,8 +517,8 @@ export function SettingsPage() {
         </div>
 
         {/* 고객센터 */}
-        <div className="bg-white rounded-xl overflow-hidden">
-          <p className="text-[12px] text-gray-400 px-4 pt-4 pb-2">고객센터</p>
+        <div className="bg-white rounded-xl overflow-hidden border border-[#EDE5D8] shadow-sm">
+          <p className="text-[12px] font-semibold text-[#8A6A52] px-4 pt-4 pb-2">고객센터</p>
           <div className="divide-y divide-gray-50">
             {[
               "1:1 문의하기",
@@ -528,9 +528,9 @@ export function SettingsPage() {
             ].map((item) => (
               <button
                 key={item}
-                className="w-full flex items-center justify-between px-4 py-3.5 active:bg-gray-50 transition-colors"
+                className="w-full flex items-center justify-between px-4 py-3.5 active:bg-[#F8F5F0] transition-colors"
               >
-                <span className="text-[14px] text-gray-800">{item}</span>
+                <span className="text-[14px] text-[#46352C]">{item}</span>
                 <ChevronRight className="w-4 h-4 text-gray-300" />
               </button>
             ))}
@@ -538,9 +538,9 @@ export function SettingsPage() {
         </div>
 
         {/* 앱 버전 */}
-        <div className="bg-white rounded-xl px-4 py-3.5 flex items-center justify-between">
-          <span className="text-[14px] text-gray-400">앱 버전</span>
-          <span className="text-[14px] text-gray-400">1.0.0</span>
+        <div className="bg-white rounded-xl border border-[#EDE5D8] shadow-sm px-4 py-3.5 flex items-center justify-between">
+          <span className="text-[14px] text-[#8A776B]">앱 버전</span>
+          <span className="text-[14px] text-[#8A776B]">1.0.0</span>
         </div>
 
       </div>
