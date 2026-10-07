@@ -345,6 +345,19 @@ export function markCouponUsed(couponId: string, store: { id: number; name: stri
   return used;
 }
 
+/** 이 기기에서 쓰던 예전 비회원 아이디의 기록(포인트·쿠폰·신청)을 새 아이디로 옮긴다. */
+export function adoptGuestAccount(oldId: string, newId: string) {
+  if (!oldId || oldId === newId) return;
+  writeUserState(newId, mergeUserState(readUserState(newId), readUserState(oldId)));
+  const items = loadSubmissionsLocal();
+  if (items.some((item) => item.phone === oldId)) {
+    const next = items.map((item) => (item.phone === oldId ? { ...item, phone: newId } : item));
+    saveSubmissionsLocal(next);
+    void pushSubmissions(next);
+  }
+  void syncRewardState(newId);
+}
+
 function readUserState(userId: string): UserRewardState {
   return {
     progress: loadProgress(userId),
