@@ -65,6 +65,10 @@ export function IdolEventPage() {
       else if (latest.stage >= IDOL_STAGE_COUNT) start.push({ id: ++messageSeq, role: "idol", text: IDOL_VOICE.final });
       else if (latest.stage > 0) start.push({ id: ++messageSeq, role: "idol", text: `${latest.stage}단계까지 통과하셨어요! 이어서 ${latest.stage + 1}단계를 진행해볼까요?` });
       setMessages(start);
+      const last = start[start.length - 1].text;
+      const voiceKey = [["greeting", IDOL_VOICE.greeting], ["done", IDOL_VOICE.done], ["final", IDOL_VOICE.final]]
+        .find(([, text]) => text === last)?.[0];
+      if (voiceOnRef.current) void speakIdol(last, voiceKey, setSpeaking);
     })();
     return () => {
       alive = false;
@@ -122,6 +126,15 @@ export function IdolEventPage() {
     say(`${IDOL_REWARD_POINTS}P와 굿즈 추첨권 1장이 들어왔어요! ${IDOL_VOICE.done}`);
   };
 
+  const replayLast = () => {
+    const last = [...messages].reverse().find((message) => message.role === "idol");
+    if (!last) return;
+    const voiceKey = Object.entries(IDOL_VOICE).find(([, text]) => text === last.text)?.[0];
+    setVoiceOn(true);
+    voiceOnRef.current = true;
+    void speakIdol(last.text, voiceKey, setSpeaking);
+  };
+
   const toggleVoice = () => {
     if (voiceOn) stopIdolVoice();
     setSpeaking(false);
@@ -140,12 +153,17 @@ export function IdolEventPage() {
 
       <div className="mx-auto max-w-md space-y-3 px-4 pt-4">
         <div className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm">
-          <div className={`flex h-14 w-14 items-center justify-center rounded-full bg-[#E1F5EE] text-[26px] ${speaking ? "animate-bounce" : ""}`}>
+          <button
+            type="button"
+            onClick={replayLast}
+            aria-label="마지막 말 다시 듣기"
+            className={`flex h-14 w-14 items-center justify-center rounded-full bg-[#E1F5EE] text-[26px] ${speaking ? "animate-bounce" : ""}`}
+          >
             {IDOL.emoji}
-          </div>
+          </button>
           <div className="min-w-0 flex-1">
             <p className="text-[17px] font-extrabold text-gray-900">{IDOL.name}</p>
-            <p className="text-[12px] text-gray-400">{IDOL.group}</p>
+            <p className="text-[12px] text-gray-400">{IDOL.group} · 프로필을 누르면 다시 들려줘요</p>
           </div>
           <button
             type="button"
