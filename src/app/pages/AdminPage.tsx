@@ -48,7 +48,8 @@ import { useAuth } from "../context/AuthContext";
 import { AdminPreviewMap, type AdminPreviewStorePin } from "../components/AdminPreviewMap";
 import { STORES_BY_MARKET, type StoreData } from "../data/storeData";
 import { SEED_MARKET_ORDER, syntheticSeedStoreId } from "../data/seedStoreIds";
-import { MARKET_VIEW_CONFIG, pickStoreDisplayLatLng } from "../map/storeMapPlacement";
+import { pickStoreDisplayLatLng } from "../map/storeMapPlacement";
+import { hydrateMarketArea, resolveMarketView } from "../data/marketArea";
 import {
   OWNER_EDIT_STORE_KEY,
   OWNER_EDIT_FACILITY_KEY,
@@ -237,6 +238,7 @@ export function AdminPage() {
       ? marketParam
       : "jungang";
   const [selectedMarket, setSelectedMarket] = useState<MarketId>(initialMarket);
+  const [marketMapView, setMarketMapView] = useState(() => resolveMarketView(initialMarket));
   const [adminPanelView, setAdminPanelView] = useState<AdminPanelView>("market");
   const [rewardPendingCount, setRewardPendingCount] = useState(0);
   const [membersListTab, setMembersListTab] = useState<MembersListTab>("customers");
@@ -606,6 +608,17 @@ export function AdminPage() {
       cancelled = true;
     };
   }, [adminPanelView]);
+
+  useEffect(() => {
+    setMarketMapView(resolveMarketView(selectedMarket));
+    let cancelled = false;
+    void hydrateMarketArea(selectedMarket).then(() => {
+      if (!cancelled) setMarketMapView(resolveMarketView(selectedMarket));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedMarket, adminPanelView]);
 
   const dummyStores = useMemo<DraftStore[]>(() => {
     return SEED_MARKET_ORDER.flatMap((marketId, marketIndex) =>
@@ -1455,6 +1468,16 @@ export function AdminPage() {
   const openFacilityRegistration = () => {
     captureAdminReturnState();
     navigate(`/owner/facility-registration?market=${selectedMarket}&returnTo=admin`);
+  };
+
+  const openWalkPathEditor = () => {
+    captureAdminReturnState("admin-store-map-section");
+    navigate(`/admin/walk-path?market=${selectedMarket}`);
+  };
+
+  const openMarketAreaEditor = () => {
+    captureAdminReturnState("admin-store-map-section");
+    navigate(`/admin/market-area?market=${selectedMarket}`);
   };
 
   const openFacilityEditor = (facility: DraftFacility) => {
@@ -2343,7 +2366,7 @@ export function AdminPage() {
         )}
 
         {adminPanelView === "market" && <div className="bg-white rounded-xl p-4">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-2 gap-2">
             <div className="flex items-center gap-1.5 rounded-lg bg-gray-100 p-1">
               <button
                 onClick={() => {
@@ -2368,12 +2391,28 @@ export function AdminPage() {
                 편의시설
               </button>
             </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={openMarketAreaEditor}
+                className="h-8 px-3 rounded-lg text-[12px] bg-violet-50 text-violet-700 border border-violet-200 whitespace-nowrap"
+              >
+                시장영역
+              </button>
+              <button
+                type="button"
+                onClick={openWalkPathEditor}
+                className="h-8 px-3 rounded-lg text-[12px] bg-sky-50 text-sky-700 border border-sky-200 whitespace-nowrap"
+              >
+                보행경로
+              </button>
+            </div>
           </div>
 
           <div id="admin-store-map-section" className="mb-3 overflow-hidden rounded-lg border border-gray-200">
             <div className="naver-map-wrap h-[220px] w-full">
               <AdminPreviewMap
-                view={MARKET_VIEW_CONFIG[selectedMarket]}
+                view={marketMapView}
                 tab={managementTab}
                 stores={storesForMapPreview}
                 facilities={filteredFacilities}

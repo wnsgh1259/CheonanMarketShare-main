@@ -1,19 +1,28 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import {
-  ChevronLeft, MapPin, Zap, Trash2, ShoppingCart,
+  ChevronLeft, Zap, Trash2, ShoppingCart,
   Search, CheckCircle2, PlusCircle, X, ChevronDown, ChevronUp, Route,
 } from "lucide-react";
 import { useCart } from "../components/CartContext";
-import type { MarketId } from "../components/CartContext";
+import type { CartItem, MarketId } from "../components/CartContext";
 import { BottomNav } from "../components/BottomNav";
 import { RouteRecommendation } from "../components/RouteRecommendation";
+import { MarketConflictModal } from "../components/MarketConflictModal";
+import {
+  searchProducts,
+  unresolvedCartItemId,
+  type ProductSearchGroup,
+  type ProductStoreOffer,
+} from "../data/productSearch";
 
-const MARKET_NAMES: Record<string, string> = {
+const MARKET_NAMES: Record<MarketId, string> = {
   jungang: "천안중앙시장",
   byeongcheon: "천안역전시장",
   seonghwan: "성환전통시장",
 };
+
+const MARKET_ORDER: MarketId[] = ["jungang", "byeongcheon", "seonghwan"];
 
 const VEG_IMG   = "https://images.unsplash.com/photo-1771250625125-6e552f84fe11?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=200";
 const MEAT_IMG  = "https://images.unsplash.com/photo-1616627152550-5aac9b71a949?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=200";
@@ -73,8 +82,15 @@ const RECIPES: Record<string, RecipeIngredient[]> = {
 };
 
 export function CartPage() {
-  const { items, removeItem, clearCart, totalCount, currentMarketId, addItem } = useCart();
+  const { items, removeItem, clearCart, totalCount, currentMarketId, addItem, switchMarketAndAdd } = useCart();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+
+  const [searchMarket, setSearchMarket] = useState<MarketId>(currentMarketId ?? "jungang");
+  const [productQuery, setProductQuery] = useState("");
+  const [productGroups, setProductGroups] = useState<ProductSearchGroup[] | null>(null);
+  const [productSearched, setProductSearched] = useState(false);
+  const [pendingConflictItem, setPendingConflictItem] = useState<CartItem | null>(null);
+  const [productNotice, setProductNotice] = useState("");
 
   const [recipeQuery, setRecipeQuery]     = useState("");
   const [recipeResults, setRecipeResults] = useState<RecipeIngredient[] | null>(null);
@@ -82,6 +98,56 @@ export function CartPage() {
   const [addedIds, setAddedIds]           = useState<Set<string>>(new Set());
   const [conflictMsg, setConflictMsg]     = useState("");
   const [resultsCollapsed, setResultsCollapsed] = useState(false);
+
+  const activeSearchMarket = currentMarketId ?? searchMarket;
+
+  const cartIdSet = useMemo(() => new Set(items.map((i) => i.id)), [items]);
+
+  const handleProductSearch = () => {
+    const q = productQuery.trim();
+    if (!q) return;
+    const groups = searchProducts(activeSearchMarket, q);
+    setProductGroups(groups);
+    setProductSearched(true);
+    setProductNotice("");
+  };
+
+  const tryAdd = (item: CartItem) => {
+    const result = addItem(item);
+    if (result === "market_conflict") {
+      setPendingConflictItem(item);
+      return false;
+    }
+    setProductNotice(`「${item.name}」을(를) 담았어요.`);
+    return true;
+  };
+
+  const addUnresolved = (group: ProductSearchGroup) => {
+    tryAdd({
+      id: unresolvedCartItemId(activeSearchMarket, group.productName),
+      name: group.productName,
+      storeName: "상점 미지정",
+      storeId: 0,
+      marketId: activeSearchMarket,
+      price: group.minPrice,
+      quantity: 1,
+      image: group.offers[0]?.storeImage ?? "",
+      unresolved: true,
+    });
+  };
+
+  const addOffer = (offer: ProductStoreOffer) => {
+    tryAdd({
+      id: offer.menuId,
+      name: offer.menuName,
+      storeName: offer.storeName,
+      storeId: offer.storeId,
+      marketId: offer.marketId,
+      price: offer.price,
+      quantity: 1,
+      image: offer.storeImage,
+    });
+  };
 
   const handleRecipeSearch = () => {
     const q = recipeQuery.trim();
@@ -162,8 +228,125 @@ export function CartPage() {
         </div>
       </div>
 
-      {/* Cart Items */}
+      {/* Product search */}
       <div className="bg-white mx-4 mt-3 rounded-xl p-4">
+        <h2 className="text-[14px] text-gray-900 mb-1">상품 검색</h2>
+        <p className="text-[12px] text-gray-400 mb-3">
+          사고 싶은 상품을 검색한 뒤, 상점을 고르거나 상점 무관으로 담으세요
+        </p>
+
+        {!currentMarketId && (
+          <div className="flex gap-1.5 mb-2.5 overflow-x-auto">
+            {MARKET_ORDER.map((id) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => {
+                  setSearchMarket(id);
+                  setProductGroups(null);
+                  setProductSearched(false);
+                }}
+                className={`h-8 px-3 rounded-lg text-[12px] whitespace-nowrap ${
+                  searchMarket === id ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"
+                }`}
+              >
+                {MARKET_NAMES[id]}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={productQuery}
+            onChange={(e) => setProductQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleProductSearch()}
+            placeholder="상품명 검색 (예: 고등어, 배추)"
+            className="flex-1 px-3 py-2.5 bg-gray-100 rounded-lg text-[14px] focus:outline-none focus:ring-1 focus:ring-gray-300 placeholder:text-gray-400"
+          />
+          <button
+            type="button"
+            onClick={handleProductSearch}
+            className="px-4 py-2.5 bg-gray-900 text-white rounded-lg text-[13px] active:bg-gray-800 transition-colors flex items-center gap-1"
+          >
+            <Search className="w-3.5 h-3.5" />검색
+          </button>
+        </div>
+
+        {productSearched && productGroups !== null && (
+          <div className="mt-3 border border-gray-100 rounded-lg overflow-hidden">
+            {productGroups.length === 0 ? (
+              <div className="px-3 py-5 text-center">
+                <p className="text-[13px] text-gray-500">상품정보가 없습니다</p>
+                <p className="text-[11px] text-gray-400 mt-1">장바구니에 추가할 수 없어요</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {productGroups.map((group) => {
+                  const unresolvedId = unresolvedCartItemId(activeSearchMarket, group.productName);
+                  const unresolvedAdded = cartIdSet.has(unresolvedId);
+                  return (
+                    <div key={group.productName} className="p-2.5 space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => addUnresolved(group)}
+                        className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg text-left transition-colors ${
+                          unresolvedAdded ? "bg-sky-50" : "bg-gray-50 active:bg-gray-100"
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <p className="text-[13px] text-gray-900 font-medium truncate">{group.productName}</p>
+                          <p className="text-[11px] text-gray-400">상점 무관 · 최저 {group.minPrice.toLocaleString()}원~</p>
+                        </div>
+                        <span className={`text-[11px] shrink-0 ${unresolvedAdded ? "text-[#0EA5E9]" : "text-gray-500"}`}>
+                          {unresolvedAdded ? "담김" : "담기"}
+                        </span>
+                      </button>
+
+                      {group.offers.map((offer) => {
+                        const added = cartIdSet.has(offer.menuId);
+                        return (
+                          <button
+                            key={`${offer.storeId}-${offer.menuId}`}
+                            type="button"
+                            onClick={() => addOffer(offer)}
+                            className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-left transition-colors ${
+                              added ? "bg-sky-50/70" : "active:bg-gray-50"
+                            }`}
+                          >
+                            <div className="min-w-0 pl-1">
+                              <p className="text-[13px] text-gray-800 truncate">{offer.storeName}</p>
+                              {offer.originalPrice != null && offer.originalPrice > offer.price ? (
+                                <p className="text-[11px] text-emerald-600">할인중</p>
+                              ) : (
+                                <p className="text-[11px] text-gray-400">등록 메뉴</p>
+                              )}
+                            </div>
+                            <div className="flex flex-col items-end shrink-0">
+                              <span className="text-[13px] text-gray-900">{offer.price.toLocaleString()}원</span>
+                              <span className={`text-[10px] ${added ? "text-[#0EA5E9]" : "text-gray-400"}`}>
+                                {added ? "담김" : "담기"}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {productNotice && (
+          <p className="mt-2 text-[12px] text-emerald-600">{productNotice}</p>
+        )}
+      </div>
+
+      {/* Cart Items */}
+      <div className="bg-white mx-4 mt-2.5 rounded-xl p-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-[14px] text-gray-900">담은 상품 ({totalCount})</h2>
           {items.length > 0 && (
@@ -188,13 +371,21 @@ export function CartPage() {
                 {directItems.map((item) => (
                   <div key={item.id} className="flex items-center gap-3 py-3 border-b border-gray-50 last:border-0">
                     <div className="w-11 h-11 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
-                      <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                      {item.image ? (
+                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-[11px] text-gray-400">상품</div>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="text-[14px] text-gray-900">{item.name}</h3>
-                      <p className="text-[12px] text-gray-400">{item.storeName}</p>
+                      <p className={`text-[12px] ${item.unresolved ? "text-amber-600" : "text-gray-400"}`}>
+                        {item.unresolved ? "상점 미지정 · 경로 추천 시 배정" : item.storeName}
+                      </p>
                       <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="text-[14px] text-gray-900">{item.price.toLocaleString()}원</span>
+                        <span className="text-[14px] text-gray-900">
+                          {item.unresolved ? `${item.price.toLocaleString()}원~` : `${item.price.toLocaleString()}원`}
+                        </span>
                         <span className="text-[12px] text-gray-400">× {item.quantity}</span>
                       </div>
                     </div>
@@ -407,6 +598,17 @@ export function CartPage() {
         </p>
         <RouteRecommendation items={items} marketId={currentMarketId as MarketId | null} />
       </div>
+
+      <MarketConflictModal
+        open={pendingConflictItem != null}
+        onCancel={() => setPendingConflictItem(null)}
+        onConfirm={() => {
+          if (!pendingConflictItem) return;
+          switchMarketAndAdd(pendingConflictItem);
+          setPendingConflictItem(null);
+          setProductNotice(`시장을 바꾸고 「${pendingConflictItem.name}」을(를) 담았어요.`);
+        }}
+      />
 
       {/* 초기화 확인 팝업 */}
       {showClearConfirm && (

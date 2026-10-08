@@ -23,6 +23,14 @@ import {
 import { syntheticSeedStoreId } from "../data/seedStoreIds";
 import { buildFacilityMarkerIcon, buildStoreMarkerIcon } from "../map/naverMarkerIcons";
 import { MARKET_VIEW_CONFIG, pickStoreDisplayLatLng, toStoreLatLng } from "../map/storeMapPlacement";
+import { clearMarketAreaOverlays, drawMarketAreaOverlays, type MarketAreaOverlays } from "../map/drawMarketArea";
+import { hydrateMarketArea, resolveMarketView } from "../data/marketArea";
+import {
+  clearActiveNavRoute,
+  loadActiveNavRoute,
+  type ActiveNavRoute,
+} from "../data/activeNavRoute";
+import { hydrateWalkPathGraph } from "../data/walkPathSeed";
 import {
   discountedPrice,
   formatDealClock,
@@ -58,11 +66,6 @@ type NaverMapRef = {
   getZoom: () => number;
 };
 
-type NaverPolygonRef = {
-  setMap: (map: unknown) => void;
-  setPath: (path: unknown) => void;
-  setOptions: (options: Record<string, unknown>) => void;
-};
 
 type NaverMarkerRef = {
   setMap: (map: unknown) => void;
@@ -102,31 +105,14 @@ declare global {
   }
 }
 
-function clearMarketPolygons(polygons: NaverPolygonRef[]) {
-  polygons.forEach((polygon) => {
-    try {
-      polygon.setMap(null);
-    } catch {
-      /* 지도가 이미 정리된 경우 네이버 SDK가 예외를 던짐 */
-    }
-  });
-}
-
-function createMarketPolygons(map: unknown, view: (typeof MARKET_VIEW_CONFIG)[MarketId]) {
+function createMarketAreaLayer(map: unknown, marketId: MarketId): MarketAreaOverlays {
   const naver = window.naver;
-  return view.areaPaths.map(
-    (path) =>
-      new naver.maps.Polygon({
-        map,
-        paths: path.map((point) => new naver.maps.LatLng(point.lat, point.lng)),
-        fillColor: view.fillColor,
-        fillOpacity: 0.28,
-        strokeColor: view.fillColor,
-        strokeOpacity: 0,
-        strokeWeight: 0,
-        zIndex: 10,
-        clickable: false,
-      }),
+  const view = resolveMarketView(marketId);
+  return drawMarketAreaOverlays(
+    naver,
+    map,
+    { fillColor: view.fillColor, areaPaths: view.areaPaths },
+    { showLabel: false, zIndex: 10 },
   );
 }
 
@@ -291,6 +277,7 @@ function NaverMarketMap({
   suppressHighlightPanRef,
   customLocationPin,
   onCustomPinClick,
+  activeNavRoute,
 }: {
   selectedMarket: MarketId;
   visibleStores: StoreData[];
@@ -307,13 +294,16 @@ function NaverMarketMap({
   suppressHighlightPanRef?: React.RefObject<boolean>;
   customLocationPin?: { name: string; lat: number; lng: number } | null;
   onCustomPinClick?: () => void;
+  activeNavRoute?: ActiveNavRoute | null;
 }) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<NaverMapRef | null>(null);
-  const marketPolygonsRef = useRef<NaverPolygonRef[]>([]);
+  const marketAreaOverlaysRef = useRef<MarketAreaOverlays | null>(null);
   const storeMarkersRef = useRef<NaverMarkerRef[]>([]);
   const facilityMarkersRef = useRef<NaverMarkerRef[]>([]);
   const customPinMarkerRef = useRef<NaverMarkerRef | null>(null);
+  const routePolylineRef = useRef<{ setMap: (map: unknown) => void } | null>(null);
+  const routeStopMarkersRef = useRef<NaverMarkerRef[]>([]);
   const onCustomPinClickRef = useRef(onCustomPinClick);
   onCustomPinClickRef.current = onCustomPinClick;
   const onSelectStoreRef = useRef(onSelectStore);
@@ -397,7 +387,8 @@ function NaverMarketMap({
       naver.maps.Event.addListener(mapRef.current, "dragstart", notifyDragStart);
       naver.maps.Event.addListener(mapRef.current, "dragend", notifyDragEnd);
 
-      marketPolygonsRef.current = createMarketPolygons(mapRef.current, view);
+      clearMarketAreaOverlays(marketAreaOverlaysRef.current);
+      marketAreaOverlaysRef.current = createMarketAreaLayer(mapRef.current, selectedMarketRef.current);
       setMapInstanceEpoch((n) => n + 1);
     };
 
@@ -431,8 +422,8 @@ function NaverMarketMap({
     return () => {
       cancelled = true;
       if (rafId !== null) window.cancelAnimationFrame(rafId);
-      clearMarketPolygons(marketPolygonsRef.current);
-      marketPolygonsRef.current = [];
+      clearMarketAreaOverlays(marketAreaOverlaysRef.current);
+      marketAreaOverlaysRef.current = null;
       clearStoreMarkers(storeMarkersRef.current);
       storeMarkersRef.current = [];
       clearStoreMarkers(facilityMarkersRef.current);
@@ -444,24 +435,37 @@ function NaverMarketMap({
 
   useEffect(() => {
     if (!window.naver?.maps || !mapRef.current) return;
-    const view = MARKET_VIEW_CONFIG[selectedMarket];
-    centerRef.current = view.center;
-    const naver = window.naver;
+    let cancelled = false;
     const map = mapRef.current;
+    const naver = window.naver;
 
-    const isInitial = isInitialMarketEffectRef.current;
-    isInitialMarketEffectRef.current = false;
+    const applyView = () => {
+      if (cancelled || !mapRef.current) return;
+      const view = resolveMarketView(selectedMarket);
+      centerRef.current = view.center;
 
-    // 초기 마운트이고 커스텀 핀이 있으면 시장 중심으로 이동하지 않음
-    // (initMap에서 이미 핀 위치로 지도를 초기화했기 때문)
-    if (!(isInitial && customLocationPinRef.current)) {
-      map.setCenter(new naver.maps.LatLng(view.center.lat, view.center.lng));
-      map.setZoom(view.zoom);
-      setZoomLevel(view.zoom);
-    }
+      const isInitial = isInitialMarketEffectRef.current;
+      isInitialMarketEffectRef.current = false;
 
-    clearMarketPolygons(marketPolygonsRef.current);
-    marketPolygonsRef.current = createMarketPolygons(map, view);
+      // 초기 마운트이고 커스텀 핀이 있으면 시장 중심으로 이동하지 않음
+      // (initMap에서 이미 핀 위치로 지도를 초기화했기 때문)
+      if (!(isInitial && customLocationPinRef.current)) {
+        map.setCenter(new naver.maps.LatLng(view.center.lat, view.center.lng));
+        map.setZoom(view.zoom);
+        setZoomLevel(view.zoom);
+      }
+
+      clearMarketAreaOverlays(marketAreaOverlaysRef.current);
+      marketAreaOverlaysRef.current = createMarketAreaLayer(map, selectedMarket);
+    };
+
+    applyView();
+    void hydrateMarketArea(selectedMarket).then(() => {
+      if (!cancelled) applyView();
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [selectedMarket]);
 
   useEffect(() => {
@@ -663,6 +667,83 @@ function NaverMarketMap({
     };
   }, [customLocationPin, mapInstanceEpoch]);
 
+  /** 장바구니에서 고른 맞춤 경로 폴리라인 */
+  useEffect(() => {
+    if (!window.naver?.maps || !mapRef.current) return;
+    const naver = window.naver;
+    const map = mapRef.current;
+
+    if (routePolylineRef.current) {
+      routePolylineRef.current.setMap(null);
+      routePolylineRef.current = null;
+    }
+    routeStopMarkersRef.current.forEach((m) => {
+      try {
+        m.setMap(null);
+      } catch {
+        /* ignore */
+      }
+    });
+    routeStopMarkersRef.current = [];
+
+    if (!activeNavRoute || activeNavRoute.marketId !== selectedMarket) return;
+    if (!activeNavRoute.pathLatLng.length) return;
+
+    const path = activeNavRoute.pathLatLng.map((p) => new naver.maps.LatLng(p.lat, p.lng));
+    routePolylineRef.current = new naver.maps.Polyline({
+      map,
+      path,
+      strokeColor: activeNavRoute.lineColor || "#2563EB",
+      strokeOpacity: 0.92,
+      strokeWeight: 6,
+      zIndex: 80,
+      clickable: false,
+    });
+
+    // 출발 (내 위치 / 입구)
+    const start = activeNavRoute.pathLatLng[0];
+    const startMark = activeNavRoute.startSource === "gps" ? "나" : "출";
+    routeStopMarkersRef.current.push(
+      new naver.maps.Marker({
+        map,
+        position: new naver.maps.LatLng(start.lat, start.lng),
+        zIndex: 90,
+        icon: {
+          content: `<div style="width:22px;height:22px;border-radius:999px;background:#111827;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.25);">${startMark}</div>`,
+          anchor: new naver.maps.Point(11, 11),
+        },
+      }),
+    );
+
+    activeNavRoute.stops.forEach((stop) => {
+      routeStopMarkersRef.current.push(
+        new naver.maps.Marker({
+          map,
+          position: new naver.maps.LatLng(stop.lat, stop.lng),
+          zIndex: 91,
+          icon: {
+            content: `<div style="width:24px;height:24px;border-radius:999px;background:${activeNavRoute.lineColor};color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.25);">${stop.order}</div>`,
+            anchor: new naver.maps.Point(12, 12),
+          },
+        }),
+      );
+    });
+
+    // 경로가 보이도록 대략 맞춤
+    try {
+      const bounds = new naver.maps.LatLngBounds(
+        new naver.maps.LatLng(activeNavRoute.pathLatLng[0].lat, activeNavRoute.pathLatLng[0].lng),
+        new naver.maps.LatLng(activeNavRoute.pathLatLng[0].lat, activeNavRoute.pathLatLng[0].lng),
+      );
+      activeNavRoute.pathLatLng.forEach((p) => {
+        bounds.extend(new naver.maps.LatLng(p.lat, p.lng));
+      });
+      map.fitBounds(bounds, { top: 48, right: 48, bottom: 120, left: 48 });
+    } catch {
+      /* ignore */
+    }
+  }, [activeNavRoute, selectedMarket, mapInstanceEpoch]);
+
   if (isPlaceholderClientId) {
     return (
       <div className="w-full h-full bg-gray-100 flex items-center justify-center text-[12px] text-gray-500">
@@ -700,9 +781,21 @@ export function MapPage() {
   const [selectedMarket, setSelectedMarket] = useState<MarketId>(() => {
     const param = new URLSearchParams(window.location.search).get("market");
     if (param === "jungang" || param === "byeongcheon" || param === "seonghwan") return param;
+    const nav = loadActiveNavRoute();
+    if (nav && new URLSearchParams(window.location.search).get("navRoute") === "1") {
+      return nav.marketId;
+    }
     return "byeongcheon";
   });
+  const [activeNavRoute, setActiveNavRoute] = useState<ActiveNavRoute | null>(() => {
+    if (new URLSearchParams(window.location.search).get("navRoute") !== "1") return null;
+    return loadActiveNavRoute();
+  });
   const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    void hydrateWalkPathGraph(selectedMarket);
+  }, [selectedMarket]);
 
   /** URL ?store=<이름> 으로 진입 시 자동으로 해당 상점 상세를 열기 위한 초기값 */
   const initialStoreNameRef = useRef<string | null>(
@@ -1314,7 +1407,33 @@ export function MapPage() {
             suppressHighlightPanRef={suppressHighlightPanRef}
             customLocationPin={customLocationPinForMap}
             onCustomPinClick={() => setCustomPinCardOpen(true)}
+            activeNavRoute={activeNavRoute}
           />
+          {activeNavRoute && activeNavRoute.marketId === selectedMarket && (
+            <div className="absolute left-3 right-3 top-3 z-20 flex items-start gap-2">
+              <div className="flex-1 rounded-xl bg-white/95 px-3 py-2.5 shadow-md border border-gray-100">
+                <p className="text-[13px] text-gray-900 font-medium">{activeNavRoute.title}</p>
+                <p className="text-[11px] text-gray-500 mt-0.5">
+                  {activeNavRoute.startLabel || "출발"} · {activeNavRoute.distance}m · 약 {activeNavRoute.time}분 ·{" "}
+                  {activeNavRoute.stops.length}곳
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  clearActiveNavRoute();
+                  setActiveNavRoute(null);
+                  const url = new URL(window.location.href);
+                  url.searchParams.delete("navRoute");
+                  window.history.replaceState({}, "", url.pathname + url.search);
+                }}
+                className="h-9 w-9 rounded-xl bg-white shadow-md border border-gray-100 flex items-center justify-center text-gray-500"
+                aria-label="경로 닫기"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
           <div className="pointer-events-none absolute inset-x-0 bottom-0 top-0">
             <div className="pointer-events-auto absolute bottom-3 left-3 rounded-md bg-white px-2 py-1 text-[11px] text-gray-500 shadow-md">
               {filteredStores.length}개 상점
