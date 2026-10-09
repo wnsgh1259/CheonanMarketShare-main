@@ -269,7 +269,22 @@ export function RegisterPage() {
 
   if (isOwner && ownerStep === "market") {
     return (
-      <div className="flex flex-col min-h-screen bg-white">
+      <>
+      <style>{`
+        .owner-signup-theme [class~="bg-gray-900"] { background-color: #5B4335 !important; }
+        .owner-signup-theme [class~="active:bg-gray-800"]:active { background-color: #6B5142 !important; }
+        .owner-signup-theme [class~="bg-gray-100"],
+        .owner-signup-theme [class~="bg-gray-50"] { background-color: #F5F0E7 !important; }
+        .owner-signup-theme [class~="text-gray-900"],
+        .owner-signup-theme [class~="text-gray-800"],
+        .owner-signup-theme [class~="text-gray-700"] { color: #46352C !important; }
+        .owner-signup-theme [class~="text-gray-600"],
+        .owner-signup-theme [class~="text-gray-500"] { color: #6B5142 !important; }
+        .owner-signup-theme [class~="text-gray-400"] { color: #8A776B !important; }
+        .owner-signup-theme [class~="border-gray-100"],
+        .owner-signup-theme [class~="border-gray-200"] { border-color: #E5D9CB !important; }
+      `}</style>
+      <div className="owner-signup-theme flex flex-col min-h-screen bg-[#F7F6F1]">
         <div className="flex items-center px-4 py-3 border-b border-gray-100">
           <button onClick={() => navigate(-1)} className="p-1 mr-2">
             <ChevronLeft className="w-5 h-5 text-gray-700" />
@@ -321,11 +336,34 @@ export function RegisterPage() {
           </button>
         </div>
       </div>
+      </>
     );
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-white">
+    <>
+    {!isOwner && (
+      <style>{`
+        .guest-signup-theme [class~="bg-gray-900"],
+        .owner-signup-theme [class~="bg-gray-900"] { background-color: #5B4335 !important; }
+        .guest-signup-theme [class~="active:bg-gray-800"]:active,
+        .owner-signup-theme [class~="active:bg-gray-800"]:active { background-color: #6B5142 !important; }
+        .guest-signup-theme [class~="bg-gray-100"], .guest-signup-theme [class~="bg-gray-50"],
+        .owner-signup-theme [class~="bg-gray-100"], .owner-signup-theme [class~="bg-gray-50"] { background-color: #F5F0E7 !important; }
+        .guest-signup-theme [class~="text-gray-900"], .guest-signup-theme [class~="text-gray-800"], .guest-signup-theme [class~="text-gray-700"],
+        .owner-signup-theme [class~="text-gray-900"], .owner-signup-theme [class~="text-gray-800"], .owner-signup-theme [class~="text-gray-700"] { color: #46352C !important; }
+        .guest-signup-theme [class~="text-gray-600"], .guest-signup-theme [class~="text-gray-500"],
+        .owner-signup-theme [class~="text-gray-600"], .owner-signup-theme [class~="text-gray-500"] { color: #6B5142 !important; }
+        .guest-signup-theme [class~="text-gray-400"], .owner-signup-theme [class~="text-gray-400"] { color: #8A776B !important; }
+        .guest-signup-theme [class~="border-gray-100"], .guest-signup-theme [class~="border-gray-200"],
+        .owner-signup-theme [class~="border-gray-100"], .owner-signup-theme [class~="border-gray-200"] { border-color: #E5D9CB !important; }
+        .guest-signup-theme [class~="focus:border-gray-400"]:focus,
+        .owner-signup-theme [class~="focus:border-gray-400"]:focus { border-color: #B89A7D !important; }
+        .guest-signup-theme [class~="focus:ring-gray-300"]:focus,
+        .owner-signup-theme [class~="focus:ring-gray-300"]:focus { --tw-ring-color: #B89A7D !important; }
+      `}</style>
+    )}
+    <div className={`${isOwner ? "owner-signup-theme " : "guest-signup-theme "}flex flex-col min-h-screen ${isOwner ? "bg-[#F7F6F1]" : "bg-[#F7F6F1]"}`}>
       {/* 헤더 */}
       <div className="flex items-center px-4 py-3 border-b border-gray-100">
         <button
@@ -336,7 +374,7 @@ export function RegisterPage() {
         </button>
         <h1 className="text-[16px] font-semibold text-gray-900">회원가입</h1>
         <span className={`ml-2 text-[11px] font-semibold px-2.5 py-1 rounded-full ${
-          isOwner ? "bg-amber-100 text-amber-700" : "bg-sky-100 text-sky-700"
+          isOwner ? "bg-amber-100 text-amber-700" : "bg-white text-[#3F4140]"
         }`}>
           {isOwner ? "🏪 사장님" : "🛍 손님"}
         </span>
@@ -543,5 +581,6 @@ export function RegisterPage() {
         )}
       </div>
     </div>
+    </>
   );
 }

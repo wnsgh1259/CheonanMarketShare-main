@@ -1625,7 +1625,39 @@ export function AdminPage() {
 
   return (
     <>
-    <div className="min-h-screen bg-[#F7F8FA]">
+    <style>{`
+      .admin-theme [class~="bg-gray-900"],
+      .admin-theme [class~="bg-blue-500"],
+      .admin-theme [class~="bg-blue-600"] { background-color: #5B4335 !important; }
+      .admin-theme [class~="bg-gray-800"] { background-color: #6B5142 !important; }
+      .admin-theme button[class~="bg-amber-500"] { background-color: #5B4335 !important; }
+      .admin-theme [class~="active:bg-gray-700"]:active,
+      .admin-theme [class~="active:bg-gray-800"]:active,
+      .admin-theme [class~="active:bg-blue-600"]:active { background-color: #6B5142 !important; }
+      .admin-theme [class~="bg-gray-100"],
+      .admin-theme [class~="bg-blue-100"] { background-color: #F5F0E7 !important; }
+      .admin-theme [class~="bg-gray-50"] { background-color: #F7F5F1 !important; }
+      .admin-theme [class~="bg-blue-50"] { background-color: #F7F2E8 !important; }
+      .admin-theme [class~="active:bg-gray-100"]:active,
+      .admin-theme [class~="active:bg-gray-50"]:active,
+      .admin-theme [class~="active:bg-blue-100"]:active { background-color: #EFE4D8 !important; }
+      .admin-theme [class~="text-gray-900"],
+      .admin-theme [class~="text-gray-800"] { color: #46352C !important; }
+      .admin-theme [class~="text-gray-700"] { color: #46352C !important; }
+      .admin-theme [class~="text-gray-600"] { color: #6B5142 !important; }
+      .admin-theme [class~="text-gray-500"],
+      .admin-theme [class~="text-blue-500"],
+      .admin-theme [class~="text-blue-600"],
+      .admin-theme [class~="text-blue-700"] { color: #8A776B !important; }
+      .admin-theme [class~="border-gray-100"],
+      .admin-theme [class~="border-blue-100"],
+      .admin-theme [class~="border-blue-200"] { border-color: #E5D9CB !important; }
+      .admin-theme [class~="border-gray-200"] { border-color: #D8C6B8 !important; }
+      .admin-theme [class~="focus:ring-blue-300"]:focus,
+      .admin-theme [class~="focus:ring-gray-300"]:focus { --tw-ring-color: #B89A7D !important; }
+      .admin-theme [class~="focus:border-gray-400"]:focus { border-color: #B89A7D !important; }
+    `}</style>
+    <div className="admin-theme min-h-screen bg-[#F7F6F1]">
       <div className="sticky top-0 z-10 bg-white border-b border-gray-100">
         <div className="flex items-center justify-between px-4 py-3">
           <Link to="/" className="p-1" aria-label="로그인 페이지로 이동">
@@ -2312,15 +2344,15 @@ export function AdminPage() {
           </div>
         )}
 
-        {adminPanelView === "market" && <div className="bg-white rounded-xl p-4">
+        {adminPanelView === "market" && <div className="rounded-2xl border border-[#E5D9CB] bg-white p-4 shadow-[0_4px_14px_-12px_rgba(70,53,44,0.3)]">
           <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-1.5 rounded-lg bg-gray-100 p-1">
+            <div className="flex items-center gap-1.5 rounded-xl bg-[#F7F2E8] p-1">
               <button
                 onClick={() => {
                   setManagementTab("store");
                 }}
                 className={`h-8 px-3 rounded-md text-[12px] ${
-                  managementTab === "store" ? "bg-gray-900 text-white" : "text-gray-700"
+                  managementTab === "store" ? "bg-[#5B4335] text-white" : "text-[#6B5142] hover:bg-[#EFE4D8]"
                 }`}
               >
                 상점
@@ -2332,7 +2364,7 @@ export function AdminPage() {
                   setIsEditing(false);
                 }}
                 className={`h-8 px-3 rounded-md text-[12px] ${
-                  managementTab === "facility" ? "bg-gray-900 text-white" : "text-gray-700"
+                  managementTab === "facility" ? "bg-[#5B4335] text-white" : "text-[#6B5142] hover:bg-[#EFE4D8]"
                 }`}
               >
                 편의시설
@@ -2360,10 +2392,10 @@ export function AdminPage() {
               <div className="flex items-center justify-between mb-2">
                 <h2 className="text-[14px] text-gray-900">{selectedMarketLabel} 등록 상점</h2>
                 <div className="flex items-center gap-2">
-                  <span className="text-[12px] text-gray-500">{filteredStores.length}개</span>
+                <span className="rounded-full bg-[#F5F0E7] px-2.5 py-1 text-[12px] font-semibold text-[#6B5142]">{filteredStores.length}개</span>
                   <button
                     onClick={openOwnerNewStoreEditor}
-                    className="h-7 px-2.5 rounded-lg bg-gray-900 text-[12px] text-white"
+                    className="h-7 px-3 rounded-lg bg-[#5B4335] text-[12px] font-medium text-white transition-colors hover:bg-[#6B5142]"
                   >
                     추가
                   </button>
@@ -2376,7 +2408,7 @@ export function AdminPage() {
                       setStoreDeleteModeActive(false);
                     }}
                     className={`h-7 px-2.5 rounded-lg text-[12px] transition-colors ${
-                      storeSettingsModeActive ? "bg-blue-500 text-white" : "bg-blue-50 text-blue-600 border border-blue-200"
+                      storeSettingsModeActive ? "bg-[#5B4335] text-white" : "border border-[#E5D9CB] bg-[#F7F2E8] text-[#6B5142]"
                     }`}
                   >
                     {storeSettingsModeActive ? "완료" : "설정"}
@@ -2405,7 +2437,7 @@ export function AdminPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="상점명"
-                className="w-full h-9 rounded-lg bg-gray-100 px-3 text-[12px] focus:outline-none focus:ring-1 focus:ring-gray-300"
+                className="w-full h-9 rounded-xl border border-[#E5D9CB] bg-[#F7F5F1] px-3 text-[12px] text-[#46352C] placeholder:text-[#9A897F] focus:outline-none focus:ring-2 focus:ring-[#B89A7D]"
               />
               <div className="flex gap-1.5 overflow-x-auto">
                 {MAP_CATEGORY_OPTIONS.map((category) => (
@@ -2413,7 +2445,9 @@ export function AdminPage() {
                     key={category}
                     onClick={() => setSelectedCategory(category)}
                     className={`h-8 px-2.5 rounded-lg whitespace-nowrap text-[12px] ${
-                      selectedCategory === category ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"
+                      selectedCategory === category
+                        ? "bg-[#EEF7FF] text-[#2875A8] ring-1 ring-inset ring-[#A9D9F7]"
+                        : "bg-white text-[#666A60] ring-1 ring-inset ring-[#EAE8DF]"
                     }`}
                   >
                     {category}
@@ -2428,7 +2462,7 @@ export function AdminPage() {
                 <div className="space-y-2">
                   <button
                     onClick={() => setSelectedStoreId(null)}
-                    className="h-8 px-2 rounded-lg bg-gray-100 text-[12px] text-gray-700"
+                    className="h-8 px-3 rounded-lg border border-[#E5D9CB] bg-[#F5F0E7] text-[12px] text-[#6B5142]"
                   >
                     목록으로
                   </button>
@@ -2482,20 +2516,20 @@ export function AdminPage() {
                       <div className="grid grid-cols-2 gap-2">
                         <button
                           onClick={() => setIsEditing(false)}
-                          className="h-9 rounded-lg bg-gray-100 text-[12px] text-gray-700"
+                          className="h-9 rounded-xl border border-[#E5D9CB] bg-[#F5F0E7] text-[12px] font-medium text-[#6B5142]"
                         >
                           취소
                         </button>
                         <button
                           onClick={handleEditSave}
-                          className="h-9 rounded-lg bg-gray-900 text-[12px] text-white"
+                          className="h-9 rounded-xl bg-[#5B4335] text-[12px] font-medium text-white transition-colors hover:bg-[#6B5142]"
                         >
                           저장
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <div className="rounded-lg bg-gray-50 p-3">
+                    <div className="rounded-2xl border border-[#D8C6B8] bg-white p-3 shadow-[0_4px_14px_-12px_rgba(70,53,44,0.3)]">
                       <p className="text-[14px] text-gray-900">{selectedStore.name}</p>
                       <p className="text-[12px] text-gray-500 mt-1">{selectedStore.category}</p>
                       <p className="text-[12px] text-gray-500 mt-1">위치: {selectedStore.location}</p>
@@ -2505,7 +2539,7 @@ export function AdminPage() {
                       <div className="grid grid-cols-2 gap-2 mt-3">
                         <button
                           onClick={handleEditStart}
-                          className="h-9 rounded-lg bg-gray-100 text-[12px] text-gray-700"
+                          className="h-9 rounded-xl border border-[#E5D9CB] bg-[#F5F0E7] text-[12px] font-medium text-[#6B5142]"
                         >
                           수정
                         </button>
@@ -2525,7 +2559,7 @@ export function AdminPage() {
                     <div
                       key={store.id}
                       id={`admin-store-card-${store.id}`}
-                      className="flex items-center gap-2 rounded-lg bg-gray-50 p-3"
+                      className="flex items-center gap-2 rounded-2xl border border-[#D8C6B8] bg-white p-3 shadow-[0_4px_14px_-12px_rgba(70,53,44,0.3)]"
                     >
                       <button
                         type="button"
