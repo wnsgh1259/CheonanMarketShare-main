@@ -1,6 +1,6 @@
 // src/app/pages/ProfilePage.tsx
 import {
-  ChevronLeft, Settings, Ticket, Gift, Camera,
+  ChevronLeft, Settings, Ticket, Gift, Camera, Coins,
   X, Sparkles, Lock, Check,
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router";
@@ -63,6 +63,7 @@ export function ProfilePage() {
   const [syncTick, setSyncTick] = useState(0);
   const [exchangeResult, setExchangeResult] = useState<{ name: string; emoji: string } | null>(null);
   const [progressTick, setProgressTick] = useState(0);
+  const [stepProgress, setStepProgress] = useState(0);
   const [showCheckin, setShowCheckin] = useState(false);
   const [notice, setNotice] = useState("");
   const [submissions, setSubmissions] = useState<RewardSubmission[]>([]);
@@ -70,6 +71,11 @@ export function ProfilePage() {
   const [photoEventId, setPhotoEventId] = useState<string | null>(null);
   const [rejectInfoId, setRejectInfoId] = useState<string | null>(null);
   const [coupons, setCoupons] = useState<EarnedCoupon[]>(() => loadCoupons());
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setStepProgress(85), 80);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const progress = loadProgress();
   const visited = uniqueCheckinCount(progress);
@@ -247,11 +253,11 @@ export function ProfilePage() {
           {[
             { label: "방문 가게", value: visited, unit: "곳", emoji: "🏪", bg: "bg-white/60", border: "border-[#E5D9CB]" },
             { label: "스탬프", value: `${collectedCount}/${totalStamps}`, unit: "", emoji: "⭐", bg: "bg-white/60", border: "border-[#E5D9CB]" },
-            { label: "포인트", value: mileage.toLocaleString(), unit: "P", emoji: "🪙", bg: "bg-white/60", border: "border-[#E5D9CB]" },
+            { label: "포인트", value: mileage.toLocaleString(), unit: "P", emoji: "", bg: "bg-white/60", border: "border-[#E5D9CB]" },
           ].map(stat => {
             const body = (
               <>
-                <span className="text-[16px]">{stat.emoji}</span>
+                {stat.label === "포인트" ? <Coins className="mx-auto h-4 w-4 text-[#B5813D]" strokeWidth={2.2} /> : <span className="text-[16px]">{stat.emoji}</span>}
                 <p className="text-[#46352C] text-[16px] font-bold mt-0.5 leading-none">
                   {stat.value}<span className="text-[10px] text-[#8A776B] ml-0.5">{stat.unit}</span>
                 </p>
@@ -302,6 +308,28 @@ export function ProfilePage() {
       {activeTab === "stamps" && (
         <div className="px-4 py-4 space-y-3">
           {notice && <p className="text-[12px] text-emerald-700 bg-emerald-50 rounded-xl px-3 py-2">{notice}</p>}
+          <div className="overflow-hidden rounded-2xl border border-[#EAD7CB] bg-white shadow-sm">
+            <div className="flex items-center justify-between bg-[#F6E9E0] px-4 py-3">
+              <div className="flex items-center gap-2">
+                <span className="text-[20px]">👟</span>
+                <div>
+                  <p className="text-[13px] font-semibold text-[#70483A]">만보기 챌린지</p>
+                  <p className="text-[10px] text-[#8B6758]">달성 시 100P 지급</p>
+                </div>
+              </div>
+              <span className="rounded-full bg-white/75 px-2 py-1 text-[9px] font-medium text-[#9A6249]">미리보기</span>
+            </div>
+            <div className="px-4 py-3">
+              <div className="mb-2 flex items-center justify-between text-[12px]">
+                <span className="text-[#8A776B]">오늘 걸음 수</span>
+                <span className="font-semibold text-[#554F49]">8,500 / 10,000보</span>
+              </div>
+              <div className="h-2.5 w-full overflow-hidden rounded-full bg-[#F1E3DA]">
+                <div className="h-2.5 rounded-full bg-gradient-to-r from-[#EF984C] to-[#D65D45] transition-[width] duration-[1400ms] ease-out" style={{ width: `${stepProgress}%` }} />
+              </div>
+              <p className="mt-1.5 text-[11px] text-[#8B6758]">🏃 1,500보만 더!</p>
+            </div>
+          </div>
           <div className="flex items-center justify-between px-1">
             <h3 className="text-[13px] font-semibold text-[#46352C]">진행 중인 퀘스트</h3>
             <span className="text-[11px] text-[#8A776B]">카드를 누르면 인증</span>
@@ -532,7 +560,7 @@ export function ProfilePage() {
             <div className="relative flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-1.5 mb-1">
-                  <span className="text-[14px]">🪙</span>
+                  <Coins className="h-4 w-4 text-[#B5813D]" strokeWidth={2.2} />
                   <span className="text-[12px] text-[#8A6A52]">보유 마일리지</span>
                 </div>
                 <p className="text-[32px] font-bold text-[#5B4335] leading-none">
@@ -706,7 +734,7 @@ export function ProfilePage() {
 
                   <div className="bg-[#F7F5F1] border border-[#E5D9CB] rounded-xl px-4 py-2.5 flex items-center justify-between mb-4">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[16px]">🪙</span>
+                      <Coins className="h-4 w-4 text-[#B5813D]" strokeWidth={2.2} />
                       <span className="text-[12px] text-[#8A776B]">보유 마일리지</span>
                     </div>
                     <span className="text-[16px] font-bold text-[#46352C]">{mileage.toLocaleString()} P</span>

@@ -3,8 +3,6 @@ import { Link } from "react-router";
 import { Bell, MapPin, Store, ChevronRight, Clock, Tag, ShoppingCart, Settings, Star, Ticket } from "lucide-react";
 import { useCart } from "../components/CartContext";
 import { BottomNav, OWNER_MODE_KEY, OwnerBackToStoreButton, getSettingsPath } from "../components/BottomNav";
-import { loadOwnerCatalog, refreshOwnerCatalogFromRemote } from "../data/ownerStoreData";
-import { listLiveDeals } from "../data/storePromotion";
 import { IDOL, IDOL_STAGE_COUNT } from "../data/idolEvent";
 import { loadIdolProgress, syncRewardState } from "../data/rewards";
 
@@ -106,7 +104,6 @@ export function HomePage() {
   const [activeCourseIndex, setActiveCourseIndex] = useState(0);
   const spotsStripDragRef = useRef<{ pointerId: number; startX: number; startScrollLeft: number; dragging: boolean } | null>(null);
   const suppressSpotClickUntilRef = useRef(0);
-  const [liveDealCount, setLiveDealCount] = useState(0);
   const { totalCount } = useCart();
   const ownerMode = localStorage.getItem(OWNER_MODE_KEY) === "true";
   const [idolStage, setIdolStage] = useState(() => loadIdolProgress().stage);
@@ -120,20 +117,6 @@ export function HomePage() {
       alive = false;
     };
   }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      const remote = await refreshOwnerCatalogFromRemote();
-      if (cancelled) return;
-      const stores = remote?.stores ?? loadOwnerCatalog().stores ?? [];
-      setLiveDealCount(listLiveDeals(stores, Date.now(), selectedMarketId).length);
-    };
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedMarketId]);
 
   const selectedMarket = markets.find((m) => m.id === selectedMarketId)!;
   const spots = spotsByMarket[selectedMarketId];
@@ -206,7 +189,7 @@ export function HomePage() {
 
       <div className="sticky top-0 z-30 bg-transparent px-4 py-2">
         <div className="grid grid-cols-3 gap-2">
-          <Link to="/map" aria-label="할인 상품" className="flex h-[44px] min-w-0 cursor-pointer items-center justify-center gap-1 rounded-full bg-white/95 px-2 text-[13px] font-semibold tracking-tight text-[#6B6B6B] shadow-[0_5px_18px_-14px_rgba(70,53,44,0.32)] transition-transform hover:-translate-y-0.5 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4A096]">
+          <Link to={`/deals?market=${selectedMarketId}`} aria-label="할인 상품" className="flex h-[44px] min-w-0 cursor-pointer items-center justify-center gap-1 rounded-full bg-white/95 px-2 text-[13px] font-semibold tracking-tight text-[#6B6B6B] shadow-[0_5px_18px_-14px_rgba(70,53,44,0.32)] transition-transform hover:-translate-y-0.5 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4A096]">
             <Tag className="h-[18px] w-[18px] flex-shrink-0 text-[#C9C9C9]" />
             <span className="whitespace-nowrap">할인 상품</span>
           </Link>
@@ -247,38 +230,6 @@ export function HomePage() {
           </div>
         </div>
       </section>
-
-      {!ownerMode && (
-        <Link
-          to="/idol"
-          className="mx-4 mt-3 flex items-center gap-3 rounded-xl bg-gradient-to-r from-[#7F77DD] to-[#A78BFA] p-4 text-white active:opacity-90"
-        >
-          <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-white/20 text-[22px]">{IDOL.emoji}</span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[14px] font-bold">{IDOL.name}의 시장 미션</p>
-            <p className="mt-0.5 text-[11px] text-white/80">
-              {idolStage >= IDOL_STAGE_COUNT
-                ? "미션을 모두 풀었어요"
-                : `힌트를 찾아 문제를 풀면 포인트와 굿즈 추첨권 · ${idolStage}/${IDOL_STAGE_COUNT}`}
-            </p>
-          </div>
-          <ChevronRight className="h-5 w-5 flex-shrink-0 text-white/80" />
-        </Link>
-      )}
-
-      {!ownerMode && (
-        <Link
-          to="/profile?tab=events"
-          className="mx-4 mt-3 flex items-center gap-3 rounded-xl bg-gradient-to-r from-[#FF7A59] to-[#FFB347] p-4 text-white active:opacity-90"
-        >
-          <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-white/20 text-[22px]">📣</span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[14px] font-bold">시장을 SNS에 알려주세요</p>
-            <p className="mt-0.5 text-[11px] text-white/85">게시물을 올리고 인증하면 최대 400P를 받아요</p>
-          </div>
-          <ChevronRight className="h-5 w-5 flex-shrink-0 text-white/80" />
-        </Link>
-      )}
 
       {/* Main Content */}
       <div className="relative z-10 px-4 pt-8">
@@ -343,24 +294,36 @@ export function HomePage() {
           </div>
         </div>
 
-        {/* Flash Sale */}
-        <div className="bg-[#5B4335] rounded-xl p-4 mb-6">
-          <div className="flex items-center gap-2 mb-1">
-            <Tag className="w-4 h-4 text-orange-400" />
-            <span className="text-[14px] text-white">할인·이벤트 알림</span>
+        {!ownerMode && (
+          <div className="mb-6 space-y-3">
+            <Link
+              to="/idol"
+              className="flex items-center gap-3 rounded-xl border border-[#D7D3E8] bg-[#E4E2EF] p-4 text-[#302C40] active:opacity-90"
+            >
+              <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-white/65 text-[22px]">{IDOL.emoji}</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[14px] font-bold text-[#6250A4]">에스파 {IDOL.name}의 시장 미션</p>
+                <p className="mt-0.5 text-[11px] text-[#625D76]">
+                  {idolStage >= IDOL_STAGE_COUNT
+                    ? "미션을 모두 풀었어요"
+                    : `힌트를 찾아 문제를 풀면 포인트와 굿즈 추첨권 · ${idolStage}/${IDOL_STAGE_COUNT}`}
+                </p>
+              </div>
+              <ChevronRight className="h-5 w-5 flex-shrink-0 text-[#6044A5]" />
+            </Link>
+            <Link
+              to="/profile?tab=events"
+              className="flex items-center gap-3 rounded-xl border border-[#D2E0EC] bg-[#E6EFF7] p-4 text-[#555B63] active:opacity-90"
+            >
+              <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-white/70 text-[22px]">📣</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[14px] font-bold text-[#1768A8]">시장을 SNS에 알려주세요</p>
+                <p className="mt-0.5 text-[11px] text-[#555B63]">게시물을 올리고 인증하면 최대 400P를 받아요</p>
+              </div>
+              <ChevronRight className="h-5 w-5 flex-shrink-0 text-[#1768A8]" />
+            </Link>
           </div>
-          <p className="text-[12px] text-[#9A897F] mb-3 leading-relaxed">
-            {liveDealCount > 0
-              ? `${selectedMarket.name}에서 ${liveDealCount}곳이 할인·이벤트를 진행 중이에요. 지도 핀은 주황색으로 표시됩니다.`
-              : `${selectedMarket.name} 상인이 연 오늘의 할인과 이벤트를 확인해 보세요.`}
-          </p>
-          <Link
-            to={`/deals?market=${selectedMarketId}`}
-            className="inline-flex items-center gap-1 bg-white/10 text-white text-[12px] px-3 py-1.5 rounded-lg active:bg-white/20 transition-colors"
-          >
-            진행 중인 상점 보기 <ChevronRight className="w-3 h-3" />
-          </Link>
-        </div>
+        )}
 
         {/* Courses */}
         <div className="mb-4">

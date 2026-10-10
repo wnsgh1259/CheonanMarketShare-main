@@ -152,23 +152,23 @@ export function IdolEventPage() {
       </div>
 
       <div className="mx-auto max-w-md space-y-3 px-4 pt-4">
-        <div className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm">
+        <div className="flex items-center gap-3 rounded-2xl border border-[#D7D3E8] bg-[#E4E2EF] p-4 shadow-sm">
           <button
             type="button"
             onClick={replayLast}
             aria-label="마지막 말 다시 듣기"
-            className={`flex h-14 w-14 items-center justify-center rounded-full bg-[#E1F5EE] text-[26px] ${speaking ? "animate-bounce" : ""}`}
+            className={`flex h-14 w-14 items-center justify-center rounded-full bg-white/70 text-[26px] ${speaking ? "animate-bounce" : ""}`}
           >
             {IDOL.emoji}
           </button>
           <div className="min-w-0 flex-1">
-            <p className="text-[17px] font-extrabold text-gray-900">{IDOL.name}</p>
-            <p className="text-[12px] text-gray-400">{IDOL.group} · 프로필을 누르면 다시 들려줘요</p>
+            <p className="text-[17px] font-extrabold text-[#302C40]">{IDOL.name} ({IDOL.group})</p>
+            <p className="text-[12px] text-[#625D76]">WINTER · 프로필을 누르면 다시 들려줘요</p>
           </div>
           <button
             type="button"
             onClick={toggleVoice}
-            className="flex h-9 items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 text-[12px] text-gray-600"
+            className="flex h-9 items-center gap-1.5 rounded-xl border border-[#D7D3E8] bg-white/80 px-3 text-[12px] text-[#51446F]"
           >
             {voiceOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
             {voiceOn ? "ON" : "OFF"}
@@ -177,18 +177,27 @@ export function IdolEventPage() {
 
         <div className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 shadow-sm">
           {Array.from({ length: IDOL_STAGE_COUNT }, (_, index) => (
-            <div key={index} className={`h-2 flex-1 rounded-full ${index < progress.stage ? "bg-[#7F77DD]" : "bg-gray-200"}`} />
+            <div key={index} className={`h-2 flex-1 rounded-full ${index < progress.stage ? "bg-[#6250A4]" : "bg-[#D2CEE3]"}`} />
           ))}
-          <span className="ml-1 text-[12px] font-semibold text-[#534AB7]">{Math.min(progress.stage, IDOL_STAGE_COUNT)}/{IDOL_STAGE_COUNT}</span>
+          <span className="ml-1 text-[12px] font-semibold text-[#6250A4]">{Math.min(progress.stage, IDOL_STAGE_COUNT)}/{IDOL_STAGE_COUNT}</span>
         </div>
 
-        <div ref={chatRef} className="flex h-[340px] flex-col gap-3 overflow-y-auto rounded-2xl bg-[#faf9f7] p-4 shadow-sm">
+        <div
+          ref={chatRef}
+          className="flex h-[340px] flex-col gap-3 overflow-y-auto rounded-2xl border border-white/60 p-4 shadow-sm"
+          style={{
+            backgroundImage: "linear-gradient(rgba(255,255,255,0.12), rgba(255,255,255,0.12)), url('/winter-mission-chat-bg.jpg')",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
+          }}
+        >
           {messages.map((message) => (
             <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
               <div
                 className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-[14px] leading-relaxed ${
                   message.role === "user"
-                    ? "rounded-br-sm bg-[#7F77DD] text-white"
+                    ? "rounded-br-sm bg-[#E4E2EF] text-[#493B70]"
                     : "rounded-bl-sm border border-gray-100 bg-white text-gray-800"
                 }`}
               >
@@ -198,7 +207,7 @@ export function IdolEventPage() {
           ))}
         </div>
 
-        <div className="space-y-2.5 rounded-2xl bg-white p-4 shadow-sm">
+        <div className="space-y-2.5 rounded-2xl border border-[#D7D3E8] bg-[#E4E2EF] p-4 shadow-sm">
           {progress.claimed ? (
             <div className="text-center">
               <p className="text-[14px] font-semibold text-gray-800">미션 완료!</p>
@@ -211,7 +220,7 @@ export function IdolEventPage() {
             <button
               type="button"
               onClick={handleClaim}
-              className="h-12 w-full rounded-xl bg-[#7F77DD] text-[14px] font-bold text-white active:opacity-80"
+              className="h-12 w-full rounded-xl bg-[#6250A4] text-[14px] font-bold text-white active:opacity-80"
             >
               포인트 {IDOL_REWARD_POINTS}P와 추첨권 받기
             </button>
@@ -219,7 +228,7 @@ export function IdolEventPage() {
             <button
               type="button"
               onClick={handleHint}
-              className="h-12 w-full rounded-xl bg-[#7F77DD] text-[14px] font-bold text-white active:opacity-80"
+              className="h-12 w-full rounded-xl bg-[#6250A4] text-[14px] font-bold text-white active:opacity-80"
             >
               {stageIndex + 1}단계 힌트 듣기
             </button>
@@ -232,7 +241,7 @@ export function IdolEventPage() {
                 inputMode="numeric"
                 maxLength={4}
                 placeholder="코드 4자리"
-                className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 text-[14px] tracking-widest outline-none focus:border-[#7F77DD]"
+                className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 text-[14px] tracking-widest outline-none focus:border-[#6250A4]"
               />
               <div className="flex gap-2">
                 <input
@@ -240,12 +249,12 @@ export function IdolEventPage() {
                   onChange={(event) => { setAnswer(event.target.value); setError(""); }}
                   onKeyDown={(event) => { if (event.key === "Enter") handleSubmit(); }}
                   placeholder="정답"
-                  className="h-11 min-w-0 flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 text-[14px] outline-none focus:border-[#7F77DD]"
+                  className="h-11 min-w-0 flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 text-[14px] outline-none focus:border-[#6250A4]"
                 />
                 <button
                   type="button"
                   onClick={handleSubmit}
-                  className="flex h-11 w-12 items-center justify-center rounded-xl bg-[#7F77DD] text-white active:opacity-80"
+                  className="flex h-11 w-12 items-center justify-center rounded-xl bg-[#6250A4] text-white active:opacity-80"
                   aria-label="정답 확인"
                 >
                   <Send className="h-4 w-4" />
