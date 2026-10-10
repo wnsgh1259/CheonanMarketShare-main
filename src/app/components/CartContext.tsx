@@ -6,12 +6,15 @@ export interface CartItem {
   id: string;
   name: string;
   storeName: string;
+  /** 상점 미지정(unresolved)일 때 0 */
   storeId: number;
   marketId: MarketId;
   price: number;
   quantity: number;
   image: string;
   isQuickAdd?: boolean;
+  /** 상점 상관없이 상품명만 담은 경우 — 경로 추천 시 상점 배정 */
+  unresolved?: boolean;
 }
 
 interface CartContextType {
@@ -43,13 +46,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
           i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
         );
       }
-      return [...prev, { ...item, quantity: 1 }];
+      return [...prev, { ...item, quantity: item.quantity > 0 ? item.quantity : 1 }];
     });
     return "added";
   };
 
   const switchMarketAndAdd = (item: CartItem) => {
-    setItems([{ ...item, quantity: 1 }]);
+    setItems([{ ...item, quantity: item.quantity > 0 ? item.quantity : 1 }]);
     setCurrentMarketId(item.marketId);
   };
 

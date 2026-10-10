@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { StorePromotion } from "./storePromotion";
 
 export const OWNER_DASHBOARD_STORAGE_KEY = "owner-dashboard-draft-v1";
 export const OWNER_EDIT_STORE_KEY = "owner-edit-store-v1";
@@ -38,6 +39,8 @@ export type SharedDraftStore = {
   marketId?: string;
   image?: string;
   menus?: SharedOwnerMenu[];
+  promotion?: StorePromotion;
+  checkinCode?: string;
 };
 
 export type SharedOwnerDashboardDraft = {

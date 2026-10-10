@@ -1,7 +1,19 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronLeft, RotateCcw } from "lucide-react";
 import { useNavigate } from "react-router";
 import { BottomNav } from "../components/BottomNav";
+import { loadOwnerCatalog } from "../data/ownerStoreData";
+import type { PointEntry } from "../data/rewards";
+import { loadStoreLedger, syncStorePoints } from "../data/storePoints";
+
+const HISTORY_PAGE_SIZE = 5;
+
+function formatDateTime(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getMonth() + 1}/${date.getDate()} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
 
 const BUTTONS = [
   { label: "100,000원", value: 100000 },
@@ -15,9 +27,22 @@ const SETTLEMENT_BANK_NAME_KEY = "settlement_bank_name";
 
 export function SettlementPage() {
   const navigate = useNavigate();
-  const [points] = useState(() => {
-    try { return Number(localStorage.getItem("user_mileage")) || 3250; } catch { return 3250; }
-  });
+  const storeId = (() => {
+    const raw = Number(localStorage.getItem("owner_store_id"));
+    return Number.isFinite(raw) && raw > 0 ? raw : null;
+  })();
+  const storeName = storeId ? (loadOwnerCatalog().stores ?? []).find((store) => store.id === storeId)?.name ?? "" : "";
+  const [ledger, setLedger] = useState<PointEntry[]>(() => (storeId ? loadStoreLedger(storeId) : []));
+  const [historyPage, setHistoryPage] = useState(0);
+  const points = Math.max(0, ledger.reduce((sum, entry) => sum + entry.points, 0));
+  const historyPages = Math.max(1, Math.ceil(ledger.length / HISTORY_PAGE_SIZE));
+  const currentHistoryPage = Math.min(historyPage, historyPages - 1);
+  const pagedLedger = ledger.slice(currentHistoryPage * HISTORY_PAGE_SIZE, (currentHistoryPage + 1) * HISTORY_PAGE_SIZE);
+
+  useEffect(() => {
+    if (!storeId) return;
+    void syncStorePoints(storeId).then(() => setLedger(loadStoreLedger(storeId)));
+  }, [storeId]);
   const [amount, setAmount] = useState(0);
   const [bankName, setBankName] = useState(() => {
     try { return localStorage.getItem(SETTLEMENT_BANK_NAME_KEY) || ""; } catch { return ""; }
@@ -59,12 +84,61 @@ export function SettlementPage() {
 
         {/* 내 포인트 */}
         <div className="bg-white rounded-2xl px-5 py-5 shadow-sm border border-gray-100">
-          <p className="text-[12px] text-gray-400 mb-1">내 포인트</p>
+          <p className="text-[12px] text-gray-400 mb-1">내 포인트{storeName ? ` · ${storeName}` : ""}</p>
           <p className="text-[32px] font-bold text-gray-900 leading-none">
             {points.toLocaleString()}
             <span className="text-[16px] text-gray-400 font-normal ml-1">P</span>
           </p>
           <p className="text-[11px] text-gray-400 mt-2">최소 정산 금액 {MIN_POINTS.toLocaleString()}P 이상</p>
+          <p className="text-[11px] text-gray-400 mt-0.5">손님 쿠폰으로 할인해 준 금액만큼 포인트가 들어와요.</p>
+        </div>
+
+        {/* 포인트 내역 */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[13px] font-semibold text-gray-800">포인트 내역</p>
+            <span className="text-[11px] text-gray-400">{ledger.length}건</span>
+          </div>
+          {!storeId ? (
+            <p className="py-6 text-center text-[12px] text-gray-400">가게 정보를 찾을 수 없어요. 다시 로그인해 주세요.</p>
+          ) : ledger.length === 0 ? (
+            <p className="py-6 text-center text-[12px] text-gray-400">아직 받은 포인트가 없어요.</p>
+          ) : (
+            <div className="space-y-2">
+              {pagedLedger.map((entry) => (
+                <div key={entry.id} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-[12px] text-gray-700">{entry.label}</p>
+                    <p className="text-[10px] text-gray-400">{formatDateTime(entry.at)}</p>
+                  </div>
+                  <span className={`flex-shrink-0 text-[13px] font-bold ${entry.points >= 0 ? "text-emerald-600" : "text-rose-500"}`}>
+                    {entry.points >= 0 ? "+" : ""}{entry.points.toLocaleString()}P
+                  </span>
+                </div>
+              ))}
+              {historyPages > 1 && (
+                <div className="flex items-center justify-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    disabled={currentHistoryPage === 0}
+                    onClick={() => setHistoryPage(currentHistoryPage - 1)}
+                    className="h-9 rounded-full border border-gray-200 bg-white px-4 text-[12px] font-medium text-gray-600 disabled:opacity-40"
+                  >
+                    ‹ 이전
+                  </button>
+                  <span className="text-[12px] text-gray-500">{currentHistoryPage + 1} / {historyPages}</span>
+                  <button
+                    type="button"
+                    disabled={currentHistoryPage >= historyPages - 1}
+                    onClick={() => setHistoryPage(currentHistoryPage + 1)}
+                    className="h-9 rounded-full border border-gray-200 bg-white px-4 text-[12px] font-medium text-gray-600 disabled:opacity-40"
+                  >
+                    다음 ›
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* 정산 금액 선택 */}

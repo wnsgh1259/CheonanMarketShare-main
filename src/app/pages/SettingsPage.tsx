@@ -52,6 +52,7 @@ export function SettingsPage() {
   const [eventAlarm, setEventAlarm] = useState(false);
   const [newAlarm, setNewAlarm] = useState(false);
 
+  const isGuestAccount = userPhone.startsWith("guest-");
   const changeRequestSource = ownerMode ? "store" : "customer";
   const changeRequestName = ownerMode ? ownerStoreName || nickname : nickname;
 
@@ -309,11 +310,11 @@ export function SettingsPage() {
                 <Phone className="w-4 h-4 text-[#8A6A52] flex-shrink-0" />
                 <span className="text-[12px] text-[#9A897F]">휴대폰 번호</span>
               </div>
-              <div className="flex items-center justify-between bg-[#F8F5F0] rounded-lg px-3 py-2.5">
+              <div className="flex items-center justify-between bg-[#F7F5F1] rounded-lg px-3 py-2.5">
                 <span className="text-[15px] text-[#46352C]">
-                  {userPhone ? formatPhoneDisplay(userPhone) : "등록된 번호 없음"}
+                  {isGuestAccount ? "비회원 실험 계정" : userPhone ? formatPhoneDisplay(userPhone) : "등록된 번호 없음"}
                 </span>
-                {settingsModal !== "phone" && (
+                {settingsModal !== "phone" && !isGuestAccount && (
                   <button
                     type="button"
                     disabled={isPhonePending}
@@ -325,7 +326,7 @@ export function SettingsPage() {
                     }}
                     className={`flex items-center gap-1 text-[13px] transition-colors ${
                       isPhonePending
-                        ? "text-gray-400 cursor-not-allowed"
+                        ? "text-[#8A776B] cursor-not-allowed"
                         : "text-[#8A6A52] active:text-[#46352C]"
                     }`}
                   >
@@ -493,7 +494,7 @@ export function SettingsPage() {
               </div>
               <button
                 onClick={() => setEventAlarm((v) => !v)}
-                className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${eventAlarm ? "bg-[#5B4335]" : "bg-gray-200"}`}
+                className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${eventAlarm ? "bg-[#5B4335]" : "bg-[#EFE4D8]"}`}
               >
                 <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${eventAlarm ? "translate-x-5" : "translate-x-0"}`} />
               </button>
@@ -508,7 +509,7 @@ export function SettingsPage() {
               </div>
               <button
                 onClick={() => setNewAlarm((v) => !v)}
-                className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${newAlarm ? "bg-[#5B4335]" : "bg-gray-200"}`}
+                className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${newAlarm ? "bg-[#5B4335]" : "bg-[#EFE4D8]"}`}
               >
                 <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${newAlarm ? "translate-x-5" : "translate-x-0"}`} />
               </button>
@@ -531,7 +532,7 @@ export function SettingsPage() {
                 className="w-full flex items-center justify-between px-4 py-3.5 active:bg-[#F8F5F0] transition-colors"
               >
                 <span className="text-[14px] text-[#46352C]">{item}</span>
-                <ChevronRight className="w-4 h-4 text-gray-300" />
+                <ChevronRight className="w-4 h-4 text-[#9A897F]" />
               </button>
             ))}
           </div>

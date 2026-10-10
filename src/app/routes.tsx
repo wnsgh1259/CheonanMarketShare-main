@@ -12,16 +12,36 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { StoreRegistrationPage } from "./pages/StoreRegistrationPage";
 import { FacilityRegistrationPage } from "./pages/FacilityRegistrationPage";
 import { AdminPage } from "./pages/AdminPage";
+import { WalkPathEditorPage } from "./pages/WalkPathEditorPage";
+import { MarketAreaEditorPage } from "./pages/MarketAreaEditorPage";
 import { WritePage } from "./pages/WritePage";
 import { PostDetailPage } from "./pages/PostDetailPage";
 import { CouponUsePage } from "./pages/CouponUsePage";
 import { SettlementPage } from "./pages/SettlementPage";
 import { RegisterPage } from "./pages/RegisterPage";
+import { DealsPage } from "./pages/DealsPage";
+import { IdolEventPage } from "./pages/IdolEventPage";
 
 function AdminRoute() {
   return (
     <RequireRole roles={["admin"]}>
       <AdminPage />
+    </RequireRole>
+  );
+}
+
+function AdminWalkPathRoute() {
+  return (
+    <RequireRole roles={["admin"]}>
+      <WalkPathEditorPage />
+    </RequireRole>
+  );
+}
+
+function AdminMarketAreaRoute() {
+  return (
+    <RequireRole roles={["admin"]}>
+      <MarketAreaEditorPage />
     </RequireRole>
   );
 }
@@ -66,11 +86,15 @@ export const router = createBrowserRouter([
       { path: "owner/store-registration", Component: OwnerStoreRoute },
       { path: "owner/facility-registration", Component: OwnerFacilityRoute },
       { path: "admin", Component: AdminRoute },
+      { path: "admin/walk-path", Component: AdminWalkPathRoute },
+      { path: "admin/market-area", Component: AdminMarketAreaRoute },
       { path: "write", Component: WritePage },
       { path: "post/:id", Component: PostDetailPage },
       { path: "coupon-use", Component: CouponUsePage },
       { path: "settlement", Component: OwnerSettlementRoute },
       { path: "register", Component: RegisterPage },
+      { path: "deals", Component: DealsPage },
+      { path: "idol", Component: IdolEventPage },
     ],
   },
 ]);

@@ -1,19 +1,28 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import {
-  ChevronLeft, MapPin, Zap, Trash2, ShoppingCart,
+  ChevronLeft, Zap, Trash2, ShoppingCart,
   Search, CheckCircle2, PlusCircle, X, ChevronDown, ChevronUp, Route,
 } from "lucide-react";
 import { useCart } from "../components/CartContext";
-import type { MarketId } from "../components/CartContext";
+import type { CartItem, MarketId } from "../components/CartContext";
 import { BottomNav } from "../components/BottomNav";
 import { RouteRecommendation } from "../components/RouteRecommendation";
+import { MarketConflictModal } from "../components/MarketConflictModal";
+import {
+  searchProducts,
+  unresolvedCartItemId,
+  type ProductSearchGroup,
+  type ProductStoreOffer,
+} from "../data/productSearch";
 
-const MARKET_NAMES: Record<string, string> = {
+const MARKET_NAMES: Record<MarketId, string> = {
   jungang: "천안중앙시장",
   byeongcheon: "천안역전시장",
   seonghwan: "성환전통시장",
 };
+
+const MARKET_ORDER: MarketId[] = ["jungang", "byeongcheon", "seonghwan"];
 
 const VEG_IMG   = "https://images.unsplash.com/photo-1771250625125-6e552f84fe11?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=200";
 const MEAT_IMG  = "https://images.unsplash.com/photo-1616627152550-5aac9b71a949?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=200";
@@ -73,8 +82,15 @@ const RECIPES: Record<string, RecipeIngredient[]> = {
 };
 
 export function CartPage() {
-  const { items, removeItem, clearCart, totalCount, currentMarketId, addItem } = useCart();
+  const { items, removeItem, clearCart, totalCount, currentMarketId, addItem, switchMarketAndAdd } = useCart();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+
+  const [searchMarket, setSearchMarket] = useState<MarketId>(currentMarketId ?? "jungang");
+  const [productQuery, setProductQuery] = useState("");
+  const [productGroups, setProductGroups] = useState<ProductSearchGroup[] | null>(null);
+  const [productSearched, setProductSearched] = useState(false);
+  const [pendingConflictItem, setPendingConflictItem] = useState<CartItem | null>(null);
+  const [productNotice, setProductNotice] = useState("");
 
   const [recipeQuery, setRecipeQuery]     = useState("");
   const [recipeResults, setRecipeResults] = useState<RecipeIngredient[] | null>(null);
@@ -82,6 +98,56 @@ export function CartPage() {
   const [addedIds, setAddedIds]           = useState<Set<string>>(new Set());
   const [conflictMsg, setConflictMsg]     = useState("");
   const [resultsCollapsed, setResultsCollapsed] = useState(false);
+
+  const activeSearchMarket = currentMarketId ?? searchMarket;
+
+  const cartIdSet = useMemo(() => new Set(items.map((i) => i.id)), [items]);
+
+  const handleProductSearch = () => {
+    const q = productQuery.trim();
+    if (!q) return;
+    const groups = searchProducts(activeSearchMarket, q);
+    setProductGroups(groups);
+    setProductSearched(true);
+    setProductNotice("");
+  };
+
+  const tryAdd = (item: CartItem) => {
+    const result = addItem(item);
+    if (result === "market_conflict") {
+      setPendingConflictItem(item);
+      return false;
+    }
+    setProductNotice(`「${item.name}」을(를) 담았어요.`);
+    return true;
+  };
+
+  const addUnresolved = (group: ProductSearchGroup) => {
+    tryAdd({
+      id: unresolvedCartItemId(activeSearchMarket, group.productName),
+      name: group.productName,
+      storeName: "상점 미지정",
+      storeId: 0,
+      marketId: activeSearchMarket,
+      price: group.minPrice,
+      quantity: 1,
+      image: group.offers[0]?.storeImage ?? "",
+      unresolved: true,
+    });
+  };
+
+  const addOffer = (offer: ProductStoreOffer) => {
+    tryAdd({
+      id: offer.menuId,
+      name: offer.menuName,
+      storeName: offer.storeName,
+      storeId: offer.storeId,
+      marketId: offer.marketId,
+      price: offer.price,
+      quantity: 1,
+      image: offer.storeImage,
+    });
+  };
 
   const handleRecipeSearch = () => {
     const q = recipeQuery.trim();
@@ -149,7 +215,7 @@ export function CartPage() {
   const totalPrice  = items.reduce((s, i) => s + i.price * i.quantity, 0);
 
   return (
-    <div className="relative isolate min-h-screen bg-gradient-to-b from-[#EAF3F6] via-[#F3F6F3] to-[#F8F7F3] pb-24">
+    <div className="relative isolate min-h-screen bg-[#F7F6F1] pb-24">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
         <span className="profile-leaf profile-leaf-one">🍁</span>
         <span className="profile-leaf profile-leaf-two">🍂</span>
@@ -175,24 +241,141 @@ export function CartPage() {
       </div>
 
       <main className="relative z-10">
+      {/* Product search */}
+      <div className="mx-4 mt-3 rounded-2xl border border-[#E5D9CB] bg-white p-4 shadow-[0_8px_24px_-22px_rgba(70,53,44,0.28)]">
+        <h2 className="text-[14px] text-[#46352C] mb-1">상품 검색</h2>
+        <p className="text-[12px] text-[#8A776B] mb-3">
+          사고 싶은 상품을 검색한 뒤, 상점을 고르거나 상점 무관으로 담으세요
+        </p>
+
+        {!currentMarketId && (
+          <div className="flex gap-1.5 mb-2.5 overflow-x-auto">
+            {MARKET_ORDER.map((id) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => {
+                  setSearchMarket(id);
+                  setProductGroups(null);
+                  setProductSearched(false);
+                }}
+                className={`h-8 px-3 rounded-lg text-[12px] whitespace-nowrap ${
+                  searchMarket === id ? "bg-[#5B4335] text-white" : "bg-[#F5F0E7] text-[#46352C]"
+                }`}
+              >
+                {MARKET_NAMES[id]}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={productQuery}
+            onChange={(e) => setProductQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleProductSearch()}
+            placeholder="상품명 검색 (예: 고등어, 배추)"
+            className="flex-1 px-3 py-2.5 bg-[#F5F0E7] rounded-lg text-[14px] focus:outline-none focus:ring-1 focus:ring-[#B89A7D] placeholder:text-[#8A776B]"
+          />
+          <button
+            type="button"
+            onClick={handleProductSearch}
+            className="px-4 py-2.5 bg-[#5B4335] text-white rounded-lg text-[13px] active:bg-[#6B5142] transition-colors flex items-center gap-1"
+          >
+            <Search className="w-3.5 h-3.5" />검색
+          </button>
+        </div>
+
+        {productSearched && productGroups !== null && (
+          <div className="mt-3 border border-[#E5D9CB] rounded-lg overflow-hidden">
+            {productGroups.length === 0 ? (
+              <div className="px-3 py-5 text-center">
+                <p className="text-[13px] text-[#6B5142]">상품정보가 없습니다</p>
+                <p className="text-[11px] text-[#8A776B] mt-1">장바구니에 추가할 수 없어요</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {productGroups.map((group) => {
+                  const unresolvedId = unresolvedCartItemId(activeSearchMarket, group.productName);
+                  const unresolvedAdded = cartIdSet.has(unresolvedId);
+                  return (
+                    <div key={group.productName} className="p-2.5 space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => addUnresolved(group)}
+                        className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg text-left transition-colors ${
+                          unresolvedAdded ? "bg-sky-50" : "bg-[#F7F5F1] active:bg-[#EFE4D8]"
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <p className="text-[13px] text-[#46352C] font-medium truncate">{group.productName}</p>
+                          <p className="text-[11px] text-[#8A776B]">상점 무관 · 최저 {group.minPrice.toLocaleString()}원~</p>
+                        </div>
+                        <span className={`text-[11px] shrink-0 ${unresolvedAdded ? "text-[#0EA5E9]" : "text-[#6B5142]"}`}>
+                          {unresolvedAdded ? "담김" : "담기"}
+                        </span>
+                      </button>
+
+                      {group.offers.map((offer) => {
+                        const added = cartIdSet.has(offer.menuId);
+                        return (
+                          <button
+                            key={`${offer.storeId}-${offer.menuId}`}
+                            type="button"
+                            onClick={() => addOffer(offer)}
+                            className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-left transition-colors ${
+                              added ? "bg-sky-50/70" : "active:bg-[#F7F5F1]"
+                            }`}
+                          >
+                            <div className="min-w-0 pl-1">
+                              <p className="text-[13px] text-[#46352C] truncate">{offer.storeName}</p>
+                              {offer.originalPrice != null && offer.originalPrice > offer.price ? (
+                                <p className="text-[11px] text-emerald-600">할인중</p>
+                              ) : (
+                                <p className="text-[11px] text-[#8A776B]">등록 메뉴</p>
+                              )}
+                            </div>
+                            <div className="flex flex-col items-end shrink-0">
+                              <span className="text-[13px] text-[#46352C]">{offer.price.toLocaleString()}원</span>
+                              <span className={`text-[10px] ${added ? "text-[#0EA5E9]" : "text-[#8A776B]"}`}>
+                                {added ? "담김" : "담기"}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {productNotice && (
+          <p className="mt-2 text-[12px] text-emerald-600">{productNotice}</p>
+        )}
+      </div>
+
       {/* Cart Items */}
-      <div className="bg-white mx-4 mt-4 rounded-2xl p-4 ring-1 ring-inset ring-[#EAE8DF] shadow-[0_8px_24px_-22px_rgba(70,53,44,0.28)]">
+      <div className="mx-4 mt-2.5 rounded-2xl border border-[#E5D9CB] bg-white p-4 shadow-[0_8px_24px_-22px_rgba(70,53,44,0.28)]">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[14px] text-gray-800">담은 상품 ({totalCount})</h2>
+          <h2 className="text-[14px] text-[#46352C]">담은 상품 ({totalCount})</h2>
           {items.length > 0 && (
             <button
               onClick={() => setShowClearConfirm(true)}
-              className="flex items-center gap-1 text-[12px] text-gray-600 active:text-red-500 transition-colors"
+              className="flex items-center gap-1 text-[12px] text-[#6B5142] active:text-red-500 transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5" />초기화
             </button>
           )}
         </div>
         {items.length === 0 ? (
-          <div className="flex flex-col items-center py-8 text-gray-600">
-            <ShoppingCart className="w-10 h-10 mb-2 text-gray-300" />
+          <div className="flex flex-col items-center py-8 text-[#6B5142]">
+            <ShoppingCart className="w-10 h-10 mb-2 text-[#9A897F]" />
             <p className="text-[13px] mb-0.5">장바구니가 비어있어요</p>
-            <p className="text-[12px] text-gray-600">지도에서 상품을 담아보세요</p>
+            <p className="text-[12px] text-[#6B5142]">지도에서 상품을 담아보세요</p>
           </div>
         ) : (
           <>
@@ -201,17 +384,25 @@ export function CartPage() {
                 {directItems.map((item) => (
                   <div key={item.id} className="flex items-center gap-3 py-3 border-b border-gray-50 last:border-0">
                     <div className="w-11 h-11 rounded-lg overflow-hidden flex-shrink-0 bg-[#FAF4EC]">
-                      <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                      {item.image ? (
+                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-[11px] text-[#8A776B]">상품</div>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-[14px] text-gray-800">{item.name}</h3>
-                      <p className="text-[12px] text-gray-600">{item.storeName}</p>
+                      <h3 className="text-[14px] text-[#46352C]">{item.name}</h3>
+                      <p className={`text-[12px] ${item.unresolved ? "text-amber-600" : "text-[#8A776B]"}`}>
+                        {item.unresolved ? "상점 미지정 · 경로 추천 시 배정" : item.storeName}
+                      </p>
                       <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="text-[14px] text-gray-800">{item.price.toLocaleString()}원</span>
-                        <span className="text-[12px] text-gray-600">× {item.quantity}</span>
+                        <span className="text-[14px] text-[#46352C]">
+                          {item.unresolved ? `${item.price.toLocaleString()}원~` : `${item.price.toLocaleString()}원`}
+                        </span>
+                        <span className="text-[12px] text-[#8A776B]">× {item.quantity}</span>
                       </div>
                     </div>
-                    <button onClick={() => removeItem(item.id)} className="p-2 text-gray-300 active:text-red-500">
+                    <button onClick={() => removeItem(item.id)} className="p-2 text-[#9A897F] active:text-red-500">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -231,13 +422,13 @@ export function CartPage() {
                       <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-[14px] text-gray-700">{item.name}</h3>
+                      <h3 className="text-[14px] text-[#46352C]">{item.name}</h3>
                       <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="text-[14px] text-gray-800">{item.price.toLocaleString()}원</span>
-                        <span className="text-[12px] text-gray-600">× {item.quantity}</span>
+                        <span className="text-[14px] text-[#46352C]">{item.price.toLocaleString()}원</span>
+                        <span className="text-[12px] text-[#6B5142]">× {item.quantity}</span>
                       </div>
                     </div>
-                    <button onClick={() => removeItem(item.id)} className="p-2 text-gray-300 active:text-red-500">
+                    <button onClick={() => removeItem(item.id)} className="p-2 text-[#9A897F] active:text-red-500">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -246,13 +437,13 @@ export function CartPage() {
             )}
             {items.length > 0 && (
               <div className="mt-3 pt-3 border-t border-[#EDE5D8] flex items-center justify-between">
-                <span className="text-[13px] text-gray-600">담은 상품 합계</span>
-                <span className="text-[18px] text-gray-800">{totalPrice.toLocaleString()}원</span>
+                <span className="text-[13px] text-[#6B5142]">담은 상품 합계</span>
+                <span className="text-[18px] text-[#46352C]">{totalPrice.toLocaleString()}원</span>
               </div>
             )}
             <Link
               to="/map"
-              className="mt-3 flex items-center justify-center w-full py-2.5 border border-dashed border-gray-200 rounded-lg text-[13px] text-gray-600"
+              className="mt-3 flex items-center justify-center w-full py-2.5 border border-dashed border-[#E5D9CB] rounded-lg text-[13px] text-[#6B5142]"
             >
               + 상품 추가하기
             </Link>
@@ -264,16 +455,16 @@ export function CartPage() {
       <div className="bg-white mx-4 mt-3 rounded-2xl p-4 ring-1 ring-inset ring-[#EAE8DF] shadow-[0_8px_24px_-22px_rgba(70,53,44,0.28)]">
         <div className="flex items-center gap-2 mb-1">
           <Zap className="w-4 h-4 text-[#8A6A52]" />
-          <h2 className="text-[14px] text-gray-800">빠른 장보기</h2>
+          <h2 className="text-[14px] text-[#46352C]">빠른 장보기</h2>
         </div>
-        <p className="text-[12px] text-gray-600 mb-3">요리명을 검색하면 재료를 자동 추가해요</p>
+        <p className="text-[12px] text-[#6B5142] mb-3">요리명을 검색하면 재료를 자동 추가해요</p>
         <div className="flex gap-2 mb-2">
           <input
             type="text" value={recipeQuery}
             onChange={(e) => setRecipeQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleRecipeSearch()}
             placeholder="요리명을 입력하세요"
-            className="flex-1 px-3 py-2.5 bg-[#F7F2E8] rounded-xl text-[14px] focus:outline-none focus:ring-2 focus:ring-[#B89A7D] placeholder:text-gray-500"
+            className="flex-1 px-3 py-2.5 bg-[#F7F2E8] rounded-xl text-[14px] focus:outline-none focus:ring-2 focus:ring-[#B89A7D] placeholder:text-[#6B5142]"
           />
           <button
             onClick={handleRecipeSearch}
@@ -304,15 +495,15 @@ export function CartPage() {
 
         {recipeResults !== null && (
           recipeResults.length === 0 ? (
-            <div className="text-center py-6 text-gray-600">
+            <div className="text-center py-6 text-[#6B5142]">
               <p className="text-[13px]">검색 결과가 없어요</p>
-              <p className="text-[12px] mt-1 text-gray-600">다른 요리명을 입력해 보세요</p>
+              <p className="text-[12px] mt-1 text-[#6B5142]">다른 요리명을 입력해 보세요</p>
             </div>
           ) : (
             <div className="mt-1 border border-[#EDE5D8] rounded-lg overflow-hidden">
-              <div className="flex items-center justify-between px-3 py-2.5 bg-gray-50 border-b border-[#EDE5D8]">
+              <div className="flex items-center justify-between px-3 py-2.5 bg-[#F7F5F1] border-b border-[#EDE5D8]">
                 <div className="flex items-center gap-2">
-                  <span className="text-[13px] text-gray-800">{recipeTitle} 재료</span>
+                  <span className="text-[13px] text-[#46352C]">{recipeTitle} 재료</span>
                   <span className="text-[11px] text-[#8A6A52]">{addedIds.size}/{recipeResults.length}</span>
                 </div>
                 <div className="flex items-center gap-1">
@@ -324,12 +515,12 @@ export function CartPage() {
                       전체 담기
                     </button>
                   )}
-                  <button onClick={() => setResultsCollapsed((v) => !v)} className="p-1.5 text-gray-600">
+                  <button onClick={() => setResultsCollapsed((v) => !v)} className="p-1.5 text-[#6B5142]">
                     {resultsCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
                   </button>
                   <button
                     onClick={() => { setRecipeResults(null); setRecipeTitle(""); setAddedIds(new Set()); setConflictMsg(""); setResultsCollapsed(false); }}
-                    className="p-1.5 text-gray-600"
+                    className="p-1.5 text-[#6B5142]"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -346,15 +537,15 @@ export function CartPage() {
                       <span
                         key={ing.id}
                         className={`text-[11px] px-2 py-0.5 rounded ${
-                          addedIds.has(ing.id) ? "bg-[#EFE4D8] text-[#6B5142]" : "bg-[#F5F0E7] text-gray-600"
+                          addedIds.has(ing.id) ? "bg-[#EFE4D8] text-[#6B5142]" : "bg-[#F5F0E7] text-[#6B5142]"
                         }`}
                       >
                         {ing.name}
                       </span>
                     ))}
-                    {recipeResults.length > 4 && <span className="text-[11px] text-gray-600">+{recipeResults.length - 4}</span>}
+                    {recipeResults.length > 4 && <span className="text-[11px] text-[#6B5142]">+{recipeResults.length - 4}</span>}
                   </div>
-                  <ChevronDown className="w-4 h-4 text-gray-600 flex-shrink-0 ml-2" />
+                  <ChevronDown className="w-4 h-4 text-[#6B5142] flex-shrink-0 ml-2" />
                 </div>
               ) : (
                 <div className="p-3">
@@ -366,7 +557,7 @@ export function CartPage() {
                           key={ing.id}
                           onClick={() => handleToggleIngredient(ing)}
                           className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left ${
-                            isAdded ? "bg-[#FAF0E3]" : "bg-gray-50 active:bg-[#FAF0E3]"
+                            isAdded ? "bg-[#FAF0E3]" : "bg-[#F7F5F1] active:bg-[#FAF0E3]"
                           }`}
                         >
                           <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center text-[18px] flex-shrink-0">
@@ -374,19 +565,19 @@ export function CartPage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
-                              <span className="text-[13px] text-gray-800">{ing.name}</span>
-                              <span className="text-[10px] text-gray-600">{ing.amount}</span>
+                              <span className="text-[13px] text-[#46352C]">{ing.name}</span>
+                              <span className="text-[10px] text-[#6B5142]">{ing.amount}</span>
                             </div>
-                            <span className="text-[11px] text-gray-600">{ing.storeName}</span>
+                            <span className="text-[11px] text-[#6B5142]">{ing.storeName}</span>
                           </div>
                           <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
-                            <span className="text-[13px] text-gray-800">{ing.price.toLocaleString()}원</span>
+                            <span className="text-[13px] text-[#46352C]">{ing.price.toLocaleString()}원</span>
                             {isAdded ? (
                               <span className="flex items-center gap-0.5 text-[10px] text-[#8A6A52]">
                                 <CheckCircle2 className="w-3 h-3" />담김
                               </span>
                             ) : (
-                              <span className="flex items-center gap-0.5 text-[10px] text-gray-600">
+                              <span className="flex items-center gap-0.5 text-[10px] text-[#6B5142]">
                                 <PlusCircle className="w-3 h-3" />담기
                               </span>
                             )}
@@ -395,9 +586,9 @@ export function CartPage() {
                       );
                     })}
                   </div>
-                  <div className="mt-3 p-3 bg-gray-50 rounded-lg flex items-center justify-between">
-                    <span className="text-[12px] text-gray-600">전체 재료 합계</span>
-                    <span className="text-[14px] text-gray-800">
+                  <div className="mt-3 p-3 bg-[#F7F5F1] rounded-lg flex items-center justify-between">
+                    <span className="text-[12px] text-[#6B5142]">전체 재료 합계</span>
+                    <span className="text-[14px] text-[#46352C]">
                       {recipeResults.reduce((s, i) => s + i.price, 0).toLocaleString()}원
                     </span>
                   </div>
@@ -413,14 +604,25 @@ export function CartPage() {
       <div className="bg-white mx-4 mt-3 rounded-2xl p-4 ring-1 ring-inset ring-[#EAE8DF] shadow-[0_8px_24px_-22px_rgba(70,53,44,0.28)]">
         <div className="flex items-center gap-2 mb-1">
           <Route className="w-4 h-4 text-[#A9652D]" />
-          <h2 className="text-[14px] text-gray-800">맞춤형 경로 추천</h2>
+          <h2 className="text-[14px] text-[#46352C]">맞춤형 경로 추천</h2>
         </div>
-        <p className="text-[12px] text-gray-600 mb-4">
+        <p className="text-[12px] text-[#6B5142] mb-4">
           장바구니 상품 기반으로 3가지 최적 동선을 계산해요
         </p>
         <RouteRecommendation items={items} marketId={currentMarketId as MarketId | null} />
       </div>
       </main>
+
+      <MarketConflictModal
+        open={pendingConflictItem != null}
+        onCancel={() => setPendingConflictItem(null)}
+        onConfirm={() => {
+          if (!pendingConflictItem) return;
+          switchMarketAndAdd(pendingConflictItem);
+          setPendingConflictItem(null);
+          setProductNotice(`시장을 바꾸고 「${pendingConflictItem.name}」을(를) 담았어요.`);
+        }}
+      />
 
       {/* 초기화 확인 팝업 */}
       {showClearConfirm && (
@@ -429,13 +631,13 @@ export function CartPage() {
           <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[210] w-[280px] bg-white rounded-[24px] shadow-2xl ring-1 ring-inset ring-[#EAE8DF] overflow-hidden">
             <div className="px-6 pt-6 pb-5 text-center">
               <p className="text-[28px] mb-2">🗑️</p>
-              <p className="text-[16px] font-bold text-gray-800 mb-1">장바구니 초기화</p>
-              <p className="text-[13px] text-gray-600">담은 상품을 모두 삭제할까요?</p>
+              <p className="text-[16px] font-bold text-[#46352C] mb-1">장바구니 초기화</p>
+              <p className="text-[13px] text-[#6B5142]">담은 상품을 모두 삭제할까요?</p>
             </div>
             <div className="flex border-t border-[#EDE5D8]">
               <button
                 onClick={() => setShowClearConfirm(false)}
-                className="flex-1 py-3.5 text-[14px] text-gray-600 active:bg-[#FAF0E3] transition-colors border-r border-[#EDE5D8]"
+                className="flex-1 py-3.5 text-[14px] text-[#6B5142] active:bg-[#FAF0E3] transition-colors border-r border-[#EDE5D8]"
               >
                 취소
               </button>

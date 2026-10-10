@@ -10,6 +10,8 @@ import {
 } from "../data/adminAccount";
 import { useNavigate, useSearchParams } from "react-router";
 import { setOwnerMode, OWNER_STORE_MGMT_RETURN_KEY } from "../components/BottomNav";
+import { StoreCheckinPanel } from "../components/StoreCheckinPanel";
+import { OwnerSnsPromoPanel } from "../components/OwnerSnsPromoPanel";
 import { useAuth } from "../context/AuthContext";
 import { restoreAdminSessionFromBackup } from "../data/authSession";
 import { peekAdminReturnState, buildAdminReturnUrl } from "../data/adminNavigation";
@@ -38,6 +40,21 @@ import {
 import { refreshOwnerChangeRequestsFromRemote } from "../data/ownerChangeRequestsSync";
 import { refreshStoreAccountsFromRemote } from "../data/storeAccountsSync";
 import { formatPhoneDisplay, formatPhoneInput } from "../utils/phoneFormat";
+import {
+  DAILY_PROMOTION_LIMIT_MINUTES,
+  commitStorePromotion,
+  formatDealClock,
+  formatMinutes,
+  getScheduledSlot,
+  localDateKey,
+  parseMenuPrice,
+  remainingMinutesOnDate,
+  toDatetimeLocalValue,
+  turnOffStorePromotion,
+  usedMinutesOnDate,
+  type DiscountMode,
+  type StorePromotion,
+} from "../data/storePromotion";
 
 type NaverMapRef = {
   setCenter: (latLng: unknown) => void;
@@ -67,18 +84,22 @@ type DraftStore = {
   marketId?: MarketId;
   image?: string;
   menus?: OwnerMenu[];
+  promotion?: StorePromotion;
+  checkinCode?: string;
 };
 
-type OwnerSection = "store" | "product" | "communication" | "customerMode" | "community" | "promotion" | "settings";
+type OwnerSection = "store" | "product" | "qr" | "communication" | "customerMode" | "community" | "promotion" | "sns" | "settings";
 
 function parseOwnerSection(value: string | null): OwnerSection | null {
   if (
     value === "store" ||
     value === "product" ||
+    value === "qr" ||
     value === "communication" ||
     value === "customerMode" ||
     value === "community" ||
     value === "promotion" ||
+    value === "sns" ||
     value === "settings"
   ) {
     return value;
@@ -92,6 +113,90 @@ type OwnerMenu = {
   price: string;
   photoName: string;
 };
+
+type DealDiscountRow = {
+  rowKey: string;
+  menuId: number;
+  enabled: boolean;
+  mode: DiscountMode;
+  value: string;
+};
+
+function withUniqueMenuIds(list: OwnerMenu[]): OwnerMenu[] {
+  const seen = new Set<number>();
+  return list.map((menu, index) => {
+    if (!seen.has(menu.id)) {
+      seen.add(menu.id);
+      return menu;
+    }
+    let nextId = Date.now() + index;
+    while (seen.has(nextId)) nextId += 1;
+    seen.add(nextId);
+    return { ...menu, id: nextId };
+  });
+}
+
+function parseHourMinute(local: string) {
+  const fallback = new Date();
+  if (!local.includes("T")) {
+    return { hour: fallback.getHours(), minute: 0 };
+  }
+  const [hourText, minuteText] = local.split("T")[1].split(":");
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  return {
+    hour: Number.isInteger(hour) ? hour : fallback.getHours(),
+    minute: Number.isInteger(minute) ? minute : 0,
+  };
+}
+
+function todayAt(hour: number, minute: number) {
+  const now = new Date();
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(hour)}:${pad(minute)}`;
+}
+
+function formatTodayTime(local: string) {
+  if (!local) return "시간을 선택해 주세요";
+  const { hour, minute } = parseHourMinute(local);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  const period = hour < 12 ? "오전" : "오후";
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `오늘 ${period} ${hour12}:${pad(minute)}`;
+}
+
+type DealFormState = {
+  note: string;
+  start: string;
+  end: string;
+  discounts: DealDiscountRow[];
+};
+
+function emptyDealForm(): DealFormState {
+  return { note: "", start: "", end: "", discounts: [] };
+}
+
+function promotionToDealForm(
+  promotion: StorePromotion | null | undefined,
+  menuList: OwnerMenu[],
+): DealFormState {
+  const slot = getScheduledSlot(promotion);
+  return {
+    note: promotion?.note ?? "",
+    start: slot ? toDatetimeLocalValue(slot.startAt) : "",
+    end: slot ? toDatetimeLocalValue(slot.endAt) : "",
+    discounts: menuList.filter((menu) => menu.name.trim()).map((menu, index) => {
+      const found = promotion?.menuDiscounts.find((item) => item.menuId === menu.id);
+      return {
+        rowKey: String(index),
+        menuId: menu.id,
+        enabled: Boolean(found),
+        mode: found?.mode ?? "percent",
+        value: found ? String(found.value) : "",
+      };
+    }),
+  };
+}
 
 type OwnerDashboardDraft = {
   stores: DraftStore[];
@@ -280,6 +385,19 @@ export function StoreRegistrationPage() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedPayments, setSelectedPayments] = useState<string[]>([]);
   const [menus, setMenus] = useState<OwnerMenu[]>([{ id: Date.now(), name: "", price: "", photoName: "" }]);
+  const [dealForm, setDealForm] = useState<DealFormState>(emptyDealForm);
+  const [savedDealForm, setSavedDealForm] = useState<DealFormState>(emptyDealForm);
+  const [storePromotion, setStorePromotion] = useState<StorePromotion | null>(null);
+  const [openTimeField, setOpenTimeField] = useState<null | "start" | "end">(null);
+  const [timeDraft, setTimeDraft] = useState({ hour: 13, minute: 0 });
+  const promotionRef = useRef<StorePromotion | null>(null);
+  const promotionHydratedRef = useRef(false);
+
+  useEffect(() => {
+    const ids = menus.map((menu) => menu.id);
+    if (new Set(ids).size === ids.length) return;
+    setMenus(withUniqueMenuIds(menus));
+  }, [menus]);
   const [todayDeal, setTodayDeal] = useState("");
   const [news, setNews] = useState("");
   const [couponEvent, setCouponEvent] = useState("");
@@ -447,6 +565,7 @@ export function StoreRegistrationPage() {
       couponEvent,
       reviewReply,
       inquiryReply,
+      ...(promotionHydratedRef.current ? { promotion: promotionRef.current } : {}),
     });
   };
 
@@ -530,7 +649,7 @@ export function StoreRegistrationPage() {
     );
     setPin({ lat: target.lat, lng: target.lng });
     if (target.menus?.length) {
-      setMenus(target.menus);
+      setMenus(withUniqueMenuIds(target.menus));
     } else if (dummyMatch?.menus?.length) {
       setMenus(
         dummyMatch.menus.map((menu, index) => ({
@@ -635,7 +754,20 @@ export function StoreRegistrationPage() {
         }
 
         if (workspace && !cancelled && loadGeneration === storeLoadGenerationRef.current) {
-          setMenus(workspace.menus?.length ? workspace.menus : [{ id: Date.now(), name: "", price: "", photoName: "" }]);
+          const nextMenus = withUniqueMenuIds(
+            workspace.menus?.length ? workspace.menus : [{ id: Date.now(), name: "", price: "", photoName: "" }],
+          );
+          const catalogStore = workspaceStoreId
+            ? (catalog.stores ?? []).find((store) => store.id === workspaceStoreId)
+            : undefined;
+          const promo = catalogStore?.promotion ?? workspace.promotion ?? null;
+          const nextDealForm = promotionToDealForm(promo, nextMenus);
+          promotionRef.current = promo;
+          promotionHydratedRef.current = true;
+          setMenus(nextMenus);
+          setStorePromotion(promo);
+          setDealForm(nextDealForm);
+          setSavedDealForm(nextDealForm);
           setTodayDeal(workspace.todayDeal ?? "");
           setNews(workspace.news ?? "");
           setCouponEvent(workspace.couponEvent ?? "");
@@ -1204,13 +1336,17 @@ export function StoreRegistrationPage() {
   })();
 
   const hasUnsavedPromotionChanges = (() => {
-    const baseline = baselineRef.current;
-    if (!baseline) return false;
-    return (
-      todayDeal.trim() !== baseline.todayDeal.trim() ||
-      news.trim() !== baseline.news.trim() ||
-      couponEvent.trim() !== baseline.couponEvent.trim()
-    );
+    const snapshot = (form: DealFormState) =>
+      JSON.stringify({
+        note: form.note.trim(),
+        start: form.start,
+        end: form.end,
+        discounts: form.discounts
+          .filter((item) => item.enabled)
+          .map((item) => ({ rowKey: item.rowKey, mode: item.mode, value: item.value.trim() }))
+          .sort((a, b) => a.rowKey.localeCompare(b.rowKey)),
+      });
+    return snapshot(dealForm) !== snapshot(savedDealForm);
   })();
 
   const hasUnsavedChanges = (section: OwnerSection | null) => {
@@ -1326,9 +1462,7 @@ export function StoreRegistrationPage() {
       setReviewReply(baseline.reviewReply);
       setInquiryReply(baseline.inquiryReply);
     } else if (section === "promotion") {
-      setTodayDeal(baseline.todayDeal);
-      setNews(baseline.news);
-      setCouponEvent(baseline.couponEvent);
+      setDealForm(savedDealForm);
     }
     queueSyncBaseline();
   };
@@ -1377,6 +1511,164 @@ export function StoreRegistrationPage() {
       return;
     }
     closeOrMoveSection(null, onConfirm);
+  };
+
+  const namedDealMenus = menus.filter((menu) => menu.name.trim() && parseMenuPrice(menu.price) > 0);
+  const discountRows = namedDealMenus.map((menu, index) => {
+    const rowKey = String(index);
+    const row = dealForm.discounts.find((item) => item.rowKey === rowKey);
+    return row ?? { rowKey, menuId: menu.id, enabled: false, mode: "percent" as const, value: "" };
+  });
+  const todayKey = localDateKey(new Date());
+  const usedDealMinutes = usedMinutesOnDate(storePromotion, todayKey);
+  const remainDealMinutes = remainingMinutesOnDate(storePromotion, todayKey);
+  const scheduledDeal = getScheduledSlot(storePromotion);
+  const dealIsLive = Boolean(
+    scheduledDeal && Date.now() >= Date.parse(scheduledDeal.startAt) && Date.now() < Date.parse(scheduledDeal.endAt),
+  );
+
+  const updateDiscountRow = (rowKey: string, patch: Partial<DealDiscountRow>) => {
+    setDealForm((prev) => {
+      const current = namedDealMenus.map((menu, index) => {
+        const key = String(index);
+        const row = prev.discounts.find((item) => item.rowKey === key);
+        return row ?? { rowKey: key, menuId: menu.id, enabled: false, mode: "percent" as const, value: "" };
+      });
+      return {
+        ...prev,
+        discounts: current.map((row) => (row.rowKey === rowKey ? { ...row, ...patch, rowKey } : row)),
+      };
+    });
+  };
+
+  const openTimePicker = (field: "start" | "end") => {
+    const parsed = parseHourMinute(field === "start" ? dealForm.start : dealForm.end);
+    const snapped = Math.round(parsed.minute / 10) * 10;
+    setTimeDraft({ hour: parsed.hour, minute: snapped >= 60 ? 50 : snapped });
+    setOpenTimeField(field);
+  };
+
+  const confirmTimePicker = () => {
+    if (!openTimeField) return;
+    const value = todayAt(timeDraft.hour, timeDraft.minute);
+    setDealForm((prev) => ({ ...prev, [openTimeField]: value }));
+    setOpenTimeField(null);
+  };
+
+  const fillDealDuration = (minutes: number) => {
+    const start = new Date();
+    start.setSeconds(0, 0);
+    const span = remainDealMinutes > 0 ? Math.min(minutes, remainDealMinutes) : minutes;
+    const end = new Date(start.getTime() + span * 60_000);
+    const endOfDay = new Date(start);
+    endOfDay.setHours(23, 59, 0, 0);
+    const capped = end.getTime() > endOfDay.getTime() ? endOfDay : end;
+    setDealForm((prev) => ({
+      ...prev,
+      start: toDatetimeLocalValue(start.toISOString()),
+      end: toDatetimeLocalValue(capped.toISOString()),
+    }));
+  };
+
+  const persistPromotion = (promotion: StorePromotion | null, notice: string, menusOverride?: OwnerMenu[]) => {
+    const menuList = menusOverride ?? menus;
+    const targetStoreId = editingStoreId ?? resolvedStoreId;
+    if (targetStoreId == null) {
+      setSaveNotice("상점을 먼저 저장한 뒤 할인·이벤트를 설정해 주세요.");
+      window.setTimeout(() => setSaveNotice(""), 2800);
+      return;
+    }
+    if (menusOverride) setMenus(menusOverride);
+    promotionRef.current = promotion;
+    promotionHydratedRef.current = true;
+    setStorePromotion(promotion);
+    const nextForm = promotionToDealForm(promotion, menuList);
+    setDealForm(nextForm);
+    setSavedDealForm(nextForm);
+    const existing = stores.find((store) => store.id === targetStoreId) ?? readEditStoreDraftSync(targetStoreId);
+    if (!existing) {
+      setSaveNotice("상점을 먼저 저장한 뒤 할인·이벤트를 설정해 주세요.");
+      window.setTimeout(() => setSaveNotice(""), 2800);
+      return;
+    }
+    const nextStore: DraftStore = {
+      ...existing,
+      promotion: promotion ?? undefined,
+      menus: menuList.filter((menu) => menu.name.trim()).map((menu) => ({
+        ...menu,
+        price: menu.price.trim(),
+      })),
+    };
+    const nextStores = stores.some((store) => store.id === targetStoreId)
+      ? stores.map((store) => (store.id === targetStoreId ? nextStore : store))
+      : [nextStore, ...stores];
+    setStores(persistOwnerCatalog(nextStores));
+    saveOwnerStoreWorkspace(targetStoreId, {
+      menus: menuList,
+      todayDeal,
+      news,
+      couponEvent,
+      reviewReply,
+      inquiryReply,
+      promotion,
+    });
+    setSaveNotice(notice);
+    window.setTimeout(() => setSaveNotice(""), 2400);
+  };
+
+  const saveDeal = () => {
+    const sameWindow = Boolean(
+      scheduledDeal
+      && dealForm.start === toDatetimeLocalValue(scheduledDeal.startAt)
+      && dealForm.end === toDatetimeLocalValue(scheduledDeal.endAt),
+    );
+    const menusForSave = withUniqueMenuIds(menus);
+    const namedForSave = menusForSave.filter((menu) => menu.name.trim() && parseMenuPrice(menu.price) > 0);
+    const basePromotion = sameWindow && storePromotion
+      ? {
+          ...storePromotion,
+          activeSlotId: undefined,
+          slots: storePromotion.slots.filter((slot) => slot.id !== scheduledDeal?.id),
+        }
+      : storePromotion;
+    const result = commitStorePromotion(basePromotion, {
+      note: dealForm.note,
+      startLocal: dealForm.start,
+      endLocal: dealForm.end,
+      menus: discountRows.map((row, index) => {
+        const menu = namedForSave[index];
+        return {
+          menuId: menu?.id ?? row.menuId,
+          name: menu?.name ?? "메뉴",
+          price: parseMenuPrice(menu?.price ?? 0),
+          enabled: row.enabled,
+          mode: row.mode,
+          value: Number(row.value),
+        };
+      }),
+    });
+    if (!result.ok) {
+      setSaveNotice(result.error);
+      window.setTimeout(() => setSaveNotice(""), 3200);
+      return;
+    }
+    if (sameWindow && storePromotion && scheduledDeal) {
+      persistPromotion(
+        {
+          ...storePromotion,
+          note: result.promotion.note,
+          menuDiscounts: result.promotion.menuDiscounts,
+        },
+        "할인·이벤트 내용이 수정됐어요.",
+        menusForSave,
+      );
+      return;
+    }
+    persistPromotion(result.promotion, "할인·이벤트가 저장됐어요. 설정한 시간 동안 지도에 표시됩니다.", menusForSave);
+  };
+
+  const turnOffDeal = () => {
+    persistPromotion(turnOffStorePromotion(storePromotion), "할인·이벤트를 껐습니다. 아직 시작 전이면 사용 시간이 되돌아옵니다.");
   };
 
   return (
@@ -1444,10 +1736,12 @@ export function StoreRegistrationPage() {
           {[
             { key: "store" as OwnerSection, label: "상점 관리" },
             { key: "product" as OwnerSection, label: "상품 관리" },
+            { key: "qr" as OwnerSection, label: "QR" },
             { key: "communication" as OwnerSection, label: "고객 소통" },
             { key: "customerMode" as OwnerSection, label: "상점 모드" },
             { key: "community" as OwnerSection, label: "커뮤니티" },
-            { key: "promotion" as OwnerSection, label: "SNS 홍보" },
+            { key: "promotion" as OwnerSection, label: "할인·이벤트" },
+            { key: "sns" as OwnerSection, label: "SNS홍보" },
           ].map((section) => (
             <button
               key={section.key}
@@ -1718,16 +2012,27 @@ export function StoreRegistrationPage() {
           </>
         )}
 
+        {activeSection === "qr" && (
+          <StoreCheckinPanel storeId={resolvedStoreId} />
+        )}
+
+        {activeSection === "sns" && (
+          <OwnerSnsPromoPanel
+            storeId={resolvedStoreId}
+            storeName={pageTitle !== "~~사장님" ? pageTitle : form.name.trim()}
+          />
+        )}
+
         {activeSection === "product" && (
           <div className="bg-white rounded-xl p-4 space-y-3">
             <h2 className="text-[14px] text-gray-900">메뉴 관리</h2>
             {menus.map((menu, idx) => (
-              <div key={menu.id} className="rounded-lg bg-gray-50 p-3 space-y-2">
+              <div key={`${menu.id}-${idx}`} className="rounded-lg bg-gray-50 p-3 space-y-2">
                 <p className="text-[12px] text-gray-400">메뉴 {idx + 1}</p>
                 <input
                   value={menu.name}
                   onChange={(e) =>
-                    setMenus((prev) => prev.map((m) => (m.id === menu.id ? { ...m, name: e.target.value } : m)))
+                    setMenus((prev) => prev.map((m, i) => (i === idx ? { ...m, name: e.target.value } : m)))
                   }
                   placeholder="메뉴 이름"
                   className="w-full h-9 rounded-md bg-white px-3 text-[13px] border border-gray-200"
@@ -1735,7 +2040,7 @@ export function StoreRegistrationPage() {
                 <input
                   value={menu.price}
                   onChange={(e) =>
-                    setMenus((prev) => prev.map((m) => (m.id === menu.id ? { ...m, price: e.target.value } : m)))
+                    setMenus((prev) => prev.map((m, i) => (i === idx ? { ...m, price: e.target.value } : m)))
                   }
                   placeholder="가격"
                   className="w-full h-9 rounded-md bg-white px-3 text-[13px] border border-gray-200"
@@ -1748,7 +2053,7 @@ export function StoreRegistrationPage() {
                     className="hidden"
                     onChange={(e) =>
                       setMenus((prev) =>
-                        prev.map((m) => (m.id === menu.id ? { ...m, photoName: e.target.files?.[0]?.name ?? "" } : m)),
+                        prev.map((m, i) => (i === idx ? { ...m, photoName: e.target.files?.[0]?.name ?? "" } : m)),
                       )
                     }
                   />
@@ -1939,29 +2244,212 @@ export function StoreRegistrationPage() {
         )}
 
         {activeSection === "promotion" && (
-          <div className="bg-white rounded-xl p-4 space-y-3">
-            <div>
-              <label className="block text-[13px] font-medium text-gray-700 mb-2">홍보 내용</label>
+          <div className="space-y-3">
+            <div className="rounded-xl bg-white p-4 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-[14px] font-medium text-gray-900">할인·이벤트</h2>
+                  <p className="mt-1 text-[12px] leading-relaxed text-gray-500">
+                    메뉴 할인과 안내 문구, 시간을 저장하면 그 시간 동안 지도 핀이 할인 표시로 바뀝니다.
+                  </p>
+                </div>
+                <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] ${dealIsLive ? "bg-orange-500 text-white" : "bg-gray-100 text-gray-500"}`}>
+                  {dealIsLive ? "진행 중" : scheduledDeal ? "예약됨" : "꺼짐"}
+                </span>
+              </div>
+              <div>
+                <div className="mb-1 flex items-center justify-between text-[12px] text-gray-500">
+                  <span>오늘 사용 {formatMinutes(usedDealMinutes)}</span>
+                  <span>남은 {formatMinutes(remainDealMinutes)} / {formatMinutes(DAILY_PROMOTION_LIMIT_MINUTES)}</span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-gray-100">
+                  <div
+                    className="h-full rounded-full bg-orange-500"
+                    style={{ width: `${Math.min(100, (usedDealMinutes / DAILY_PROMOTION_LIMIT_MINUTES) * 100)}%` }}
+                  />
+                </div>
+                <p className="mt-2 text-[11px] leading-relaxed text-gray-400">
+                  하루에 합쳐서 4시간만 켤 수 있습니다. 시작 전에 끄면 그 시간은 다시 쓸 수 있고, 이미 지난 시간은 되돌려지지 않습니다.
+                </p>
+              </div>
+              {scheduledDeal && (
+                <div className="rounded-lg bg-orange-50 px-3 py-2 text-[12px] text-orange-800">
+                  {formatDealClock(scheduledDeal.startAt)} – {formatDealClock(scheduledDeal.endAt)}
+                  {storePromotion?.note ? ` · ${storePromotion.note}` : ""}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-xl bg-white p-4 space-y-3">
+              <label className="block text-[13px] font-medium text-gray-700">안내 내용</label>
               <textarea
-                value={news}
-                onChange={(e) => setNews(e.target.value)}
-                rows={10}
-                placeholder="신상품 입고, 특가, 쿠폰/이벤트 등 다양한 홍보내용을 입력해주세요."
-                className="w-full rounded-lg bg-gray-100 px-3 py-2.5 text-[13px] resize-none leading-relaxed"
+                value={dealForm.note}
+                onChange={(event) => setDealForm((prev) => ({ ...prev, note: event.target.value }))}
+                rows={4}
+                maxLength={200}
+                placeholder="예: 오늘 4시까지 순대국밥 20% 할인"
+                className="w-full resize-none rounded-lg bg-gray-100 px-3 py-2.5 text-[13px] leading-relaxed"
               />
             </div>
+
+            <div className="rounded-xl bg-white p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-[13px] font-medium text-gray-700">할인 메뉴</h3>
+                <button type="button" onClick={() => closeOrMoveSection("product")} className="text-[12px] text-gray-400">
+                  상품 관리
+                </button>
+              </div>
+              {discountRows.length === 0 ? (
+                <p className="rounded-lg bg-gray-50 px-3 py-4 text-[12px] leading-relaxed text-gray-500">
+                  등록된 메뉴가 없습니다. 상품 관리에서 이름과 가격을 저장한 뒤 할인을 설정해 주세요.
+                </p>
+              ) : (
+                discountRows.map((row, index) => {
+                  const menu = namedDealMenus[index];
+                  const base = parseMenuPrice(menu?.price ?? 0);
+                  const amount = Number(row.value);
+                  const sale = row.enabled && amount > 0
+                    ? (row.mode === "percent"
+                      ? Math.max(0, Math.round(base * (1 - Math.min(90, amount) / 100)))
+                      : Math.max(0, base - amount))
+                    : base;
+                  return (
+                    <div key={row.rowKey} className="rounded-lg border border-gray-100 p-3 space-y-2">
+                      <label className="flex items-center justify-between gap-3">
+                        <span className="min-w-0">
+                          <span className="block truncate text-[13px] text-gray-900">{menu?.name}</span>
+                          <span className="text-[12px] text-gray-400">{base.toLocaleString()}원</span>
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={row.enabled}
+                          onChange={(event) => updateDiscountRow(row.rowKey, { enabled: event.target.checked })}
+                          className="h-4 w-4"
+                        />
+                      </label>
+                      {row.enabled && (
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            {(["percent", "amount"] as DiscountMode[]).map((mode) => (
+                              <button
+                                key={mode}
+                                type="button"
+                                onClick={() => updateDiscountRow(row.rowKey, { mode, value: "" })}
+                                className={`h-8 rounded-lg text-[12px] ${row.mode === mode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600"}`}
+                              >
+                                {mode === "percent" ? "퍼센트" : "금액 직접 입력"}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              inputMode="numeric"
+                              value={row.value}
+                              onChange={(event) => updateDiscountRow(row.rowKey, { value: event.target.value.replace(/[^\d]/g, "") })}
+                              placeholder={row.mode === "percent" ? "20" : "2000"}
+                              className="h-9 flex-1 rounded-lg bg-gray-100 px-3 text-[13px]"
+                            />
+                            <span className="w-6 text-[12px] text-gray-500">{row.mode === "percent" ? "%" : "원"}</span>
+                          </div>
+                          <p className="text-[12px] text-orange-700">
+                            할인가 {sale.toLocaleString()}원
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="rounded-xl bg-white p-4 space-y-3">
+              <h3 className="text-[13px] font-medium text-gray-700">시간</h3>
+              <div className="flex gap-2">
+                {[60, 120, 180].map((minutes) => (
+                  <button
+                    key={minutes}
+                    type="button"
+                    onClick={() => fillDealDuration(minutes)}
+                    className="h-8 flex-1 rounded-lg bg-gray-100 text-[12px] text-gray-700"
+                  >
+                    {formatMinutes(minutes)}
+                  </button>
+                ))}
+              </div>
+              <div className="space-y-2">
+                {(["start", "end"] as const).map((field) => {
+                  const label = field === "start" ? "시작" : "종료";
+                  const value = field === "start" ? dealForm.start : dealForm.end;
+                  const open = openTimeField === field;
+                  return (
+                    <div key={field}>
+                      <p className="text-[12px] text-gray-500">{label}</p>
+                      <button
+                        type="button"
+                        onClick={() => openTimePicker(field)}
+                        className="mt-1 flex h-10 w-full items-center justify-between rounded-lg bg-gray-100 px-3 text-left text-[13px] text-gray-800"
+                      >
+                        <span>{formatTodayTime(value)}</span>
+                        <span className="text-[12px] text-gray-400">{open ? "선택 중" : "변경"}</span>
+                      </button>
+                      {open && (
+                        <div className="mt-2 space-y-2 rounded-lg border border-gray-200 p-3">
+                          <div className="grid grid-cols-2 gap-2">
+                            <label className="text-[12px] text-gray-500">
+                              시
+                              <select
+                                value={timeDraft.hour}
+                                onChange={(event) => setTimeDraft((prev) => ({ ...prev, hour: Number(event.target.value) }))}
+                                className="mt-1 h-10 w-full rounded-lg bg-gray-100 px-2 text-[13px]"
+                              >
+                                {Array.from({ length: 24 }, (_, hour) => (
+                                  <option key={hour} value={hour}>{hour}시</option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="text-[12px] text-gray-500">
+                              분
+                              <select
+                                value={timeDraft.minute}
+                                onChange={(event) => setTimeDraft((prev) => ({ ...prev, minute: Number(event.target.value) }))}
+                                className="mt-1 h-10 w-full rounded-lg bg-gray-100 px-2 text-[13px]"
+                              >
+                                {[0, 10, 20, 30, 40, 50].map((minute) => (
+                                  <option key={minute} value={minute}>{String(minute).padStart(2, "0")}분</option>
+                                ))}
+                              </select>
+                            </label>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={confirmTimePicker}
+                            className="h-10 w-full rounded-lg bg-gray-900 text-[13px] text-white"
+                          >
+                            확인
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => handleCancel()}
-                className="h-10 rounded-lg bg-gray-100 text-gray-600 text-[13px]"
+                onClick={() => {
+                  if (scheduledDeal) turnOffDeal();
+                  else handleCancel();
+                }}
+                className="h-10 rounded-lg bg-gray-100 text-[13px] text-gray-600"
               >
-                취소
+                {scheduledDeal ? "끄기" : "취소"}
               </button>
               <button
                 type="button"
-                onClick={() => saveOwnerDraft("SNS 홍보 내용이 저장됐어요.")}
-                className="h-10 rounded-lg bg-gray-900 text-white text-[13px]"
+                onClick={saveDeal}
+                className="h-10 rounded-lg bg-gray-900 text-[13px] text-white"
               >
                 저장
               </button>

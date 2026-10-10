@@ -6,6 +6,7 @@ import {
   type SharedFacility,
   type SharedOwnerMenu,
 } from "./ownerSharedStore";
+import type { StorePromotion } from "./storePromotion";
 
 export const OWNER_DRAFT_MIGRATED_KEY = "owner-draft-migrated-v1";
 
@@ -16,6 +17,7 @@ export type OwnerStoreWorkspace = {
   couponEvent?: string;
   reviewReply?: string;
   inquiryReply?: string;
+  promotion?: StorePromotion | null;
 };
 
 export type OwnerDashboardCatalog = {

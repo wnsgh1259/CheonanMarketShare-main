@@ -5,6 +5,7 @@ import {
   getSignupRejectReason,
 } from "./ownerSignupApplications";
 import { findRegisteredUserByPhone, type RegisteredUser } from "./userAccounts";
+import { adoptGuestAccount } from "./rewards";
 
 export type UserRole = "guest" | "customer" | "owner" | "admin";
 
@@ -29,6 +30,11 @@ const EMPTY_SESSION: AuthSession = {
 };
 
 export function readAuthSession(): AuthSession {
+  const savedPhone = localStorage.getItem("user_phone") || "";
+  if (savedPhone.startsWith("guest-") && savedPhone !== GUEST_ACCOUNT_ID) {
+    // 예전에 기기마다 따로 만들어진 비회원 아이디로 로그인된 상태면 공용 계정으로 옮긴다.
+    loginAsGuest();
+  }
   const role = (localStorage.getItem("user_role") as UserRole) || "guest";
   const storeIdRaw = localStorage.getItem("owner_store_id");
   const storeId = storeIdRaw ? Number(storeIdRaw) : null;
@@ -233,9 +239,40 @@ export function loginAsAdminShortcut(): LoginResult {
   return loginWithCredentials(ADMIN_PHONE, "0000");
 }
 
+const GUEST_ACCOUNT_KEY = "guest_customer_account";
+/** 비회원 실험 계정은 모든 기기가 같은 아이디를 쓴다. 그래야 폰과 PC에서 같은 포인트·신청 내역이 보인다. */
+export const GUEST_ACCOUNT_ID = "guest-demo";
+
+export function ensureGuestCustomer(): { id: string; name: string } {
+  const previous: string[] = [];
+  try {
+    const stored = JSON.parse(localStorage.getItem(GUEST_ACCOUNT_KEY) || "null") as { id?: string } | null;
+    if (stored?.id) previous.push(stored.id);
+  } catch {
+    // 저장된 값이 깨졌으면 무시한다.
+  }
+  const rewardId = localStorage.getItem("guest_reward_id");
+  if (rewardId) previous.push(rewardId);
+  for (const oldId of new Set(previous)) {
+    if (oldId.startsWith("guest-") && oldId !== GUEST_ACCOUNT_ID) adoptGuestAccount(oldId, GUEST_ACCOUNT_ID);
+  }
+  const account = { id: GUEST_ACCOUNT_ID, name: "손님" };
+  localStorage.setItem(GUEST_ACCOUNT_KEY, JSON.stringify(account));
+  return account;
+}
+
 export function loginAsGuest(): LoginResult {
-  clearAuthSession();
-  localStorage.setItem("user_role", "guest");
+  const account = ensureGuestCustomer();
+  writeAuthSession({
+    role: "customer",
+    phone: account.id,
+    name: account.name,
+    email: "",
+    status: "active",
+    storeId: null,
+    storeName: "",
+  });
+  localStorage.setItem("guest_reward_id", account.id);
   return { ok: true, redirect: "/home" };
 }
 

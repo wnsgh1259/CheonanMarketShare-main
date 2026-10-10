@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { buildFacilityMarkerIcon, buildStoreMarkerIcon } from "../map/naverMarkerIcons";
+import { clearMarketAreaOverlays, drawMarketAreaOverlays, type MarketAreaOverlays } from "../map/drawMarketArea";
 
 export type AdminPreviewMarketView = {
   center: { lat: number; lng: number };
@@ -15,7 +16,6 @@ type NaverMapRef = {
 };
 
 type NaverMarkerRef = { setMap: (map: unknown) => void };
-type NaverPolygonRef = { setMap: (map: unknown) => void };
 
 function clampNaverLogoLayer(container: HTMLElement | null) {
   if (!container) return;
@@ -56,7 +56,7 @@ export function AdminPreviewMap({
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<NaverMapRef | null>(null);
-  const polygonsRef = useRef<NaverPolygonRef[]>([]);
+  const areaOverlaysRef = useRef<MarketAreaOverlays | null>(null);
   const storeMarkersRef = useRef<NaverMarkerRef[]>([]);
   const facilityMarkersRef = useRef<NaverMarkerRef[]>([]);
   const viewRef = useRef(view);
@@ -90,20 +90,12 @@ export function AdminPreviewMap({
         mapDataControl: false,
       });
       mapRef.current = map;
-      polygonsRef.current.forEach((p) => p.setMap(null));
-      polygonsRef.current = v.areaPaths.map(
-        (path) =>
-          new naver.maps.Polygon({
-            map,
-            paths: path.map((point) => new naver.maps.LatLng(point.lat, point.lng)),
-            fillColor: v.fillColor,
-            fillOpacity: 0.28,
-            strokeColor: v.fillColor,
-            strokeOpacity: 0,
-            strokeWeight: 0,
-            zIndex: 10,
-            clickable: false,
-          }),
+      clearMarketAreaOverlays(areaOverlaysRef.current);
+      areaOverlaysRef.current = drawMarketAreaOverlays(
+        naver,
+        map,
+        { fillColor: v.fillColor, areaPaths: v.areaPaths },
+        { showLabel: false, zIndex: 10 },
       );
       setMapEpoch((n) => n + 1);
       window.setTimeout(() => clampNaverLogoLayer(containerRef.current), 0);
@@ -143,8 +135,8 @@ export function AdminPreviewMap({
       storeMarkersRef.current = [];
       clearMarkers(facilityMarkersRef.current);
       facilityMarkersRef.current = [];
-      polygonsRef.current.forEach((p) => p.setMap(null));
-      polygonsRef.current = [];
+      clearMarketAreaOverlays(areaOverlaysRef.current);
+      areaOverlaysRef.current = null;
       script.onload = null;
     };
   }, [clientId, isPlaceholder]);
@@ -155,20 +147,12 @@ export function AdminPreviewMap({
     const map = mapRef.current;
     map.setCenter(new naver.maps.LatLng(view.center.lat, view.center.lng));
     map.setZoom(view.zoom);
-    polygonsRef.current.forEach((p) => p.setMap(null));
-    polygonsRef.current = view.areaPaths.map(
-      (path) =>
-        new naver.maps.Polygon({
-          map,
-          paths: path.map((point) => new naver.maps.LatLng(point.lat, point.lng)),
-          fillColor: view.fillColor,
-          fillOpacity: 0.28,
-          strokeColor: view.fillColor,
-          strokeOpacity: 0,
-          strokeWeight: 0,
-          zIndex: 10,
-          clickable: false,
-        }),
+    clearMarketAreaOverlays(areaOverlaysRef.current);
+    areaOverlaysRef.current = drawMarketAreaOverlays(
+      naver,
+      map,
+      { fillColor: view.fillColor, areaPaths: view.areaPaths },
+      { showLabel: false, zIndex: 10 },
     );
   }, [view]);
 

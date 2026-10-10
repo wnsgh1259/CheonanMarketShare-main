@@ -39,15 +39,19 @@ export function escapeHtml(s: string) {
 export function buildStoreMarkerIcon(
   naver: any,
   store: { name: string; category: string },
-  opts: { highlighted: boolean; circleSize: number },
+  opts: { highlighted: boolean; circleSize: number; onSale?: boolean },
 ): { content: string; size: unknown; anchor: unknown } {
   const cat = asCategoryKey(store.category.split(",")[0]?.trim() || store.category);
   const emoji = CATEGORY_EMOJI[cat] ?? "🏪";
   const pinColor = CATEGORY_COLOR[cat]?.pin ?? "#2563EB";
-  const { highlighted, circleSize } = opts;
+  const { highlighted, onSale } = opts;
+  const circleSize = onSale ? opts.circleSize + 4 : opts.circleSize;
   const name = escapeHtml(store.name);
-  const fontPx = Math.max(10, Math.round(circleSize * 0.5));
-  const circleHtml = `<div style="width:${circleSize}px;height:${circleSize}px;border-radius:999px;background:#fff;border:2.5px solid ${highlighted ? "#111827" : pinColor};box-shadow:0 2px 10px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;font-size:${fontPx}px;line-height:1;">${emoji}</div>`;
+  const fontPx = Math.max(11, Math.round(circleSize * (onSale ? 0.62 : 0.5)));
+  const badge = onSale
+    ? `<div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%);background:#111827;color:#fff;font-size:9px;font-weight:800;line-height:1;padding:2px 5px;border-radius:999px;white-space:nowrap;pointer-events:none;letter-spacing:-0.02em;">할인</div>`
+    : "";
+  const circleHtml = `<div style="position:relative;width:${circleSize}px;height:${circleSize}px;">${badge}<div style="width:${circleSize}px;height:${circleSize}px;border-radius:999px;background:${onSale ? "#FF6B00" : "#fff"};border:2.5px solid ${onSale ? "#fff" : highlighted ? "#111827" : pinColor};box-shadow:${onSale ? "0 2px 10px rgba(255,107,0,.45)" : "0 2px 10px rgba(0,0,0,.2)"};display:flex;align-items:center;justify-content:center;font-size:${fontPx}px;font-weight:${onSale ? 800 : 400};color:${onSale ? "#fff" : "inherit"};line-height:1;">${onSale ? "%" : emoji}</div></div>`;
 
   if (highlighted) {
     const W = Math.max(40, circleSize + 8);
