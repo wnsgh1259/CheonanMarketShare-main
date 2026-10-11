@@ -59,6 +59,7 @@ export function dijkstraMeters(
   if (fromId === toId) return { meters: 0, nodeIds: [fromId] };
   const adj = buildAdj(graph);
   if (!adj.has(fromId) || !adj.has(toId)) return null;
+  const storeNodeIds = new Set(graph.nodes.filter((n) => n.type === "store_front").map((n) => n.id));
 
   const dist = new Map<string, number>();
   const prev = new Map<string, string | null>();
@@ -80,6 +81,8 @@ export function dijkstraMeters(
     if (u == null || best === Infinity) break;
     if (u === toId) break;
     used.add(u);
+    // 상점 앞 노드는 출발/도착으로만 쓰고, 다른 상점으로 가는 통로로는 쓰지 않음
+    if (storeNodeIds.has(u) && u !== fromId) continue;
     for (const { to, w } of adj.get(u) ?? []) {
       const nd = best + w;
       if (nd < (dist.get(to) ?? Infinity)) {

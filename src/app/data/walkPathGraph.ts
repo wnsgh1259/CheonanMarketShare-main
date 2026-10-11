@@ -79,20 +79,157 @@ export function edgeLengthMeters(graph: WalkPathGraph, edge: WalkEdge): number {
   return haversineMeters(from, to);
 }
 
+/** 통로 노드(교차점·입구) 여부 — 상점 앞 노드는 통로가 아님 */
+export function isPassageNode(node: WalkNode): boolean {
+  return node.type === "junction" || node.type === "entrance";
+}
+
 export function findNearestNode(
   graph: WalkPathGraph,
   lat: number,
   lng: number,
-  opts?: { excludeIds?: Set<string>; maxMeters?: number },
+  opts?: { excludeIds?: Set<string>; maxMeters?: number; passageOnly?: boolean },
 ): { node: WalkNode; meters: number } | null {
   let best: { node: WalkNode; meters: number } | null = null;
   for (const node of graph.nodes) {
     if (opts?.excludeIds?.has(node.id)) continue;
+    if (opts?.passageOnly && !isPassageNode(node)) continue;
     const meters = haversineMeters(node, { lat, lng });
     if (opts?.maxMeters != null && meters > opts.maxMeters) continue;
     if (!best || meters < best.meters) best = { node, meters };
   }
   return best;
+}
+
+/** 기존 store_front 노드 좌표를 현재 상점 핀 위치로 맞춘다 (잘못된 시드 좌표 보정). */
+export function syncStoreFrontPositions(
+  graph: WalkPathGraph,
+  pins: Array<{ id: number; lat: number; lng: number; name?: string }>,
+): WalkPathGraph {
+  if (pins.length === 0) return graph;
+  const byId = new Map(pins.map((p) => [p.id, p]));
+  let changed = false;
+  const nodes = graph.nodes.map((n) => {
+    if (n.type !== "store_front" || n.storeId == null) return n;
+    const pin = byId.get(n.storeId);
+    if (!pin) return n;
+    if (n.lat === pin.lat && n.lng === pin.lng && (pin.name == null || n.label === pin.name)) {
+      return n;
+    }
+    changed = true;
+    return {
+      ...n,
+      lat: pin.lat,
+      lng: pin.lng,
+      label: pin.name ?? n.label,
+    };
+  });
+  return changed ? { ...graph, nodes } : graph;
+}
+
+/**
+ * 등록 상점마다 store_front 노드가 있도록 맞춘다.
+ * - 좌표 동기화
+ * - 없는 상점은 노드 추가 (통로 연결은 상점연결/연결 모드에서)
+ */
+export function ensureStoreFrontNodes(
+  graph: WalkPathGraph,
+  pins: Array<{ id: number; lat: number; lng: number; name?: string }>,
+): WalkPathGraph {
+  let next = syncStoreFrontPositions(graph, pins);
+  if (pins.length === 0) return next;
+
+  // 삭제/이동된 상점의 옛 store_front 노드와 중복 노드 제거
+  const pinIds = new Set(pins.map((p) => p.id));
+  const seenStoreIds = new Set<number>();
+  const dropNodeIds = new Set<string>();
+  for (const n of next.nodes) {
+    if (n.type !== "store_front") continue;
+    if (typeof n.storeId !== "number" || !pinIds.has(n.storeId) || seenStoreIds.has(n.storeId)) {
+      dropNodeIds.add(n.id);
+      continue;
+    }
+    seenStoreIds.add(n.storeId);
+  }
+  if (dropNodeIds.size > 0) {
+    next = {
+      ...next,
+      nodes: next.nodes.filter((n) => !dropNodeIds.has(n.id)),
+      edges: next.edges.filter((e) => !dropNodeIds.has(e.from) && !dropNodeIds.has(e.to)),
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  const linked = new Set(
+    next.nodes
+      .filter((n) => n.type === "store_front" && typeof n.storeId === "number")
+      .map((n) => n.storeId as number),
+  );
+
+  let changed = next !== graph;
+  const additions: WalkNode[] = [];
+  for (const pin of pins) {
+    if (linked.has(pin.id)) continue;
+    additions.push({
+      id: createWalkNodeId(),
+      lat: pin.lat,
+      lng: pin.lng,
+      type: "store_front",
+      storeId: pin.id,
+      label: pin.name,
+    });
+    changed = true;
+  }
+  if (additions.length > 0) {
+    next = {
+      ...next,
+      nodes: [...next.nodes, ...additions],
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  const repaired = repairStoreFrontLinks(next);
+  if (repaired !== next) {
+    next = repaired;
+    changed = true;
+  }
+  return changed ? next : graph;
+}
+
+/**
+ * 상점 앞 노드는 통로 노드에만 붙어야 한다.
+ * - 상점↔상점 간선 제거
+ * - 통로 연결이 없는 상점은 가까운 통로 노드에 자동 연결
+ */
+export function repairStoreFrontLinks(
+  graph: WalkPathGraph,
+  autoConnectMaxMeters = 45,
+): WalkPathGraph {
+  const byId = new Map(graph.nodes.map((n) => [n.id, n]));
+  const isStore = (id: string) => byId.get(id)?.type === "store_front";
+
+  let edges = graph.edges.filter((e) => !(isStore(e.from) && isStore(e.to)));
+  let changed = edges.length !== graph.edges.length;
+
+  for (const node of graph.nodes) {
+    if (node.type !== "store_front") continue;
+    const hasPassageLink = edges.some((e) => {
+      const other = e.from === node.id ? e.to : e.to === node.id ? e.from : null;
+      if (!other) return false;
+      const o = byId.get(other);
+      return !!o && isPassageNode(o);
+    });
+    if (hasPassageLink) continue;
+    const nearest = findNearestNode({ ...graph, edges }, node.lat, node.lng, {
+      passageOnly: true,
+      maxMeters: autoConnectMaxMeters,
+    });
+    if (!nearest) continue;
+    edges = [...edges, { id: createWalkEdgeId(), from: node.id, to: nearest.node.id }];
+    changed = true;
+  }
+
+  return changed ? { ...graph, edges, updatedAt: new Date().toISOString() } : graph;
 }
 
 /** 상점 좌표를 그래프에 붙일 때 사용. 기존 store_front가 있으면 위치만 갱신. */
@@ -130,16 +267,23 @@ export function upsertStoreFrontNode(
     ];
   }
 
-  let edges = [...graph.edges];
+  // 상점↔상점 간선은 허용하지 않음. 통로 노드에 연결된 간선만 연결로 인정
+  let edges = graph.edges.filter((e) => {
+    if (e.from !== storeNodeId && e.to !== storeNodeId) return true;
+    const otherId = e.from === storeNodeId ? e.to : e.from;
+    const other = nodes.find((n) => n.id === otherId);
+    return !!other && isPassageNode(other);
+  });
   const alreadyLinked = edges.some(
     (e) => e.from === storeNodeId || e.to === storeNodeId,
   );
   if (!alreadyLinked) {
+    // 가장 가까운 "통로 노드"에만 연결 (다른 상점 노드는 제외)
     const nearest = findNearestNode(
       { ...graph, nodes },
       lat,
       lng,
-      { excludeIds: new Set([storeNodeId]), maxMeters: autoMax },
+      { excludeIds: new Set([storeNodeId]), maxMeters: autoMax, passageOnly: true },
     );
     if (nearest) {
       const dup = edges.some(
@@ -188,6 +332,10 @@ export function addEdgeBetween(
   toId: string,
 ): WalkPathGraph {
   if (fromId === toId) return graph;
+  const a = graph.nodes.find((n) => n.id === fromId);
+  const b = graph.nodes.find((n) => n.id === toId);
+  // 상점 앞 노드끼리는 연결 불가 (통로 노드를 거쳐야 함)
+  if (a?.type === "store_front" && b?.type === "store_front") return graph;
   const exists = graph.edges.some(
     (e) =>
       (e.from === fromId && e.to === toId) || (e.from === toId && e.to === fromId),

@@ -28,11 +28,11 @@ const CATEGORIES: Category[] = ["사장님", "질문", "정보", "후기"];
 const MARKET_LABELS: Record<MarketKey, string> = {
   jungang:     "천안중앙시장",
   byeongcheon: "천안역전시장",
-  seonghwan:   "성환전통시장",
+  seonghwan:   "성환이화시장",
 };
 
 const CATEGORY_STYLE: Record<Category, string> = {
-  사장님: "bg-gray-900 text-white",
+  사장님: "bg-[#E8E6E4] text-[#5E5955] ring-1 ring-inset ring-[#D6D2CF]",
   질문:   "bg-amber-100 text-amber-700",
   정보:   "bg-emerald-100 text-emerald-700",
   후기:   "bg-purple-100 text-purple-700",
@@ -511,26 +511,26 @@ export function WritePage() {
   };
 
   return (
-    <div className="min-h-screen bg-white flex flex-col max-w-md mx-auto relative">
+    <div className="min-h-screen bg-[#F7F6F1] flex flex-col max-w-md mx-auto relative">
 
       {/* ── 헤더 ── */}
-      <div className="sticky top-0 bg-white z-20 border-b border-gray-100">
+      <div className="sticky top-0 bg-white z-20 border-b border-[#EEEAE4]">
         <div className="flex items-center justify-between px-4 py-3">
           <button onClick={() => navigate(-1)} className="p-1 -ml-1">
-            <X className="w-5 h-5 text-gray-700" />
+            <X className="w-5 h-5 text-[#5A453B]" />
           </button>
           <button
             onClick={() => setShowMarketSheet(true)}
             className="flex items-center gap-1"
           >
-            <span className="text-[12px] text-gray-500">{MARKET_LABELS[market]}</span>
-            <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+            <span className="text-[12px] text-[#765F53]">{MARKET_LABELS[market]}</span>
+            <ChevronDown className="w-3.5 h-3.5 text-[#9A897F]" />
           </button>
           <button
             onClick={handleSubmit}
             disabled={!canSubmit}
             className={`text-[15px] font-medium transition-colors ${
-              canSubmit ? "text-gray-900" : "text-gray-300"
+              canSubmit ? "text-[#A55345]" : "text-gray-300"
             }`}
           >
             완료
@@ -539,7 +539,7 @@ export function WritePage() {
       </div>
 
       {/* ── 작성 영역 ── */}
-      <div className="flex-1 px-4 pt-4 pb-36">
+      <div className="mx-3 mt-3 mb-3 flex-1 rounded-[24px] border border-[#EEEAE4] bg-white px-4 pt-4 pb-36 shadow-[0_10px_26px_-24px_rgba(70,53,44,0.45)]">
 
         {/* 주제 선택 + 익명 토글 */}
         <div className="flex items-center gap-2 mb-3">
@@ -555,9 +555,9 @@ export function WritePage() {
                 {category}
               </span>
             ) : (
-              <span className="text-[14px] text-gray-400">주제를 선택해주세요.</span>
+              <span className="text-[14px] text-[#A1948B]">주제를 선택해주세요.</span>
             )}
-            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showCategorySheet ? "rotate-180" : ""}`} />
+            <ChevronDown className={`w-4 h-4 text-[#9A897F] transition-transform ${showCategorySheet ? "rotate-180" : ""}`} />
           </button>
 
           {showCategorySheet && (
@@ -567,7 +567,7 @@ export function WritePage() {
                 className="fixed inset-0 z-10"
                 onClick={() => setShowCategorySheet(false)}
               />
-              <div className="absolute left-0 top-full mt-1.5 z-20 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden min-w-[200px]">
+              <div className="absolute left-0 top-full mt-1.5 z-20 bg-white rounded-2xl shadow-xl border border-[#EEEAE4] overflow-hidden min-w-[200px]">
                 {CATEGORIES.map((cat) => {
                   const disabled = cat === "사장님" && !isSajangnim;
                   return (
@@ -579,7 +579,7 @@ export function WritePage() {
                         ${disabled
                           ? "text-gray-300 cursor-not-allowed"
                           : category === cat
-                            ? "text-gray-900 font-semibold bg-gray-50"
+                          ? "text-[#46352C] font-semibold bg-[#F8F3EE]"
                             : "text-gray-700 active:bg-gray-50"
                         }`}
                     >
@@ -587,7 +587,7 @@ export function WritePage() {
                         {cat}
                         {disabled && <span className="ml-1 text-[10px] text-gray-300">사장님 전용</span>}
                       </span>
-                      {!disabled && category === cat && <Check className="w-3.5 h-3.5 text-gray-900" />}
+                        {!disabled && category === cat && <Check className="w-3.5 h-3.5 text-[#A55345]" />}
                     </button>
                   );
                 })}
@@ -601,8 +601,8 @@ export function WritePage() {
           onClick={() => setIsAnonymous((v) => !v)}
           className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-[12px] font-medium transition-all ${
             isAnonymous
-              ? "bg-gray-900 border-gray-900 text-white"
-              : "bg-white border-gray-200 text-gray-500"
+              ? "bg-[#75845F] border-[#75845F] text-white"
+              : "bg-white border-[#E6DED7] text-[#806E63]"
           }`}
         >
           {isAnonymous ? (
@@ -621,18 +621,18 @@ export function WritePage() {
           onChange={(e) => setTitle(e.target.value)}
           placeholder="제목을 입력하세요."
           maxLength={60}
-          className="w-full text-[18px] font-semibold text-gray-900 placeholder:text-gray-300 focus:outline-none mb-3"
+          className="w-full text-[18px] font-semibold text-[#46352C] placeholder:text-[#C2B8B1] focus:outline-none mb-3"
         />
 
         {/* 제목 / 내용 구분선 */}
-        <div className="h-px bg-gray-300 mb-3" />
+        <div className="h-px bg-[#EEEAE4] mb-3" />
 
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
           placeholder={`시장 이웃과 이야기를 나눠보세요.\n#맛집 #세일 #이벤트...`}
           rows={8}
-          className="w-full text-[15px] text-gray-700 placeholder:text-gray-300 focus:outline-none resize-none leading-relaxed"
+          className="w-full text-[15px] text-[#5A4C43] placeholder:text-[#C2B8B1] focus:outline-none resize-none leading-relaxed"
         />
 
         {/* 이미지 미리보기 */}
@@ -808,11 +808,11 @@ export function WritePage() {
       </div>
 
       {/* ── 하단 툴바 ── */}
-      <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t border-gray-100 px-4 py-3">
-        <div className="flex items-center gap-5 text-gray-400">
+      <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t border-[#EEEAE4] px-4 py-3">
+        <div className="flex items-center gap-5 text-[#9A897F]">
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-1.5 active:text-gray-700 transition-colors"
+            className="flex items-center gap-1.5 active:text-[#5A453B] transition-colors"
           >
             <Image className="w-5 h-5" />
             <span className="text-[13px]">사진</span>
@@ -820,16 +820,16 @@ export function WritePage() {
           <button
             onClick={() => setShowLocationPicker(true)}
             className={`flex items-center gap-1.5 transition-colors ${
-              locationPin ? "text-blue-500" : "active:text-gray-700"
+              locationPin ? "text-[#A55345]" : "active:text-[#5A453B]"
             }`}
           >
-            <MapPin className={`w-5 h-5 ${locationPin ? "fill-blue-100" : ""}`} />
+            <MapPin className={`w-5 h-5 ${locationPin ? "fill-[#F8EAE6]" : ""}`} />
             <span className="text-[13px]">장소</span>
           </button>
           <button
             onClick={() => setShowPoll((v) => !v)}
             className={`flex items-center gap-1.5 transition-colors ${
-              showPoll ? "text-gray-900" : "active:text-gray-700"
+              showPoll ? "text-[#75845F]" : "active:text-[#5A453B]"
             }`}
           >
             <BarChart2 className="w-5 h-5" />
@@ -838,7 +838,7 @@ export function WritePage() {
           <button
             onClick={() => setShowTagInput((v) => !v)}
             className={`flex items-center gap-1.5 transition-colors ${
-              showTagInput ? "text-gray-900" : "active:text-gray-700"
+              showTagInput ? "text-[#75845F]" : "active:text-[#5A453B]"
             }`}
           >
             <Hash className="w-5 h-5" />

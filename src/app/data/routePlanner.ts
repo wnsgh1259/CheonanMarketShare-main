@@ -1,4 +1,5 @@
 import type { CartItem, MarketId } from "../components/CartContext";
+import { getMarketStorePins } from "../map/marketStorePins";
 import { pickStoreDisplayLatLng } from "../map/storeMapPlacement";
 import { getSearchableStores, searchProducts } from "./productSearch";
 import type { StoreData } from "./storeData";
@@ -38,8 +39,14 @@ export type PlannedRoute = {
   startLabel: string;
 };
 
+function storeDisplayPos(marketId: MarketId, store: StoreData) {
+  const pin = getMarketStorePins(marketId).find((p) => p.id === store.id);
+  if (pin) return { lat: pin.lat, lng: pin.lng };
+  return pickStoreDisplayLatLng(marketId, store);
+}
+
 function storePos(marketId: MarketId, store: StoreData) {
-  const { lat, lng } = pickStoreDisplayLatLng(marketId, store);
+  const { lat, lng } = storeDisplayPos(marketId, store);
   return { lat, lng, storeId: store.id };
 }
 
@@ -100,7 +107,7 @@ function entryMetrics(
   store: StoreData,
   cartItems: CartItem[],
 ): Omit<PlannedStop, "hopDistance" | "lat" | "lng"> & { lat: number; lng: number } {
-  const { lat, lng } = pickStoreDisplayLatLng(marketId, store);
+  const { lat, lng } = storeDisplayPos(marketId, store);
   let basePrice = 0;
   let discountSavings = 0;
   for (const ci of cartItems) {
@@ -388,7 +395,7 @@ export function planRoutes(
     if (item.unresolved || !item.storeId) continue;
     const store = stores.find((s) => s.id === item.storeId);
     if (!store) continue;
-    focusPoints.push(pickStoreDisplayLatLng(marketId, store));
+    focusPoints.push(storeDisplayPos(marketId, store));
   }
 
   const ctx = createRoutingContext(marketId, {

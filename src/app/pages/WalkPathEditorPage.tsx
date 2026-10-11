@@ -2,11 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, Link2, MapPin, MousePointer2, Plus, RotateCcw, Save, Store, Trash2, Undo2 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router";
 import type { MarketId } from "../components/CartContext";
-import { MARKET_VIEW_CONFIG, pickStoreDisplayLatLng } from "../map/storeMapPlacement";
+import { MARKET_VIEW_CONFIG } from "../map/storeMapPlacement";
+import { getMarketStorePins, type MarketStorePin } from "../map/marketStorePins";
 import { clearMarketAreaOverlays, drawMarketAreaOverlays, type MarketAreaOverlays } from "../map/drawMarketArea";
 import { resolveMarketView } from "../data/marketArea";
-import { STORES_BY_MARKET } from "../data/storeData";
-import { loadOwnerCatalog } from "../data/ownerStoreData";
 import {
   addEdgeBetween,
   createWalkNodeId,
@@ -16,6 +15,7 @@ import {
   removeEdge,
   removeNode,
   saveWalkPathGraph,
+  ensureStoreFrontNodes,
   totalPathLengthMeters,
   upsertStoreFrontNode,
   type WalkNode,
@@ -27,7 +27,7 @@ import { buildAdminReturnUrl, peekAdminReturnState } from "../data/adminNavigati
 
 type EditorMode = "add_junction" | "add_entrance" | "connect" | "select" | "link_store";
 
-type StorePin = { id: number; name: string; lat: number; lng: number };
+type StorePin = MarketStorePin;
 
 type NaverMapRef = {
   setCenter: (latLng: unknown) => void;
@@ -45,7 +45,7 @@ declare global {
 const MARKET_LABELS: Record<MarketId, string> = {
   jungang: "천안중앙시장",
   byeongcheon: "천안역전시장",
-  seonghwan: "성환시장",
+  seonghwan: "성환이화시장",
 };
 
 const NODE_COLORS: Record<WalkNodeType, string> = {
@@ -65,28 +65,6 @@ const MODE_HINT: Record<EditorMode, string> = {
 function parseMarket(raw: string | null): MarketId {
   if (raw === "jungang" || raw === "byeongcheon" || raw === "seonghwan") return raw;
   return "jungang";
-}
-
-function loadStorePins(marketId: MarketId): StorePin[] {
-  const catalog = loadOwnerCatalog();
-  const drafts = (catalog.stores ?? []).filter((s) => (s.marketId ?? marketId) === marketId);
-  const draftById = new Map(drafts.map((s) => [s.id, s]));
-  const seed = STORES_BY_MARKET[marketId] ?? [];
-  const seen = new Set<number>();
-  const pins: StorePin[] = [];
-
-  for (const store of seed) {
-    seen.add(store.id);
-    const draft = draftById.get(store.id);
-    const { lat, lng } = pickStoreDisplayLatLng(marketId, store, draft);
-    pins.push({ id: store.id, name: draft?.name ?? store.name, lat, lng });
-  }
-  for (const draft of drafts) {
-    if (seen.has(draft.id)) continue;
-    if (!(draft.lat || draft.lng)) continue;
-    pins.push({ id: draft.id, name: draft.name, lat: draft.lat, lng: draft.lng });
-  }
-  return pins;
 }
 
 function nodeIconHtml(node: WalkNode, selected: boolean, connectFrom: boolean) {
@@ -136,7 +114,7 @@ export function WalkPathEditorPage() {
   const isPlaceholder = !clientId || clientId === "your_naver_map_client_id";
   const view = resolveMarketView(marketId);
   const baseView = MARKET_VIEW_CONFIG[marketId];
-  const storePins = useMemo(() => loadStorePins(marketId), [marketId]);
+  const storePins = useMemo(() => getMarketStorePins(marketId), [marketId]);
 
   graphRef.current = graph;
   modeRef.current = mode;
@@ -183,7 +161,7 @@ export function WalkPathEditorPage() {
     });
   };
 
-  // Load graph when market changes
+  // Load graph when market changes — 상점 핀 좌표로 store_front 위치 동기화
   useEffect(() => {
     let cancelled = false;
     setGraph(emptyWalkPathGraph(marketId));
@@ -194,8 +172,16 @@ export function WalkPathEditorPage() {
     setConnectFromId(null);
     setNotice("");
     ensureWalkPathSeeded(marketId);
+    const pins = getMarketStorePins(marketId);
     void loadWalkPathGraph(marketId).then((g) => {
-      if (!cancelled) setGraph(g);
+      if (cancelled) return;
+      // 등록 상점마다 상점 앞 노드가 있도록 맞춤 (시드 18개만 있던 그래프에 추가 상점 반영)
+      const synced = ensureStoreFrontNodes(g, pins);
+      setGraph(synced);
+      if (synced !== g) {
+        setDirty(true);
+        setNotice("등록 상점 목록에 맞춰 상점 앞 노드를 정리했어요. 저장을 눌러 반영하세요.");
+      }
     });
     return () => {
       cancelled = true;
@@ -322,6 +308,15 @@ export function WalkPathEditorPage() {
           setConnectFromId(null);
           return;
         }
+        const cur = graphRef.current;
+        const a = cur.nodes.find((n) => n.id === from);
+        const b = cur.nodes.find((n) => n.id === nodeId);
+        if (a?.type === "store_front" && b?.type === "store_front") {
+          setNotice("상점끼리는 연결할 수 없어요. 통로(교차점) 노드에 연결해 주세요.");
+          setConnectFromId(null);
+          setSelectedNodeId(null);
+          return;
+        }
         applyGraph((prev) => addEdgeBetween(prev, from, nodeId));
         setConnectFromId(null);
         setSelectedNodeId(null);
@@ -349,13 +344,27 @@ export function WalkPathEditorPage() {
   const onStoreClick = useCallback(
     (store: StorePin) => {
       if (modeRef.current !== "link_store") return;
-      applyGraph((prev) =>
+      const upsert = (prev: WalkPathGraph) =>
         upsertStoreFrontNode(prev, store.id, store.lat, store.lng, {
           label: store.name,
           autoConnectMaxMeters: 45,
-        }),
+        });
+      const preview = upsert(graphRef.current);
+      const frontNode = preview.nodes.find((n) => n.type === "store_front" && n.storeId === store.id);
+      const connectedToPassage =
+        !!frontNode &&
+        preview.edges.some((e) => {
+          if (e.from !== frontNode.id && e.to !== frontNode.id) return false;
+          const otherId = e.from === frontNode.id ? e.to : e.from;
+          const other = preview.nodes.find((n) => n.id === otherId);
+          return !!other && (other.type === "junction" || other.type === "entrance");
+        });
+      applyGraph(upsert);
+      setNotice(
+        connectedToPassage
+          ? `「${store.name}」 상점을 가까운 통로 노드에 연결했습니다.`
+          : `「${store.name}」 근처 45m 안에 통로 노드가 없어요. 가까운 곳에 교차점을 찍고 연결해 주세요.`,
       );
-      setNotice(`「${store.name}」 상점 앞 노드를 연결했습니다.`);
     },
     [applyGraph],
   );
@@ -447,7 +456,7 @@ export function WalkPathEditorPage() {
     }
   }, [graph, mapReady, selectedNodeId, selectedEdgeId, connectFromId, onNodeClick, onEdgeClick]);
 
-  // Store markers (for link mode)
+  // Store markers (상점연결 모드 — 실제 지정 좌표에 이름 라벨)
   useEffect(() => {
     if (!mapReady || !mapRef.current || !window.naver?.maps) return;
     const naver = window.naver;
@@ -477,6 +486,9 @@ export function WalkPathEditorPage() {
 
   const selectedNode = graph.nodes.find((n) => n.id === selectedNodeId) ?? null;
   const selectedEdge = graph.edges.find((e) => e.id === selectedEdgeId) ?? null;
+  const registeredStoreCount = storePins.length;
+  /** 직접 찍은 노드 수 (교차점·입구만, 상점 앞 노드 제외) */
+  const drawnNodeCount = graph.nodes.filter((n) => n.type !== "store_front").length;
   const pathMeters = Math.round(totalPathLengthMeters(graph));
 
   const deleteSelected = () => {
@@ -613,21 +625,24 @@ export function WalkPathEditorPage() {
 
         <p className="text-[12px] text-gray-500">{MODE_HINT[mode]}</p>
 
-        <div className="flex items-center justify-between text-[11px] text-gray-500">
-          <span>
-            노드 {graph.nodes.length} · 간선 {graph.edges.length} · 약 {pathMeters}m
-          </span>
-          <span className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-blue-600" />교차점
+        <div className="flex flex-col gap-1 text-[11px] text-gray-500">
+          <div className="flex items-center justify-between gap-2">
+            <span>
+              상점 {registeredStoreCount}개 · 노드 {drawnNodeCount} · 간선 {graph.edges.length} · 약{" "}
+              {pathMeters}m
             </span>
-            <span className="inline-flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-green-600" />입구
+            <span className="flex items-center gap-2 shrink-0">
+              <span className="inline-flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-blue-600" />교차점
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-green-600" />입구
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-orange-600" />상점
+              </span>
             </span>
-            <span className="inline-flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-orange-600" />상점
-            </span>
-          </span>
+          </div>
         </div>
       </div>
 

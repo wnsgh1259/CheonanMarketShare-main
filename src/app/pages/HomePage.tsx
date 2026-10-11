@@ -1,12 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
-import { Bell, MapPin, Store, ChevronRight, Clock, Tag, ShoppingCart, Settings } from "lucide-react";
+import { Bell, MapPin, Store, ChevronRight, Clock, Tag, ShoppingCart, Settings, Star, Ticket } from "lucide-react";
 import { useCart } from "../components/CartContext";
 import { BottomNav, OWNER_MODE_KEY, OwnerBackToStoreButton, getSettingsPath } from "../components/BottomNav";
-import { loadOwnerCatalog, refreshOwnerCatalogFromRemote } from "../data/ownerStoreData";
-import { listLiveDeals } from "../data/storePromotion";
 import { IDOL, IDOL_STAGE_COUNT } from "../data/idolEvent";
 import { loadIdolProgress, syncRewardState } from "../data/rewards";
+import { loadOwnerCatalog, refreshOwnerCatalogFromRemote } from "../data/ownerStoreData";
+import { listLiveDeals } from "../data/storePromotion";
 
 type MarketId = "jungang" | "byeongcheon" | "seonghwan";
 
@@ -44,8 +44,8 @@ const markets: Market[] = [
   },
   {
     id: "seonghwan",
-    name: "성환전통시장",
-    subtitle: "전통시장",
+    name: "성환이화시장",
+    subtitle: "이화시장",
     location: "천안시 서북구 성환읍",
     description: "성환 지역의 정겨운 전통시장. 신선한 채소와 과일, 지역 특산물이 풍부해요.",
     image: "https://images.unsplash.com/photo-1560100927-c32f29063ade?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzZW9od2FuJTIwdHJhZGl0aW9uYWwlMjBtYXJrZXQlMjBrb3JlYSUyMHZlZ2V0YWJsZXN8ZW58MXx8fHwxNzc0ODI2NzM1fDA&ixlib=rb-4.1.0&q=80&w=1080",
@@ -67,7 +67,7 @@ const spotsByMarket: Record<MarketId, { id: number; name: string; location: stri
   ],
   seonghwan: [
     { id: 1, name: "성환 배 특산물", location: "성환읍 과수 특산 코너", image: "https://images.unsplash.com/photo-1560100927-c32f29063ade?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzZW9od2FuJTIwdHJhZGl0aW9uYWwlMjBtYXJrZXQlMjBrb3JlYSUyMHZlZ2V0YWJsZXN8ZW58MXx8fHwxNzc0ODI2NzM1fDA&ixlib=rb-4.1.0&q=80&w=1080" },
-    { id: 2, name: "신선 채소과일", location: "성환전통시장 농산물 골목", image: "https://images.unsplash.com/photo-1771250625125-6e552f84fe11?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxrb3JlYW4lMjB2ZWdldGFibGVzJTIwZnJlc2glMjBwcm9kdWNlfGVufDF8fHx8MTc3NDgyNTg1OHww&ixlib=rb-4.1.0&q=80&w=1080" },
+    { id: 2, name: "신선 채소과일", location: "성환이화시장 농산물 골목", image: "https://images.unsplash.com/photo-1771250625125-6e552f84fe11?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxrb3JlYW4lMjB2ZWdldGFibGVzJTIwZnJlc2glMjBwcm9kdWNlfGVufDF8fHx8MTc3NDgyNTg1OHww&ixlib=rb-4.1.0&q=80&w=1080" },
     { id: 3, name: "지역 먹거리 골목", location: "성환읍 내 시장 거리", image: "https://images.unsplash.com/photo-1662525194400-3c516a92a148?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxrb3JlYW4lMjBzdHJlZXQlMjBmb29kJTIwbWFya2V0fGVufDF8fHx8MTc3NDc4NjE5OHww&ixlib=rb-4.1.0&q=80&w=1080" },
   ],
 };
@@ -90,9 +90,22 @@ const coursesByMarket: Record<MarketId, { id: number; title: string; image: stri
   ],
 };
 
+function getCourseTitleLines(title: string): [string, string] {
+  if (title === "풍성한 야시장 코스") return ["풍성한", "야시장 코스"];
+
+  const commaIndex = title.indexOf(",");
+  if (commaIndex >= 0) return [title.slice(0, commaIndex + 1), title.slice(commaIndex + 1).trim()];
+
+  const words = title.split(" ");
+  const splitIndex = Math.ceil(words.length / 2);
+  return [words.slice(0, splitIndex).join(" "), words.slice(splitIndex).join(" ")];
+}
+
 export function HomePage() {
   const [selectedMarketId, setSelectedMarketId] = useState<MarketId>("jungang");
-  const [liveDealCount, setLiveDealCount] = useState(0);
+  const [activeCourseIndex, setActiveCourseIndex] = useState(0);
+  const spotsStripDragRef = useRef<{ pointerId: number; startX: number; startScrollLeft: number; dragging: boolean } | null>(null);
+  const suppressSpotClickUntilRef = useRef(0);
   const { totalCount } = useCart();
   const ownerMode = localStorage.getItem(OWNER_MODE_KEY) === "true";
   const [idolStage, setIdolStage] = useState(() => loadIdolProgress().stage);
@@ -106,6 +119,8 @@ export function HomePage() {
       alive = false;
     };
   }, []);
+
+  const [liveDealCount, setLiveDealCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -125,40 +140,64 @@ export function HomePage() {
   const spots = spotsByMarket[selectedMarketId];
   const courses = coursesByMarket[selectedMarketId];
 
+  useEffect(() => {
+    setActiveCourseIndex(0);
+  }, [selectedMarketId]);
+
+  useEffect(() => {
+    if (courses.length < 2) return;
+    const timer = window.setInterval(() => {
+      setActiveCourseIndex((index) => (index + 1) % courses.length);
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [courses.length, selectedMarketId]);
+
   return (
-    <div className="min-h-screen bg-[#F7F8FA] pb-20">
+    <div className="relative isolate min-h-screen bg-[#F8F8F7] pb-20">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+        <span className="profile-leaf profile-leaf-one">🍁</span>
+        <span className="profile-leaf profile-leaf-two">🍂</span>
+        <span className="profile-leaf profile-leaf-three">🍁</span>
+        <span className="profile-leaf home-leaf-four">🍂</span>
+        <span className="profile-leaf home-leaf-five">🍁</span>
+        <span className="profile-leaf home-leaf-six">🍂</span>
+        <span className="profile-leaf home-leaf-seven">🍁</span>
+        <span className="profile-leaf home-leaf-eight">🍂</span>
+        <span className="profile-leaf home-leaf-nine">🍁</span>
+        <span className="profile-leaf home-leaf-ten">🍂</span>
+      </div>
       {/* Header */}
-      <div className="sticky top-0 bg-white z-10 px-4 py-3 border-b border-gray-100">
+      <div className="relative z-20 bg-white/95 px-4 py-3 border-b border-[#EEEAE4]">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-[11px] text-gray-400 tracking-wide">천안 스마트 장보기</p>
-            <h1 className="text-[17px] text-gray-900 tracking-tight">{selectedMarket.name}</h1>
+            <p className="text-[11px] text-[#8A776B] tracking-wide">천안 스마트 장보기</p>
+            <h1 className="text-[17px] text-[#46352C] tracking-tight">{selectedMarket.name}</h1>
           </div>
           <div className="flex items-center gap-1">
             {ownerMode ? (
               <>
                 <OwnerBackToStoreButton />
-                <button className="w-10 h-10 flex items-center justify-center relative">
-                  <Bell className="w-[20px] h-[20px] text-gray-600" />
-                  <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-red-500 rounded-full" />
+                <button className="group relative flex h-10 w-10 items-center justify-center rounded-full active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4A096]">
+                  <Bell className="bell-swing-target w-[20px] h-[20px] text-[#5A453B]" />
+                  <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-[#C9813A] rounded-full" />
                 </button>
-                <Link to={getSettingsPath()} className="w-10 h-10 flex items-center justify-center">
-                  <Settings className="w-[20px] h-[20px] text-gray-600" />
+                <Link to={getSettingsPath()} className="flex h-10 w-10 items-center justify-center rounded-full transition-transform duration-200 hover:-translate-y-0.5 hover:scale-105 active:translate-y-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4A096]">
+                  <Settings className="w-[20px] h-[20px] text-[#5A453B]" />
                 </Link>
               </>
             ) : (
               <>
-                <Link to="/cart" className="w-10 h-10 flex items-center justify-center relative">
-                  <ShoppingCart className="w-[20px] h-[20px] text-gray-600" />
+                <Link to="/cart" className="group relative flex h-10 w-10 items-center justify-center rounded-full active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4A096]">
+                  <ShoppingCart className="cart-pull-target w-[20px] h-[20px] text-[#5A453B]" />
                   {totalCount > 0 && (
-                    <span className="absolute top-1 right-0.5 bg-[#0EA5E9] text-white text-[10px] min-w-[16px] h-4 rounded-full flex items-center justify-center px-1">
+                    <span className="absolute top-1 right-0.5 bg-[#A9652D] text-white text-[10px] min-w-[16px] h-4 rounded-full flex items-center justify-center px-1">
                       {totalCount}
                     </span>
                   )}
                 </Link>
-                <button className="w-10 h-10 flex items-center justify-center relative">
-                  <Bell className="w-[20px] h-[20px] text-gray-600" />
-                  <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-red-500 rounded-full" />
+                <button className="group relative flex h-10 w-10 items-center justify-center rounded-full active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4A096]">
+                  <Bell className="bell-swing-target w-[20px] h-[20px] text-[#5A453B]" />
+                  <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-[#C9813A] rounded-full" />
                 </button>
               </>
             )}
@@ -166,162 +205,197 @@ export function HomePage() {
         </div>
       </div>
 
-      {/* Market Selector */}
-      <div className="bg-white px-4 pt-4 pb-4">
-        <div className="flex gap-2">
-          {markets.map((market) => (
-            <button
-              key={market.id}
-              onClick={() => setSelectedMarketId(market.id)}
-              className={`flex-1 relative rounded-xl overflow-hidden h-[88px] transition-all ${
-                selectedMarketId === market.id
-                  ? "ring-2 ring-gray-900 ring-offset-1"
-                  : "opacity-60"
-              }`}
-            >
-              <img src={market.image} alt={market.name} className="w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-              <div className="absolute bottom-0 left-0 right-0 p-2">
-                <p className="text-white text-[12px] leading-tight">{market.subtitle}</p>
-                <p className="text-white/70 text-[10px] mt-0.5">{market.openDays}</p>
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Selected Market Info */}
-      <div className="mx-4 mt-3 bg-white rounded-xl p-4">
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Store className="w-5 h-5 text-gray-600" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <h3 className="text-[15px] text-gray-900">{selectedMarket.name}</h3>
-              <span className="text-[11px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">
-                {selectedMarket.tag}
+      <div className="sticky top-0 z-30 bg-transparent px-4 py-2">
+        <div className="grid grid-cols-3 gap-2">
+          <Link to={`/deals?market=${selectedMarketId}`} aria-label={liveDealCount > 0 ? `할인 상품, 진행 중 ${liveDealCount}곳` : "할인 상품"} className="relative flex h-[44px] min-w-0 cursor-pointer items-center justify-center gap-1 rounded-full bg-white/95 px-2 text-[13px] font-semibold tracking-tight text-[#6B6B6B] shadow-[0_5px_18px_-14px_rgba(70,53,44,0.32)] transition-transform hover:-translate-y-0.5 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4A096]">
+            <Tag className="h-[18px] w-[18px] flex-shrink-0 text-[#C9C9C9]" />
+            <span className="whitespace-nowrap">할인 상품</span>
+            {liveDealCount > 0 && (
+              <span className="absolute -right-0.5 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#A9652D] px-1 text-[10px] font-semibold text-white">
+                {liveDealCount}
               </span>
-            </div>
-            <div className="flex items-center gap-1 text-[12px] text-gray-400 mb-0.5">
-              <MapPin className="w-3 h-3" />{selectedMarket.location}
-            </div>
-            <div className="flex items-center gap-1 text-[12px] text-gray-400 mb-2">
-              <Clock className="w-3 h-3" />{selectedMarket.openDays}
-            </div>
-            <p className="text-[13px] text-gray-500 leading-relaxed">{selectedMarket.description}</p>
-          </div>
+            )}
+          </Link>
+          <Link to="/profile?tab=coupons" aria-label="쿠폰함" className="relative flex h-[44px] min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-white/95 px-2 text-[#6B6B6B] shadow-[0_5px_18px_-14px_rgba(70,53,44,0.32)] transition-transform hover:-translate-y-0.5 active:scale-[0.97]">
+            <Ticket className="h-5 w-5 flex-shrink-0 text-[#C9C9C9]" />
+            <span className="text-[13px] font-semibold tracking-tight">쿠폰함</span>
+          </Link>
+          <button
+            type="button"
+            aria-label={`시장 변경: ${selectedMarket.name}`}
+            onClick={() => setSelectedMarketId((current) => current === "jungang" ? "byeongcheon" : current === "byeongcheon" ? "seonghwan" : "jungang")}
+            className="flex h-[44px] min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-white/95 px-2 text-[#6B6B6B] shadow-[0_5px_18px_-14px_rgba(70,53,44,0.32)] transition-transform hover:-translate-y-0.5 active:scale-[0.97]"
+          >
+            <Store className="h-5 w-5 flex-shrink-0 text-[#C9C9C9]" />
+            <span className="whitespace-nowrap text-[13px] font-semibold tracking-tight">{selectedMarket.subtitle.replace("시장", " 시장")}</span>
+          </button>
         </div>
-        <Link
-          to={`/map?market=${selectedMarketId}`}
-          className="mt-3 flex items-center justify-center gap-1.5 w-full py-2.5 bg-gray-900 text-white rounded-xl text-[14px] active:bg-gray-800 transition-colors"
-        >
-          <MapPin className="w-4 h-4" />
-          지도 보기
-        </Link>
       </div>
 
-      {!ownerMode && (
-        <Link
-          to="/idol"
-          className="mx-4 mt-3 flex items-center gap-3 rounded-xl bg-gradient-to-r from-[#7F77DD] to-[#A78BFA] p-4 text-white active:opacity-90"
-        >
-          <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-white/20 text-[22px]">{IDOL.emoji}</span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[14px] font-bold">{IDOL.name}의 시장 미션</p>
-            <p className="mt-0.5 text-[11px] text-white/80">
-              {idolStage >= IDOL_STAGE_COUNT
-                ? "미션을 모두 풀었어요"
-                : `힌트를 찾아 문제를 풀면 포인트와 굿즈 추첨권 · ${idolStage}/${IDOL_STAGE_COUNT}`}
-            </p>
+      {/* Selected Market Feature */}
+      <section className="relative z-10 px-4 pt-5">
+        <div className="relative h-[210px] overflow-hidden rounded-[28px] bg-[#3E4E3A] shadow-[0_14px_34px_-20px_rgba(45,54,39,0.55)]">
+          <img src={selectedMarket.image} alt={selectedMarket.name} className="absolute inset-0 h-full w-full object-cover opacity-65" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#17241D]/95 via-[#17241D]/35 to-black/5" />
+          <div className="relative flex h-full flex-col justify-end p-4 text-white">
+            <div className="mb-auto flex items-start justify-between pt-1">
+              <span className="rounded-full border border-white/25 bg-black/20 px-2.5 py-0.5 text-[10px] font-medium text-white/95 backdrop-blur-sm">오늘의 시장</span>
+              <span className="rounded-full bg-white px-2.5 py-0.5 text-[10px] font-semibold text-[#493719]">{selectedMarket.tag}</span>
+            </div>
+            <p className="mb-1 flex items-center gap-1 text-[11px] text-white/85"><MapPin className="h-3 w-3" />{selectedMarket.location}</p>
+            <div className="market-banner-copy mb-2">
+              <h2 className="relative z-[1] text-[23px] font-bold tracking-tight">{selectedMarket.name}</h2>
+              <p className="relative z-[1] mt-0.5 max-w-[290px] text-[12px] leading-relaxed text-white/90">{selectedMarket.description}</p>
+            </div>
+            <div className="mt-2 flex items-center gap-1.5 text-[11px] text-white/85">
+              <Clock className="h-3 w-3" />{selectedMarket.openDays}
+            </div>
           </div>
-          <ChevronRight className="h-5 w-5 flex-shrink-0 text-white/80" />
-        </Link>
-      )}
-
-      {!ownerMode && (
-        <Link
-          to="/profile?tab=events"
-          className="mx-4 mt-3 flex items-center gap-3 rounded-xl bg-gradient-to-r from-[#FF7A59] to-[#FFB347] p-4 text-white active:opacity-90"
-        >
-          <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-white/20 text-[22px]">📣</span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[14px] font-bold">시장을 SNS에 알려주세요</p>
-            <p className="mt-0.5 text-[11px] text-white/85">게시물을 올리고 인증하면 최대 400P를 받아요</p>
-          </div>
-          <ChevronRight className="h-5 w-5 flex-shrink-0 text-white/80" />
-        </Link>
-      )}
+        </div>
+      </section>
 
       {/* Main Content */}
-      <div className="px-4 pt-5">
+      <div className="relative z-10 px-4 pt-8">
         {/* Spots */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-[15px] text-gray-900">인기 명소</h2>
-            <button className="flex items-center text-[13px] text-gray-400">
-              모두보기 <ChevronRight className="w-4 h-4" />
-            </button>
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-5">
+            <div><p className="text-[11px] font-medium text-[#46352C]">LOCAL FAVORITES</p><h2 className="text-[19px] font-bold tracking-tight text-[#3F4140]">시장 한 바퀴, 여기부터</h2></div>
           </div>
-          <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide">
+          <div
+            className="flex cursor-grab select-none gap-2.5 overflow-x-auto pb-1 active:cursor-grabbing touch-pan-x [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            onPointerDown={(event) => {
+              if (event.pointerType !== "mouse" || event.button !== 0) return;
+              suppressSpotClickUntilRef.current = 0;
+              spotsStripDragRef.current = {
+                pointerId: event.pointerId,
+                startX: event.clientX,
+                startScrollLeft: event.currentTarget.scrollLeft,
+                dragging: false,
+              };
+            }}
+            onPointerMove={(event) => {
+              const drag = spotsStripDragRef.current;
+              if (!drag || drag.pointerId !== event.pointerId) return;
+              const deltaX = event.clientX - drag.startX;
+              if (!drag.dragging && Math.abs(deltaX) > 5) {
+                drag.dragging = true;
+                event.currentTarget.setPointerCapture(event.pointerId);
+              }
+              if (drag.dragging) {
+                event.preventDefault();
+                event.currentTarget.scrollLeft = drag.startScrollLeft - deltaX;
+              }
+            }}
+            onPointerUp={(event) => {
+              const drag = spotsStripDragRef.current;
+              if (!drag || drag.pointerId !== event.pointerId) return;
+              if (drag.dragging) {
+                suppressSpotClickUntilRef.current = Date.now() + 350;
+                if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                  event.currentTarget.releasePointerCapture(event.pointerId);
+                }
+              }
+              spotsStripDragRef.current = null;
+            }}
+            onPointerCancel={() => { spotsStripDragRef.current = null; }}
+            onClickCapture={(event) => {
+              if (Date.now() < suppressSpotClickUntilRef.current) {
+                event.preventDefault();
+                event.stopPropagation();
+              }
+            }}
+          >
             {spots.map((spot) => (
-              <Link key={spot.id} to="/map" className="flex-none w-[120px]">
-                <div className="relative h-[120px] rounded-xl overflow-hidden mb-1.5">
-                  <img src={spot.image} alt={spot.name} className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                  <div className="absolute bottom-2 left-2 right-2 text-white">
-                    <p className="text-[12px] leading-tight">{spot.name}</p>
-                    <p className="text-[10px] opacity-80 mt-0.5 flex items-center gap-0.5">
-                      <MapPin className="w-2.5 h-2.5" />{spot.location}
-                    </p>
-                  </div>
-                </div>
+              <Link key={spot.id} to="/map" className="flex w-[132px] flex-none flex-col items-center text-left">
+                <p className="mb-2 flex w-full items-center gap-1 px-1 text-left text-[10px] leading-snug text-[#8A7B68]">
+                  <MapPin className="h-3 w-3 flex-shrink-0" />{spot.location}
+                </p>
+                <img src={spot.image} alt={spot.name} className="mb-3 h-[124px] w-[124px] rounded-full object-cover shadow-[0_6px_18px_-12px_rgba(70,53,44,0.35)]" />
+                <p className="w-full px-1 text-center text-[13px] font-semibold leading-snug text-[#3F4140]">{spot.name}</p>
               </Link>
             ))}
           </div>
         </div>
 
-        {/* Flash Sale */}
-        <div className="bg-gray-900 rounded-xl p-4 mb-6">
-          <div className="flex items-center gap-2 mb-1">
-            <Tag className="w-4 h-4 text-orange-400" />
-            <span className="text-[14px] text-white">할인·이벤트 알림</span>
+        {!ownerMode && (
+          <div className="mb-6 space-y-3">
+            <Link
+              to="/idol"
+              className="flex items-center gap-3 rounded-xl border border-[#D7D3E8] bg-[#E4E2EF] p-4 text-[#302C40] active:opacity-90"
+            >
+              <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-white/65 text-[22px]">{IDOL.emoji}</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[14px] font-bold text-[#6250A4]">에스파 {IDOL.name}의 시장 미션</p>
+                <p className="mt-0.5 text-[11px] text-[#625D76]">
+                  {idolStage >= IDOL_STAGE_COUNT
+                    ? "미션을 모두 풀었어요"
+                    : `힌트를 찾아 문제를 풀면 포인트와 굿즈 추첨권 · ${idolStage}/${IDOL_STAGE_COUNT}`}
+                </p>
+              </div>
+              <ChevronRight className="h-5 w-5 flex-shrink-0 text-[#6044A5]" />
+            </Link>
+            <Link
+              to="/profile?tab=events"
+              className="flex items-center gap-3 rounded-xl border border-[#D2E0EC] bg-[#E6EFF7] p-4 text-[#555B63] active:opacity-90"
+            >
+              <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-white/70 text-[22px]">📣</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[14px] font-bold text-[#1768A8]">시장을 SNS에 알려주세요</p>
+                <p className="mt-0.5 text-[11px] text-[#555B63]">게시물을 올리고 인증하면 최대 400P를 받아요</p>
+              </div>
+              <ChevronRight className="h-5 w-5 flex-shrink-0 text-[#1768A8]" />
+            </Link>
           </div>
-          <p className="text-[12px] text-gray-300 mb-3 leading-relaxed">
-            {liveDealCount > 0
-              ? `${selectedMarket.name}에서 ${liveDealCount}곳이 할인·이벤트를 진행 중이에요. 지도 핀은 주황색으로 표시됩니다.`
-              : `${selectedMarket.name} 상인이 연 오늘의 할인과 이벤트를 확인해 보세요.`}
-          </p>
-          <Link
-            to={`/deals?market=${selectedMarketId}`}
-            className="inline-flex items-center gap-1 bg-white/10 text-white text-[12px] px-3 py-1.5 rounded-lg active:bg-white/20 transition-colors"
-          >
-            진행 중인 상점 보기 <ChevronRight className="w-3 h-3" />
-          </Link>
-        </div>
+        )}
 
         {/* Courses */}
         <div className="mb-4">
-          <h2 className="text-[15px] text-gray-900 mb-3">추천 코스</h2>
-          <div className="space-y-2.5">
-            {courses.map((course) => (
-              <Link key={course.id} to="/map" className="block relative h-[130px] rounded-xl overflow-hidden">
-                <img src={course.image} alt={course.title} className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between">
-                  <div className="text-white">
-                    <p className="text-[14px]">{course.title}</p>
-                    <p className="text-[11px] opacity-70 mt-0.5">{selectedMarket.name}</p>
+          <div className="mb-3"><p className="text-[11px] font-medium text-[#46352C]">MARKET WALK</p><h2 className="text-[19px] font-bold tracking-tight text-[#3F4140]">이 코스 어때요?</h2></div>
+          <div className="overflow-hidden">
+            <div
+              className="flex transition-transform duration-500 ease-in-out"
+              style={{
+                width: `${courses.length * 100}%`,
+                transform: `translateX(-${activeCourseIndex * (100 / courses.length)}%)`,
+              }}
+            >
+              {courses.map((course) => (
+                <Link key={course.id} to="/map" style={{ width: `${100 / courses.length}%` }} className={`flex min-h-[132px] flex-shrink-0 items-center justify-between gap-2 overflow-hidden rounded-[24px] border border-[#F0E8D9] ${["bg-[#F9F5E9]", "bg-[#F5F0E7]", "bg-[#F5F8E9]"][course.id - 1] || "bg-[#F9F5E9]"} px-4 py-3.5 shadow-[0_8px_22px_-18px_rgba(89,69,43,0.35)] transition-transform active:scale-[0.99]` }>
+                  <div className="min-w-0 flex-1 py-1 pl-1">
+                    <p className="text-[16px] font-semibold leading-snug tracking-tight text-[#332F29]">
+                      <span className="block">{getCourseTitleLines(course.title)[0]}</span>
+                      <span className="block">{getCourseTitleLines(course.title)[1]}</span>
+                    </p>
+                    <p className="mt-1 text-[11px] text-[#8A7B68]">{selectedMarket.name}</p>
                   </div>
-                  <div className="w-7 h-7 bg-white/20 rounded-full flex items-center justify-center">
-                    <ChevronRight className="w-4 h-4 text-white" />
+                  <div className="relative h-[104px] w-[148px] flex-shrink-0">
+                    <img src={course.image} alt="" className="h-full w-full rounded-[32px] object-cover" />
                   </div>
-                </div>
-              </Link>
+                </Link>
+              ))}
+            </div>
+          </div>
+          <div className="mt-2.5 flex justify-center gap-1.5" aria-label="코스 카드 선택">
+            {courses.map((course, index) => (
+              <button
+                key={course.id}
+                type="button"
+                aria-label={`${index + 1}번째 코스 보기`}
+                aria-current={activeCourseIndex === index}
+                onClick={() => setActiveCourseIndex(index)}
+                className={`h-1.5 rounded-full transition-all ${activeCourseIndex === index ? "w-5 bg-[#A67B50]" : "w-1.5 bg-[#D9D0C2]"}`}
+              />
             ))}
           </div>
         </div>
       </div>
+
+      <Link
+        to={`/map?market=${selectedMarketId}`}
+        className="group fixed bottom-[88px] right-[max(16px,calc(50%-208px))] z-[130] inline-flex items-center gap-1.5 rounded-full bg-[#5B4335] px-4 py-3 text-[13px] font-semibold text-white shadow-[0_8px_22px_-10px_rgba(45,54,39,0.38)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#6B5142] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4A096] active:scale-[0.97] active:translate-y-0"
+      >
+        시장 구경하기 <ChevronRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
+      </Link>
 
       <BottomNav />
     </div>

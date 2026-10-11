@@ -24,7 +24,18 @@ function normalizeMarketId(value: unknown): OwnerSignupMarketId {
   return "jungang";
 }
 
+function parseOptionalCoord(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return undefined;
+}
+
 function rowToApplication(row: Record<string, unknown>): OwnerSignupApplication {
+  const lat = parseOptionalCoord(row.lat);
+  const lng = parseOptionalCoord(row.lng);
   return {
     id: Number(row.id),
     storeName: String(row.store_name ?? ""),
@@ -34,6 +45,8 @@ function rowToApplication(row: Record<string, unknown>): OwnerSignupApplication 
     address: String(row.address ?? ""),
     storeImage: String(row.store_image ?? ""),
     marketId: normalizeMarketId(row.market_id),
+    lat,
+    lng,
     status:
       row.status === "approved" || row.status === "rejected" ? row.status : "pending",
     createdAt: String(row.created_at ?? new Date().toISOString()),
@@ -45,8 +58,8 @@ function rowToApplication(row: Record<string, unknown>): OwnerSignupApplication 
   };
 }
 
-function applicationToRow(app: OwnerSignupApplication) {
-  return {
+function applicationToRow(app: OwnerSignupApplication, includeCoords = true) {
+  const base = {
     id: app.id,
     store_name: app.storeName,
     email: app.email,
@@ -60,6 +73,12 @@ function applicationToRow(app: OwnerSignupApplication) {
     reject_reason: app.rejectReason ?? null,
     approved_store_id: app.approvedStoreId ?? null,
     updated_at: new Date().toISOString(),
+  };
+  if (!includeCoords) return base;
+  return {
+    ...base,
+    lat: typeof app.lat === "number" ? app.lat : null,
+    lng: typeof app.lng === "number" ? app.lng : null,
   };
 }
 
@@ -78,41 +97,54 @@ export async function loadOwnerSignupApplicationsFromRemote(): Promise<OwnerSign
   }
 }
 
+async function upsertSignupRow(
+  client: SupabaseClient,
+  row: Record<string, unknown>,
+): Promise<boolean> {
+  const phone = String(row.phone ?? "");
+  // phone UNIQUE: 같은 번호면 기존 행을 UPDATE (재신청 시 새 id INSERT 실패 방지)
+  const { data: existing, error: lookupError } = await client
+    .from(OWNER_SIGNUP_APPLICATIONS_TABLE)
+    .select("id")
+    .eq("phone", phone)
+    .maybeSingle();
+
+  if (!lookupError && existing?.id != null) {
+    const { error: updateError } = await client
+      .from(OWNER_SIGNUP_APPLICATIONS_TABLE)
+      .update({
+        ...row,
+        id: Number(existing.id),
+      })
+      .eq("id", existing.id);
+    if (!updateError) return true;
+  }
+
+  const { error: upsertError } = await client
+    .from(OWNER_SIGNUP_APPLICATIONS_TABLE)
+    .upsert(row, { onConflict: "id" });
+  if (!upsertError) return true;
+
+  // phone unique 충돌 시 phone 기준 upsert 재시도
+  const { error: phoneUpsertError } = await client
+    .from(OWNER_SIGNUP_APPLICATIONS_TABLE)
+    .upsert(row, { onConflict: "phone" });
+  return !phoneUpsertError;
+}
+
 export async function upsertOwnerSignupApplicationRemote(app: OwnerSignupApplication): Promise<boolean> {
   const client = getSupabaseClient();
   if (!client) return false;
-  const row = applicationToRow(app);
   try {
-    // phone UNIQUE: 같은 번호면 기존 행을 UPDATE (재신청 시 새 id INSERT 실패 방지)
-    const { data: existing, error: lookupError } = await client
-      .from(OWNER_SIGNUP_APPLICATIONS_TABLE)
-      .select("id")
-      .eq("phone", row.phone)
-      .maybeSingle();
-
-    if (!lookupError && existing?.id != null) {
-      const { error: updateError } = await client
-        .from(OWNER_SIGNUP_APPLICATIONS_TABLE)
-        .update({
-          ...row,
-          id: Number(existing.id),
-        })
-        .eq("id", existing.id);
-      if (!updateError) return true;
-    }
-
-    const { error: upsertError } = await client
-      .from(OWNER_SIGNUP_APPLICATIONS_TABLE)
-      .upsert(row, { onConflict: "id" });
-    if (!upsertError) return true;
-
-    // phone unique 충돌 시 phone 기준 upsert 재시도
-    const { error: phoneUpsertError } = await client
-      .from(OWNER_SIGNUP_APPLICATIONS_TABLE)
-      .upsert(row, { onConflict: "phone" });
-    return !phoneUpsertError;
+    // lat/lng 컬럼이 있으면 함께 저장, 없으면(스키마 미반영) 좌표 없이 재시도
+    if (await upsertSignupRow(client, applicationToRow(app, true))) return true;
+    return upsertSignupRow(client, applicationToRow(app, false));
   } catch {
-    return false;
+    try {
+      return await upsertSignupRow(client, applicationToRow(app, false));
+    } catch {
+      return false;
+    }
   }
 }
 
@@ -173,6 +205,19 @@ function shouldPreferSignupApplication(
   return incomingTime >= existingTime;
 }
 
+function mergeSignupCoords(
+  preferred: OwnerSignupApplication,
+  other?: OwnerSignupApplication,
+): OwnerSignupApplication {
+  const lat = preferred.lat ?? other?.lat;
+  const lng = preferred.lng ?? other?.lng;
+  return {
+    ...preferred,
+    ...(typeof lat === "number" ? { lat } : {}),
+    ...(typeof lng === "number" ? { lng } : {}),
+  };
+}
+
 export function mergeOwnerSignupApplications(
   local: OwnerSignupApplication[],
   remote: OwnerSignupApplication[],
@@ -185,7 +230,9 @@ export function mergeOwnerSignupApplications(
     const phone = item.phone.replace(/\D/g, "");
     const existing = byPhone.get(phone);
     if (!existing || shouldPreferSignupApplication(existing, item)) {
-      byPhone.set(phone, item);
+      byPhone.set(phone, mergeSignupCoords(item, existing));
+    } else {
+      byPhone.set(phone, mergeSignupCoords(existing, item));
     }
   }
   return Array.from(byPhone.values()).sort(

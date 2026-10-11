@@ -77,7 +77,7 @@ export function BottomNav() {
     : REGULAR_NAV.map((item) => ({ ...item, exitOwnerMode: false }));
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-[140] bg-white border-t border-gray-200/60 max-w-md mx-auto">
+    <div className="fixed bottom-0 left-0 right-0 z-[140] mx-auto max-w-md border-t border-[#EEEAE4] bg-white/95 backdrop-blur-md">
       <div className="flex items-center h-14">
         {navItems.map(({ to, icon: Icon, label, exitOwnerMode }) => {
           const isActive = location.pathname === to || (to === "/home" && location.pathname === "/");
@@ -87,14 +87,14 @@ export function BottomNav() {
               key={to}
               to={to}
               onClick={exitOwnerMode ? () => setOwnerMode(false) : undefined}
-              className={`flex-1 flex flex-col items-center justify-center gap-0.5 relative ${
-                isActive ? "text-gray-900" : "text-gray-400"
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 relative transition-colors active:text-[#8E463B] ${
+                isActive ? "text-[#A55345]" : "text-[#76645A]"
               }`}
             >
               <div className="relative">
                 <Icon className="w-[22px] h-[22px]" strokeWidth={isActive ? 2.2 : 1.8} />
                 {isCart && totalCount > 0 && (
-                  <span className="absolute -top-1.5 -right-2.5 bg-[#0EA5E9] text-white text-[10px] min-w-[16px] h-4 rounded-full flex items-center justify-center px-1">
+                  <span className="absolute -top-1.5 -right-2.5 bg-[#C9774A] text-white text-[10px] min-w-[16px] h-4 rounded-full flex items-center justify-center px-1">
                     {totalCount}
                   </span>
                 )}

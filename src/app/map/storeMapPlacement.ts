@@ -99,15 +99,92 @@ function spiralAnchorStoreId(storeId: number): number {
   return storeId;
 }
 
-export type StorePlacementPin = Pick<StoreData, "id" | "mx" | "my"> & { lat?: number; lng?: number };
+export type StorePlacementPin = Pick<StoreData, "id"> & {
+  mx?: number;
+  my?: number;
+  lat?: number;
+  lng?: number;
+};
 
 export type StoreDraftLatLng = { lat?: number; lng?: number };
 
+/** 대략적인 거리(m). 시드 좌표가 시장에서 너무 멀면 잘못된 데이터로 본다. */
+function roughMeters(
+  a: { lat: number; lng: number },
+  b: { lat: number; lng: number },
+): number {
+  const dLat = (a.lat - b.lat) * 111_320;
+  const dLng = (a.lng - b.lng) * 111_320 * Math.cos((a.lat * Math.PI) / 180);
+  return Math.sqrt(dLat * dLat + dLng * dLng);
+}
+
+/** 시장 안이거나, 중심에서 약 400m 이내면 유효한 위치로 본다 */
+export function isLatLngNearMarket(marketId: MarketId, lat: number, lng: number): boolean {
+  if (isLatLngInsideMarketArea(marketId, lat, lng)) return true;
+  return roughMeters(MARKET_VIEW_CONFIG[marketId].center, { lat, lng }) <= 400;
+}
+
+function spiralLatLng(marketId: MarketId, storeId: number): { lat: number; lng: number } {
+  const view = MARKET_VIEW_CONFIG[marketId];
+  const golden = 2.39996322972865332;
+  const sid = spiralAnchorStoreId(storeId);
+  const angle = ((sid * golden) % (2 * Math.PI)) + marketId.charCodeAt(0) * 0.02;
+  let r = 0.00009 * (1 + (sid % 5));
+  for (let attempt = 0; attempt < 14; attempt++) {
+    const lat = view.center.lat + Math.cos(angle) * r * 0.55;
+    const lng = view.center.lng + Math.sin(angle) * r;
+    if (isLatLngInsideMarketArea(marketId, lat, lng)) return { lat, lng };
+    r *= 0.62;
+  }
+  return {
+    lat: view.center.lat + Math.cos(angle) * 0.00012,
+    lng: view.center.lng + Math.sin(angle) * 0.00018,
+  };
+}
+
+/**
+ * 같은 좌표에 쌓인 핀을 살짝 펼쳐 개수가 보이게 한다.
+ * (위치 미지정 상점이 한 점에 겹치는 경우 대비)
+ */
+export function spreadOverlappingLatLngs<T extends { id: number; lat: number; lng: number }>(
+  items: T[],
+  opts?: { minMeters?: number },
+): T[] {
+  const minMeters = opts?.minMeters ?? 10;
+  const groups = new Map<string, T[]>();
+  for (const item of items) {
+    const key = `${item.lat.toFixed(5)},${item.lng.toFixed(5)}`;
+    const list = groups.get(key);
+    if (list) list.push(item);
+    else groups.set(key, [item]);
+  }
+
+  const moved = new Map<number, T>();
+  for (const group of groups.values()) {
+    if (group.length === 1) {
+      moved.set(group[0].id, group[0]);
+      continue;
+    }
+    group.forEach((item, i) => {
+      const angle = (2 * Math.PI * i) / group.length + i * 0.15;
+      const ring = 1 + Math.floor(i / Math.max(6, group.length));
+      const meters = minMeters * ring;
+      const dLat = (Math.cos(angle) * meters) / 111_320;
+      const dLng =
+        (Math.sin(angle) * meters) / (111_320 * Math.cos((item.lat * Math.PI) / 180));
+      moved.set(item.id, { ...item, lat: item.lat + dLat, lng: item.lng + dLng });
+    });
+  }
+
+  return items.map((item) => moved.get(item.id) ?? item);
+}
+
 /**
  * 지도에 찍을 좌표.
- * - 저장된 초안(override) 또는 상점에 직접 붙은 lat·lng가 있으면 **그대로 사용**한다.
- *   (사장님이 찍은 핀 / 시드 좌표가 폴리곤 경계 밖으로 보여도 무시되면 안 됨)
- * - (0,0)만 무효로 보고, 좌표가 없을 때만 mx/my·시장 안 나선 보정으로 계산한다.
+ * - 관리자/사장님이 저장한 초안(override) lat·lng는 시장 근처일 때 사용
+ * - 시드 lat·lng는 시장 근처일 때만 사용
+ * - mx/my가 있으면 그걸로 보정 (미배치 상점의 기본 50,50 강제 사용 금지)
+ * - 없으면 상점 id별 나선 배치 (한 점에 몰리지 않음)
  */
 export function pickStoreDisplayLatLng(
   marketId: MarketId,
@@ -119,37 +196,34 @@ export function pickStoreDisplayLatLng(
   const usablePair = (lat: number, lng: number) =>
     Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0);
 
+  // 초안에 복사된 잘못된 시드 좌표(시장에서 멀리)는 무시. 실제 맵에서 찍은 위치만 통과.
   if (
     override &&
     typeof override.lat === "number" &&
     typeof override.lng === "number" &&
-    usablePair(override.lat, override.lng)
+    usablePair(override.lat, override.lng) &&
+    isLatLngNearMarket(marketId, override.lat, override.lng)
   ) {
     return { lat: override.lat, lng: override.lng };
   }
 
   if (typeof store.lat === "number" && typeof store.lng === "number" && usablePair(store.lat, store.lng)) {
-    return { lat: store.lat, lng: store.lng };
+    // 잘못된 시드 좌표(시장에서 수백 m 이상)는 무시하고 mx/my로 보정
+    if (isLatLngNearMarket(marketId, store.lat, store.lng)) {
+      return { lat: store.lat, lng: store.lng };
+    }
   }
 
-  const fromMxMy = toStoreLatLng(view.center, store.mx, store.my);
-  if (isLatLngInsideMarketArea(marketId, fromMxMy.lat, fromMxMy.lng)) {
-    return fromMxMy;
+  if (typeof store.mx === "number" && typeof store.my === "number") {
+    const fromMxMy = toStoreLatLng(view.center, store.mx, store.my);
+    if (isLatLngInsideMarketArea(marketId, fromMxMy.lat, fromMxMy.lng)) {
+      return fromMxMy;
+    }
+    // 폴리곤 밖이어도 중심 근처면 mx/my 결과를 사용 (영역이 아주 좁을 때)
+    if (roughMeters(view.center, fromMxMy) <= 400) {
+      return fromMxMy;
+    }
   }
 
-  const golden = 2.39996322972865332;
-  const sid = spiralAnchorStoreId(store.id);
-  const angle = ((sid * golden) % (2 * Math.PI)) + marketId.charCodeAt(0) * 0.02;
-  let r = 0.00009 * (1 + (sid % 5));
-  for (let attempt = 0; attempt < 14; attempt++) {
-    const lat = view.center.lat + Math.cos(angle) * r * 0.55;
-    const lng = view.center.lng + Math.sin(angle) * r;
-    if (isLatLngInsideMarketArea(marketId, lat, lng)) return { lat, lng };
-    r *= 0.62;
-  }
-  // 폴리곤이 매우 좁아 나선이 실패해도 상점마다 다른 오프셋을 유지 (한 점에 몰리지 않음)
-  return {
-    lat: view.center.lat + Math.cos(angle) * 0.00012,
-    lng: view.center.lng + Math.sin(angle) * 0.00018,
-  };
+  return spiralLatLng(marketId, store.id);
 }

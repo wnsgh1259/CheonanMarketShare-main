@@ -42,7 +42,7 @@ const FIXED_FACILITY_MARKER_SIZE = 15;
 const MARKET_TAB_LABELS: Record<MarketId, string> = {
   jungang: "천안중앙시장",
   byeongcheon: "천안역전시장",
-  seonghwan: "성환시장",
+  seonghwan: "성환이화시장",
 };
 
 type NaverMapRef = {

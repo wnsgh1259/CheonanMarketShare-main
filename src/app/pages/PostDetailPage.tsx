@@ -7,7 +7,7 @@ import { postStore, INITIAL_POSTS, addComment, savePostStore, type PostItem, typ
 import { UserAvatar } from "../components/UserAvatar";
 
 const CATEGORY_STYLE: Record<PostItem["category"], string> = {
-  사장님: "bg-gray-900 text-white",
+  사장님: "bg-[#E8E6E4] text-[#5E5955] ring-1 ring-inset ring-[#D6D2CF]",
   질문:   "bg-amber-100 text-amber-700",
   정보:   "bg-emerald-100 text-emerald-700",
   후기:   "bg-purple-100 text-purple-700",
@@ -16,7 +16,7 @@ const CATEGORY_STYLE: Record<PostItem["category"], string> = {
 const MARKET_LABELS: Record<PostItem["market"], string> = {
   jungang:     "천안중앙시장",
   byeongcheon: "천안역전시장",
-  seonghwan:   "성환전통시장",
+  seonghwan:   "성환이화시장",
 };
 
 const INITIAL_COMMENTS_KEY = "cheonan_initial_comments";
@@ -161,7 +161,7 @@ export function PostDetailPage() {
 
   if (!post) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="min-h-screen bg-[#F7F6F1] flex items-center justify-center">
         <div className="text-center text-gray-400">
           <p className="text-[15px] mb-3">게시글을 찾을 수 없어요</p>
           <button onClick={() => navigate(-1)} className="text-[13px] text-gray-900 underline">돌아가기</button>
@@ -226,18 +226,18 @@ export function PostDetailPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F7F8FA] flex flex-col max-w-md mx-auto pb-40">
+    <div className="min-h-screen bg-[#F7F6F1] flex flex-col max-w-md mx-auto pb-40">
       {/* 헤더 */}
-      <div className="sticky top-0 bg-white z-10 border-b border-gray-100">
+      <div className="sticky top-0 bg-white z-10 border-b border-[#EEEAE4]">
         <div className="flex items-center justify-between px-4 py-3">
-          <button onClick={() => navigate(-1)} className="p-1 -ml-1"><ChevronLeft className="w-5 h-5 text-gray-700" /></button>
-          <span className="text-[13px] text-gray-400">{MARKET_LABELS[post.market]}</span>
+          <button onClick={() => navigate(-1)} className="p-1 -ml-1"><ChevronLeft className="w-5 h-5 text-[#5A453B]" /></button>
+          <span className="text-[13px] text-[#8A776B]">{MARKET_LABELS[post.market]}</span>
           <div className="relative" ref={menuRef}>
             <button className="p-1" onClick={() => setMenuOpen((v) => !v)}>
-              <MoreHorizontal className="w-5 h-5 text-gray-400" />
+              <MoreHorizontal className="w-5 h-5 text-[#8A776B]" />
             </button>
             {menuOpen && (
-              <div className="absolute right-0 top-8 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden min-w-[110px] z-20">
+              <div className="absolute right-0 top-8 bg-white rounded-xl shadow-lg border border-[#EEEAE4] overflow-hidden min-w-[110px] z-20">
                 {isMyPost ? (
                   <button onClick={handleDelete} className="w-full flex items-center gap-2 px-4 py-3 text-[13px] text-red-500 active:bg-red-50">
                     <Trash2 className="w-4 h-4" />삭제
@@ -254,11 +254,11 @@ export function PostDetailPage() {
       </div>
 
       {/* 본문 */}
-      <div className="bg-white px-4 pt-5 pb-5">
+      <div className="mx-3 mt-3 rounded-[24px] border border-[#EEEAE4] bg-white px-4 pt-5 pb-5 shadow-[0_10px_26px_-24px_rgba(70,53,44,0.45)]">
         <div className="flex items-center gap-2 mb-2">
           <span className={`text-[10px] px-2 py-0.5 rounded-full ${CATEGORY_STYLE[post.category]}`}>{post.category}</span>
         </div>
-        <h1 className="text-[18px] font-semibold text-gray-900 mb-1 leading-snug">{post.title}</h1>
+        <h1 className="text-[18px] font-semibold text-[#46352C] mb-1 leading-snug">{post.title}</h1>
 
         <div className="flex items-center gap-1.5 text-[12px] text-gray-400 mb-4 mt-2 flex-wrap">
           {post.authorTitleEmoji ? (
@@ -284,7 +284,7 @@ export function PostDetailPage() {
           )}
         </div>
 
-        <div className="h-px bg-gray-100 mb-4" />
+        <div className="h-px bg-[#EEEAE4] mb-4" />
 
         {post.image && (
           <div className="w-full rounded-xl overflow-hidden mb-4 max-h-64">
@@ -292,7 +292,7 @@ export function PostDetailPage() {
           </div>
         )}
 
-        <p className="text-[15px] text-gray-700 leading-relaxed whitespace-pre-line mb-4">{post.body || post.preview}</p>
+        <p className="text-[15px] text-[#5A4C43] leading-relaxed whitespace-pre-line mb-4">{post.body || post.preview}</p>
 
         {post.tags && post.tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-4">
@@ -379,7 +379,7 @@ export function PostDetailPage() {
           const totalVotes = pollVotes.reduce((s, v) => s + v, 0);
           const voted = myVote !== null;
           return (
-            <div className="bg-gray-50 rounded-xl px-4 py-4 mb-4">
+            <div className="bg-[#F8F5F0] rounded-2xl px-4 py-4 mb-4 border border-[#F0ECE7]">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-1.5">
                   <BarChart2 className="w-4 h-4 text-gray-500" />
@@ -395,16 +395,16 @@ export function PostDetailPage() {
                   const isMyPick = myVote === i;
                   if (voted) {
                     return (
-                      <div key={i} className="relative rounded-xl overflow-hidden border border-gray-200 bg-white px-3 py-2.5">
+                      <div key={i} className="relative rounded-xl overflow-hidden border border-[#E8E0D9] bg-white px-3 py-2.5">
                         {/* 진행 바 */}
                         <div
-                          className={`absolute inset-y-0 left-0 rounded-xl transition-all duration-500 ${isMyPick ? "bg-gray-900/10" : "bg-gray-100"}`}
+                          className={`absolute inset-y-0 left-0 rounded-xl transition-all duration-500 ${isMyPick ? "bg-[#F4E2DC]" : "bg-[#F7F5F1]"}`}
                           style={{ width: `${pct}%` }}
                         />
                         <div className="relative flex items-center justify-between gap-2">
                           <div className="flex items-center gap-1.5 min-w-0">
                             {isMyPick && (
-                              <span className="flex-shrink-0 w-4 h-4 rounded-full bg-gray-900 flex items-center justify-center">
+                              <span className="flex-shrink-0 w-4 h-4 rounded-full bg-[#A55345] flex items-center justify-center">
                                 <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                 </svg>
@@ -424,7 +424,7 @@ export function PostDetailPage() {
                     <button
                       key={i}
                       onClick={() => handleVote(i)}
-                      className="w-full text-left px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-[13px] text-gray-700 active:bg-gray-50 active:border-gray-400 transition-colors"
+                      className="w-full text-left px-3 py-2.5 rounded-xl border border-[#E8E0D9] bg-white text-[13px] text-[#5A4C43] active:bg-[#FBF3EF] active:border-[#D4A096] transition-colors"
                     >
                       {opt}
                     </button>
@@ -438,7 +438,7 @@ export function PostDetailPage() {
           );
         })()}
 
-        <div className="flex items-center gap-4 pt-2 border-t border-gray-100">
+        <div className="flex items-center gap-4 pt-2 border-t border-[#EEEAE4]">
           <button onClick={handleLike} className={`flex items-center gap-1.5 text-[13px] transition-colors ${liked ? "text-gray-900" : "text-gray-400"}`}>
             <ThumbsUp className={`w-4 h-4 ${liked ? "fill-gray-900" : ""}`} />
             <span>{likeCount}</span>
@@ -455,8 +455,8 @@ export function PostDetailPage() {
       </div>
 
       {/* 댓글 목록 */}
-      <div className="mt-2 bg-white px-4 py-4">
-        <p className="text-[13px] font-semibold text-gray-700 mb-4">댓글 {localComments.length}개</p>
+      <div className="mx-3 mt-3 rounded-[24px] border border-[#EEEAE4] bg-white px-4 py-4 shadow-[0_10px_26px_-24px_rgba(70,53,44,0.45)]">
+        <p className="text-[13px] font-semibold text-[#46352C] mb-4">댓글 {localComments.length}개</p>
         {localComments.length === 0 ? (
           <p className="text-[13px] text-gray-300 text-center py-6">첫 댓글을 달아보세요!</p>
         ) : (
@@ -492,16 +492,16 @@ export function PostDetailPage() {
       </div>
 
       {/* 댓글 입력 */}
-      <div className="fixed bottom-16 left-0 right-0 max-w-md mx-auto bg-white border-t border-gray-100 px-4 py-3">
+      <div className="fixed bottom-16 left-0 right-0 max-w-md mx-auto bg-white border-t border-[#EEEAE4] px-4 py-3">
         <div className="flex items-center gap-2">
           <input
             type="text" value={commentText}
             onChange={(e) => setCommentText(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleComment()}
             placeholder="댓글을 입력하세요..."
-            className="flex-1 px-4 py-2.5 bg-gray-100 rounded-full text-[13px] focus:outline-none placeholder:text-gray-400"
+            className="flex-1 px-4 py-2.5 bg-[#F7F5F1] text-[#5A4C43] rounded-full text-[13px] focus:outline-none focus:ring-2 focus:ring-[#E2C1B7] placeholder:text-[#A1948B]"
           />
-          <button onClick={handleComment} disabled={!commentText.trim()} className="w-9 h-9 bg-gray-900 text-white rounded-full flex items-center justify-center disabled:opacity-30 active:bg-gray-800 transition-colors">
+          <button onClick={handleComment} disabled={!commentText.trim()} className="w-9 h-9 bg-[#A55345] text-white rounded-full flex items-center justify-center disabled:opacity-30 active:bg-[#8E463B] transition-colors">
             <Send className="w-4 h-4" />
           </button>
         </div>

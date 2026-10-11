@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { TrendingDown, Navigation, Zap, MapPin, Clock, Tag, ChevronRight, AlertCircle } from "lucide-react";
 import { useNavigate } from "react-router";
 import type { CartItem, MarketId } from "./CartContext";
-import { MAP_CONFIGS } from "../data/storeData";
 import { planRoutes, type RouteType } from "../data/routePlanner";
 import { saveActiveNavRoute } from "../data/activeNavRoute";
 import {
@@ -149,7 +148,7 @@ export function RouteRecommendation({ items, marketId }: Props) {
 
   if (items.length === 0) {
     return (
-      <div className="text-center py-6 text-gray-400">
+      <div className="text-center py-6 text-[#6B5142]">
         <MapPin className="w-8 h-8 mx-auto mb-2 text-gray-200" />
         <p className="text-[13px]">상품을 담으면 경로를 추천해 드려요</p>
       </div>
@@ -158,10 +157,10 @@ export function RouteRecommendation({ items, marketId }: Props) {
 
   if (!routes) {
     return (
-      <div className="text-center py-6 text-gray-400">
+      <div className="text-center py-6 text-[#6B5142]">
         <AlertCircle className="w-8 h-8 mx-auto mb-2 text-gray-200" />
         <p className="text-[13px]">경로를 계산할 수 없어요</p>
-        <p className="text-[11px] mt-1 text-gray-300">
+        <p className="text-[11px] mt-1 text-[#9A897F]">
           상점 미지정 상품만 있고 매칭되는 상점이 없거나, 상점 정보가 부족해요
         </p>
       </div>
@@ -170,13 +169,12 @@ export function RouteRecommendation({ items, marketId }: Props) {
 
   const selectedRoute = routes[selected];
   const meta = ROUTE_META[selected];
-  const mapCfg = marketId ? MAP_CONFIGS[marketId] : null;
   const usedGraph = selectedRoute.usedWalkGraph;
 
   return (
     <div>
-      <div className="mb-3 px-3 py-2.5 bg-gray-50 rounded-lg text-[11px] text-gray-600 leading-relaxed">
-        출발: <span className="text-gray-900 font-medium">{selectedRoute.startLabel}</span>
+      <div className="mb-3 px-3 py-2.5 bg-[#F7F5F1] rounded-lg text-[11px] text-[#6B5142] leading-relaxed">
+        출발: <span className="text-[#46352C] font-medium">{selectedRoute.startLabel}</span>
         {!gpsReady
           ? " · 위치 확인 중…"
           : selectedRoute.startSource === "gps"
@@ -211,7 +209,7 @@ export function RouteRecommendation({ items, marketId }: Props) {
               type="button"
               onClick={() => setSelected(type)}
               className={`w-full p-3 rounded-xl border-2 transition-all text-left ${
-                isActive ? `${m.border} bg-white` : "border-gray-100 bg-white"
+                isActive ? `${m.border} bg-white` : "border-[#EDE5D8] bg-white"
               }`}
             >
               <div className="flex items-center gap-3">
@@ -220,7 +218,7 @@ export function RouteRecommendation({ items, marketId }: Props) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-0.5">
-                    <h3 className="text-[14px] text-gray-900">
+                    <h3 className="text-[14px] text-[#46352C]">
                       {m.label} {m.title}
                     </h3>
                     {r.savings > 0 && (
@@ -229,9 +227,9 @@ export function RouteRecommendation({ items, marketId }: Props) {
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-gray-400 mb-1.5">{m.desc}</p>
-                  <div className="flex gap-3 text-[12px] text-gray-500">
-                    <span className="text-gray-900">{r.totalPrice.toLocaleString()}원</span>
+                  <p className="text-[11px] text-[#6B5142] mb-1.5">{m.desc}</p>
+                  <div className="flex gap-3 text-[12px] text-[#6B5142]">
+                    <span className="text-[#46352C]">{r.totalPrice.toLocaleString()}원</span>
                     <span className="flex items-center gap-0.5">
                       <Navigation className="w-3 h-3" />
                       {r.distance}m
@@ -245,7 +243,7 @@ export function RouteRecommendation({ items, marketId }: Props) {
                     </span>
                   </div>
                 </div>
-                <ChevronRight className={`w-4 h-4 flex-shrink-0 ${isActive ? m.textColor : "text-gray-300"}`} />
+                <ChevronRight className={`w-4 h-4 flex-shrink-0 ${isActive ? m.textColor : "text-[#9A897F]"}`} />
               </div>
             </button>
           );
@@ -271,24 +269,24 @@ export function RouteRecommendation({ items, marketId }: Props) {
         </div>
       )}
 
-      <div className="border border-gray-100 rounded-xl overflow-hidden">
-        <div className={`px-4 py-2.5 ${meta.light} border-b border-gray-100 flex items-center justify-between`}>
+      <div className="border border-[#EDE5D8] rounded-xl overflow-hidden">
+        <div className={`px-4 py-2.5 ${meta.light} border-b border-[#EDE5D8] flex items-center justify-between`}>
           <span className={`text-[13px] ${meta.textColor}`}>
             {meta.label} {meta.title} 상세
           </span>
-          <span className="text-[11px] text-gray-500">
+          <span className="text-[11px] text-[#6B5142]">
             {selectedRoute.distance}m · {selectedRoute.time}분
           </span>
         </div>
         <div className="p-3 space-y-0">
           <div className="flex gap-3 items-center mb-1">
             <div className="flex flex-col items-center">
-              <div className="w-6 h-6 bg-gray-800 text-white rounded-full flex items-center justify-center text-[10px]">
+              <div className="w-6 h-6 bg-[#6B5142] text-white rounded-full flex items-center justify-center text-[10px]">
                 {selectedRoute.startSource === "gps" ? "나" : "출"}
               </div>
-              <div className="w-px h-4 bg-gray-200 my-0.5" />
+              <div className="w-px h-4 bg-[#EFE4D8] my-0.5" />
             </div>
-            <span className="text-[12px] text-gray-400">{selectedRoute.startLabel}에서 출발</span>
+            <span className="text-[12px] text-[#6B5142]">{selectedRoute.startLabel}에서 출발</span>
           </div>
 
           {selectedRoute.path.map((entry, idx) => {
@@ -302,20 +300,20 @@ export function RouteRecommendation({ items, marketId }: Props) {
                   >
                     {idx + 1}
                   </div>
-                  {!isLast && <div className="w-px flex-1 bg-gray-200 my-1 min-h-[16px]" />}
+                  {!isLast && <div className="w-px flex-1 bg-[#EFE4D8] my-1 min-h-[16px]" />}
                 </div>
                 <div className="flex-1 pb-3">
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[14px] text-gray-900">{entry.store.name}</span>
+                        <span className="text-[14px] text-[#46352C]">{entry.store.name}</span>
                         {hasDiscount && (
                           <span className="text-[9px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded-full">
                             할인
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-1 text-[11px] text-gray-400 mt-0.5">
+                      <div className="flex items-center gap-1 text-[11px] text-[#6B5142] mt-0.5">
                         <Navigation className="w-3 h-3" />
                         <span>{entry.hopDistance}m 이동</span>
                         {entry.store.location && (
@@ -326,7 +324,7 @@ export function RouteRecommendation({ items, marketId }: Props) {
                         )}
                       </div>
                     </div>
-                    <span className="text-[13px] text-gray-900 flex-shrink-0">
+                    <span className="text-[13px] text-[#46352C] flex-shrink-0">
                       {entry.basePrice.toLocaleString()}원
                     </span>
                   </div>
@@ -335,11 +333,11 @@ export function RouteRecommendation({ items, marketId }: Props) {
                       <span
                         key={ci.id}
                         className={`text-[11px] px-2 py-0.5 rounded-md ${
-                          hasDiscount ? "bg-red-50 text-red-700" : "bg-gray-100 text-gray-600"
+                          hasDiscount ? "bg-red-50 text-red-700" : "bg-[#F5F0E7] text-[#6B5142]"
                         }`}
                       >
                         {ci.name}
-                        {ci.quantity > 1 && <span className="text-gray-400"> ×{ci.quantity}</span>}
+                        {ci.quantity > 1 && <span className="text-[#6B5142]"> ×{ci.quantity}</span>}
                       </span>
                     ))}
                   </div>
@@ -349,8 +347,8 @@ export function RouteRecommendation({ items, marketId }: Props) {
           })}
         </div>
 
-        <div className="border-t border-gray-100 px-4 py-3 flex items-center justify-between bg-gray-50">
-          <div className="text-[12px] text-gray-500 space-y-0.5">
+        <div className="border-t border-[#EDE5D8] px-4 py-3 flex items-center justify-between bg-[#F7F5F1]">
+          <div className="text-[12px] text-[#6B5142] space-y-0.5">
             <div>
               총 {selectedRoute.path.length}개 매장 · {selectedRoute.distance}m 이동
               {usedGraph ? " (보행경로)" : " (직선 추정)"}
@@ -360,77 +358,16 @@ export function RouteRecommendation({ items, marketId }: Props) {
             )}
           </div>
           <div className="text-right">
-            <div className="text-[18px] text-gray-900">{selectedRoute.totalPrice.toLocaleString()}원</div>
-            <div className="text-[11px] text-gray-400">예상 합계</div>
+            <div className="text-[18px] text-[#46352C]">{selectedRoute.totalPrice.toLocaleString()}원</div>
+            <div className="text-[11px] text-[#6B5142]">예상 합계</div>
           </div>
         </div>
-      </div>
-
-      {/* Mini schematic map */}
-      <div className="mt-3 rounded-xl overflow-hidden border border-gray-100 relative" style={{ height: 160 }}>
-        {mapCfg && (
-          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full">
-            <rect x="0" y="0" width="100" height="100" fill="#F0F1F3" />
-            {mapCfg.blocks.map((b, i) => (
-              <rect
-                key={i}
-                x={b.x + 0.5}
-                y={b.y + 0.5}
-                width={b.w - 1}
-                height={b.h - 1}
-                fill={i % 3 === 0 ? "#F7F8FA" : i % 3 === 1 ? "#F0F1F3" : "#E8E9EC"}
-                rx="0.5"
-              />
-            ))}
-            {mapCfg.roads.map((d, i) => (
-              <path key={i} d={d} stroke="#FFFFFF" strokeWidth="2.5" fill="none" />
-            ))}
-            {selectedRoute.path.length > 0 && (
-              <polyline
-                points={[
-                  `50,100`,
-                  ...selectedRoute.path.map((e) => `${e.store.mx},${e.store.my}`),
-                ].join(" ")}
-                stroke={meta.lineColor}
-                strokeWidth="1.8"
-                fill="none"
-                strokeDasharray="3 2"
-                opacity="0.85"
-              />
-            )}
-          </svg>
-        )}
-        <div
-          className="absolute flex flex-col items-center"
-          style={{ left: "50%", top: "100%", transform: "translate(-50%, -100%)" }}
-        >
-          <div className="w-5 h-5 bg-gray-800 rounded-full border-2 border-white flex items-center justify-center shadow text-[8px] text-white">
-            {selectedRoute.startSource === "gps" ? "나" : "출"}
-          </div>
-        </div>
-        {selectedRoute.path.map((entry, i) => (
-          <div
-            key={`${entry.store.id}-pin-${i}`}
-            className="absolute flex flex-col items-center"
-            style={{
-              left: `${entry.store.mx}%`,
-              top: `${entry.store.my}%`,
-              transform: "translate(-50%, -50%)",
-            }}
-          >
-            <div
-              className={`w-6 h-6 ${meta.color} text-white rounded-full flex items-center justify-center text-[10px] shadow border-2 border-white z-10 relative`}
-            >
-              {i + 1}
-            </div>
-          </div>
-        ))}
       </div>
 
       <button
         type="button"
         onClick={openRouteOnMap}
-        className="mt-2.5 flex items-center justify-center gap-1.5 w-full py-3 bg-gray-900 text-white rounded-xl text-[13px] active:bg-gray-800 transition-colors"
+        className="mt-2.5 flex items-center justify-center gap-1.5 w-full py-3 bg-[#5B4335] text-white rounded-xl text-[13px] active:bg-[#6B5142] transition-colors"
       >
         <MapPin className="w-4 h-4" />
         지도에서 경로 보기

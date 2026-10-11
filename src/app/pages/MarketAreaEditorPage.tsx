@@ -30,7 +30,7 @@ declare global {
 const MARKET_LABELS: Record<MarketId, string> = {
   jungang: "천안중앙시장",
   byeongcheon: "천안역전시장",
-  seonghwan: "성환시장",
+  seonghwan: "성환이화시장",
 };
 
 function parseMarket(raw: string | null): MarketId {

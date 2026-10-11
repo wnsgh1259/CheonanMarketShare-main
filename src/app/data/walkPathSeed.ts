@@ -1,6 +1,6 @@
 import type { MarketId } from "../components/CartContext";
-import { MARKET_VIEW_CONFIG, pickStoreDisplayLatLng } from "../map/storeMapPlacement";
-import { STORES_BY_MARKET } from "./storeData";
+import { MARKET_VIEW_CONFIG } from "../map/storeMapPlacement";
+import { getMarketStorePins } from "../map/marketStorePins";
 import {
   createWalkEdgeId,
   createWalkNodeId,
@@ -8,6 +8,7 @@ import {
   hasWalkPathLocalKey,
   loadWalkPathGraphLocal,
   saveWalkPathGraphLocal,
+  ensureStoreFrontNodes,
   type WalkEdge,
   type WalkNode,
   type WalkPathGraph,
@@ -20,10 +21,10 @@ import {
  */
 export function buildSeedWalkPath(marketId: MarketId): WalkPathGraph {
   const view = MARKET_VIEW_CONFIG[marketId];
-  const stores = STORES_BY_MARKET[marketId] ?? [];
-  const positions = stores.map((s) => ({
-    store: s,
-    ...pickStoreDisplayLatLng(marketId, s),
+  const positions = getMarketStorePins(marketId).map((p) => ({
+    store: { id: p.id, name: p.name },
+    lat: p.lat,
+    lng: p.lng,
   }));
 
   // bounding box from area paths + stores
@@ -47,7 +48,7 @@ export function buildSeedWalkPath(marketId: MarketId): WalkPathGraph {
   const lngSpan = maxLng - minLng;
   const northSouth = latSpan >= lngSpan * 0.55;
 
-  const spineCount = Math.max(4, Math.min(10, 3 + Math.ceil(stores.length / 3)));
+  const spineCount = Math.max(4, Math.min(10, 3 + Math.ceil(positions.length / 3)));
   const nodes: WalkNode[] = [];
   const edges: WalkEdge[] = [];
 
@@ -130,10 +131,18 @@ export function buildSeedWalkPath(marketId: MarketId): WalkPathGraph {
   };
 }
 
+function syncLoadedWalkPath(marketId: MarketId, graph: WalkPathGraph): WalkPathGraph {
+  const pins = getMarketStorePins(marketId);
+  const synced = ensureStoreFrontNodes(graph, pins);
+  if (synced === graph) return graph;
+  // 상점 좌표·누락 store_front 보정 — 로컬에 반영해 맵/에디터와 맞춤
+  return saveWalkPathGraphLocal({ ...synced, updatedAt: new Date().toISOString() });
+}
+
 /** 로컬에 보행경로가 한 번도 없으면 시드를 채운다. 이미 저장된(빈 포함) 데이터는 건드리지 않음. */
 export function ensureWalkPathSeeded(marketId: MarketId): WalkPathGraph {
   if (hasWalkPathLocalKey(marketId)) {
-    return loadWalkPathGraphLocal(marketId);
+    return syncLoadedWalkPath(marketId, loadWalkPathGraphLocal(marketId));
   }
   const seed = buildSeedWalkPath(marketId);
   return saveWalkPathGraphLocal(seed);
@@ -147,7 +156,7 @@ export async function hydrateWalkPathGraph(marketId: MarketId): Promise<WalkPath
   const { loadWalkPathGraph } = await import("./walkPathGraph");
   const loaded = await loadWalkPathGraph(marketId);
   if (loaded.nodes.length > 0 || loaded.edges.length > 0 || hasWalkPathLocalKey(marketId)) {
-    return loaded;
+    return syncLoadedWalkPath(marketId, loaded);
   }
   return ensureWalkPathSeeded(marketId);
 }

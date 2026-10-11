@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { ChevronLeft, User, Phone, CheckCircle2, Store, ShoppingCart, ImagePlus, Clock, MapPin, Lock, Mail } from "lucide-react";
 import { setOwnerMode } from "../components/BottomNav";
+import { MarketPinPicker } from "../components/MarketPinPicker";
 import { findRegisteredUserByPhoneDigits, upsertRegisteredUser } from "../data/userAccounts";
 import {
   findPendingSignupByPhone,
@@ -13,7 +14,7 @@ import { refreshOwnerSignupApplicationsFromRemote } from "../data/ownerSignupApp
 import { formatPhoneInput } from "../utils/phoneFormat";
 import { compressImageFile, withTimeout } from "../utils/imageCompress";
 
-type Field = "nickname" | "email" | "phone" | "pin" | "pinConfirm" | "storeImage" | "address" | "market";
+type Field = "nickname" | "email" | "phone" | "pin" | "pinConfirm" | "storeImage" | "address" | "market" | "location";
 
 const OWNER_MARKET_OPTIONS: Array<{ id: OwnerSignupMarketId; label: string }> = [
   { id: "jungang", label: OWNER_SIGNUP_MARKET_LABELS.jungang },
@@ -33,6 +34,7 @@ export function RegisterPage() {
 
   const [form, setForm] = useState({ nickname: "", email: "", phone: "", address: "", pin: "", pinConfirm: "" });
   const [storeImage, setStoreImage] = useState<string | null>(null);
+  const [storePin, setStorePin] = useState<{ lat: number; lng: number } | null>(null);
   const [imageCompressing, setImageCompressing] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
   const [done, setDone] = useState(false);
@@ -59,6 +61,15 @@ export function RegisterPage() {
       pinConfirm: draft.pin || "",
     });
     if (draft.storeImage) setStoreImage(draft.storeImage);
+    if (
+      typeof draft.lat === "number" &&
+      typeof draft.lng === "number" &&
+      Number.isFinite(draft.lat) &&
+      Number.isFinite(draft.lng) &&
+      !(draft.lat === 0 && draft.lng === 0)
+    ) {
+      setStorePin({ lat: draft.lat, lng: draft.lng });
+    }
   }, [isOwner, searchParams]);
 
   const set = (field: "nickname" | "email" | "phone" | "address" | "pin" | "pinConfirm") => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -95,7 +106,7 @@ export function RegisterPage() {
   };
 
   const scrollToFirstError = (nextErrors: Partial<Record<Field, string>>) => {
-    const order: Field[] = ["market", "nickname", "storeImage", "address", "phone", "email", "pin", "pinConfirm"];
+    const order: Field[] = ["market", "nickname", "location", "storeImage", "address", "phone", "email", "pin", "pinConfirm"];
     const first = order.find((key) => nextErrors[key]);
     if (!first) return;
     window.requestAnimationFrame(() => {
@@ -120,6 +131,7 @@ export function RegisterPage() {
     if (!form.pinConfirm) e.pinConfirm = "PIN 번호 확인을 입력해주세요.";
     else if (form.pin !== form.pinConfirm) e.pinConfirm = "PIN 번호가 일치하지 않습니다.";
     if (isOwner && !selectedMarket) e.market = "시장을 선택해주세요.";
+    if (isOwner && !storePin) e.location = "지도에서 상점 위치를 지정해주세요.";
     if (isOwner && !storeImage) e.storeImage = "상점 이미지를 등록해주세요.";
     if (isOwner && !form.address.trim()) e.address = "상점 주소를 입력해주세요.";
     setErrors(e);
@@ -167,7 +179,7 @@ export function RegisterPage() {
       }
 
       if (isOwner) {
-        if (!storeImage) return;
+        if (!storeImage || !storePin) return;
         // 로컬 저장을 먼저 보장한 뒤, 서버 전송은 타임아웃으로 막히지 않게 처리
         const { submitOwnerSignupApplication } = await import("../data/ownerSignupApplications");
         const { upsertOwnerSignupApplicationRemote } = await import("../data/ownerSignupApplicationsSync");
@@ -179,6 +191,8 @@ export function RegisterPage() {
           address: form.address.trim(),
           storeImage,
           marketId: selectedMarket ?? "jungang",
+          lat: storePin.lat,
+          lng: storePin.lng,
         });
         upsertRegisteredUser({
           phone: phoneDigits,
@@ -269,7 +283,22 @@ export function RegisterPage() {
 
   if (isOwner && ownerStep === "market") {
     return (
-      <div className="flex flex-col min-h-screen bg-white">
+      <>
+      <style>{`
+        .owner-signup-theme [class~="bg-gray-900"] { background-color: #5B4335 !important; }
+        .owner-signup-theme [class~="active:bg-gray-800"]:active { background-color: #6B5142 !important; }
+        .owner-signup-theme [class~="bg-gray-100"],
+        .owner-signup-theme [class~="bg-gray-50"] { background-color: #F5F0E7 !important; }
+        .owner-signup-theme [class~="text-gray-900"],
+        .owner-signup-theme [class~="text-gray-800"],
+        .owner-signup-theme [class~="text-gray-700"] { color: #46352C !important; }
+        .owner-signup-theme [class~="text-gray-600"],
+        .owner-signup-theme [class~="text-gray-500"] { color: #6B5142 !important; }
+        .owner-signup-theme [class~="text-gray-400"] { color: #8A776B !important; }
+        .owner-signup-theme [class~="border-gray-100"],
+        .owner-signup-theme [class~="border-gray-200"] { border-color: #E5D9CB !important; }
+      `}</style>
+      <div className="owner-signup-theme flex flex-col min-h-screen bg-[#F7F6F1]">
         <div className="flex items-center px-4 py-3 border-b border-gray-100">
           <button onClick={() => navigate(-1)} className="p-1 mr-2">
             <ChevronLeft className="w-5 h-5 text-gray-700" />
@@ -289,6 +318,7 @@ export function RegisterPage() {
                 key={market.id}
                 type="button"
                 onClick={() => {
+                  if (selectedMarket !== market.id) setStorePin(null);
                   setSelectedMarket(market.id);
                   setErrors((prev) => ({ ...prev, market: "" }));
                 }}
@@ -321,11 +351,34 @@ export function RegisterPage() {
           </button>
         </div>
       </div>
+      </>
     );
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-white">
+    <>
+    {!isOwner && (
+      <style>{`
+        .guest-signup-theme [class~="bg-gray-900"],
+        .owner-signup-theme [class~="bg-gray-900"] { background-color: #5B4335 !important; }
+        .guest-signup-theme [class~="active:bg-gray-800"]:active,
+        .owner-signup-theme [class~="active:bg-gray-800"]:active { background-color: #6B5142 !important; }
+        .guest-signup-theme [class~="bg-gray-100"], .guest-signup-theme [class~="bg-gray-50"],
+        .owner-signup-theme [class~="bg-gray-100"], .owner-signup-theme [class~="bg-gray-50"] { background-color: #F5F0E7 !important; }
+        .guest-signup-theme [class~="text-gray-900"], .guest-signup-theme [class~="text-gray-800"], .guest-signup-theme [class~="text-gray-700"],
+        .owner-signup-theme [class~="text-gray-900"], .owner-signup-theme [class~="text-gray-800"], .owner-signup-theme [class~="text-gray-700"] { color: #46352C !important; }
+        .guest-signup-theme [class~="text-gray-600"], .guest-signup-theme [class~="text-gray-500"],
+        .owner-signup-theme [class~="text-gray-600"], .owner-signup-theme [class~="text-gray-500"] { color: #6B5142 !important; }
+        .guest-signup-theme [class~="text-gray-400"], .owner-signup-theme [class~="text-gray-400"] { color: #8A776B !important; }
+        .guest-signup-theme [class~="border-gray-100"], .guest-signup-theme [class~="border-gray-200"],
+        .owner-signup-theme [class~="border-gray-100"], .owner-signup-theme [class~="border-gray-200"] { border-color: #E5D9CB !important; }
+        .guest-signup-theme [class~="focus:border-gray-400"]:focus,
+        .owner-signup-theme [class~="focus:border-gray-400"]:focus { border-color: #B89A7D !important; }
+        .guest-signup-theme [class~="focus:ring-gray-300"]:focus,
+        .owner-signup-theme [class~="focus:ring-gray-300"]:focus { --tw-ring-color: #B89A7D !important; }
+      `}</style>
+    )}
+    <div className={`${isOwner ? "owner-signup-theme " : "guest-signup-theme "}flex flex-col min-h-screen ${isOwner ? "bg-[#F7F6F1]" : "bg-[#F7F6F1]"}`}>
       {/* 헤더 */}
       <div className="flex items-center px-4 py-3 border-b border-gray-100">
         <button
@@ -336,7 +389,7 @@ export function RegisterPage() {
         </button>
         <h1 className="text-[16px] font-semibold text-gray-900">회원가입</h1>
         <span className={`ml-2 text-[11px] font-semibold px-2.5 py-1 rounded-full ${
-          isOwner ? "bg-amber-100 text-amber-700" : "bg-sky-100 text-sky-700"
+          isOwner ? "bg-amber-100 text-amber-700" : "bg-white text-[#3F4140]"
         }`}>
           {isOwner ? "🏪 사장님" : "🛍 손님"}
         </span>
@@ -368,6 +421,27 @@ export function RegisterPage() {
           />
           <FieldError msg={errors.nickname || ""} />
         </div>
+
+        {/* 상점 위치 (사장님 전용, 필수) */}
+        {isOwner && selectedMarket && (
+          <div data-field="location">
+            <label className="flex items-center gap-1.5 text-[13px] font-medium text-gray-700 mb-1.5">
+              <MapPin className="w-3.5 h-3.5 text-gray-400" />
+              상점 위치 <span className="text-red-400">*</span>
+            </label>
+            <p className="text-[11px] text-gray-400 mb-2">지도를 탭해 실제 상점 위치를 지정해주세요. 승인 후 지도에 바로 표시됩니다.</p>
+            <MarketPinPicker
+              marketId={selectedMarket}
+              value={storePin}
+              error={Boolean(errors.location)}
+              onChange={(next) => {
+                setStorePin(next);
+                setErrors((prev) => ({ ...prev, location: "" }));
+              }}
+            />
+            <FieldError msg={errors.location || ""} />
+          </div>
+        )}
 
         {/* 상점 이미지 (사장님 전용, 필수) */}
         {isOwner && (
@@ -543,5 +617,6 @@ export function RegisterPage() {
         )}
       </div>
     </div>
+    </>
   );
 }

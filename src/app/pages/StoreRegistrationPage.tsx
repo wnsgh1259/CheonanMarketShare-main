@@ -280,7 +280,7 @@ const MARKET_VIEW_CONFIG: Record<MarketId, {
     ]],
   },
   seonghwan: {
-    label: "성환시장",
+    label: "성환이화시장",
     center: { lat: 36.918910, lng: 127.130431 },
     zoom: 17,
     fillColor: "#EA580C",
@@ -1167,7 +1167,9 @@ export function StoreRegistrationPage() {
 
     if (!coords || !nameStr || !categoryStr || !locationStr) {
       const msg = !coords
-        ? "지도에서 위치를 찍어 주세요. (편집 중이면 기존 좌표가 있어야 합니다. 시장 탭을 바꾸면 핀이 초기화될 수 있어요.)"
+        ? isAdminNewStore
+          ? "상점 위치를 지도에서 지정해야 추가할 수 있어요."
+          : "지도에서 위치를 찍어 주세요. (편집 중이면 기존 좌표가 있어야 합니다. 시장 탭을 바꾸면 핀이 초기화될 수 있어요.)"
         : !nameStr
           ? "상점명을 입력해 주세요."
           : !categoryStr
@@ -1393,7 +1395,9 @@ export function StoreRegistrationPage() {
 
     if (!coords || !nameStr || !categoryStr || !locationStr) {
       const msg = !coords
-        ? "지도에서 위치를 찍어 주세요."
+        ? isAdminNewStore
+          ? "상점 위치를 지도에서 지정해야 추가할 수 있어요."
+          : "지도에서 위치를 찍어 주세요."
         : !nameStr
           ? "상점명을 입력해 주세요."
           : !categoryStr
@@ -1672,7 +1676,32 @@ export function StoreRegistrationPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F7F8FA]">
+    <>
+      {returnToAdmin && (
+        <style>{`
+          .admin-store-edit-theme { background: #F7F6F1 !important; }
+          .admin-store-edit-theme [class~="bg-gray-900"] { background-color: #5B4335 !important; }
+          .admin-store-edit-theme [class~="bg-gray-100"] { background-color: #F5F0E7 !important; }
+          .admin-store-edit-theme [class~="bg-gray-50"] { background-color: #F7F5F1 !important; }
+          .admin-store-edit-theme [class~="bg-white"] { background-color: #FFFFFF !important; }
+          .admin-store-edit-theme [class~="bg-blue-50"] { background-color: #F7F2E8 !important; }
+          .admin-store-edit-theme [class~="text-gray-900"],
+          .admin-store-edit-theme [class~="text-gray-800"],
+          .admin-store-edit-theme [class~="text-gray-700"] { color: #46352C !important; }
+          .admin-store-edit-theme [class~="text-gray-600"],
+          .admin-store-edit-theme [class~="text-gray-500"] { color: #6B5142 !important; }
+          .admin-store-edit-theme [class~="text-gray-400"] { color: #8A776B !important; }
+          .admin-store-edit-theme [class~="text-blue-800"] { color: #5B4335 !important; }
+          .admin-store-edit-theme [class~="text-blue-700"],
+          .admin-store-edit-theme [class~="text-blue-600"] { color: #6B5142 !important; }
+          .admin-store-edit-theme [class~="border-gray-100"],
+          .admin-store-edit-theme [class~="border-gray-200"],
+          .admin-store-edit-theme [class~="border-blue-100"] { border-color: #E5D9CB !important; }
+          .admin-store-edit-theme [class~="focus:ring-gray-300"]:focus { --tw-ring-color: #B89A7D !important; }
+          .admin-store-edit-theme .bg-white.rounded-xl { border: 1px solid #E5D9CB; box-shadow: 0 4px 14px -12px rgba(70, 53, 44, .3); }
+        `}</style>
+      )}
+      <div className={`${returnToAdmin ? "admin-store-edit-theme " : ""}min-h-screen bg-[#F7F8FA]`}>
       <div className="sticky top-0 bg-white z-10 border-b border-gray-100">
         <div className="flex items-center justify-between px-4 py-3">
           <button
@@ -1757,8 +1786,14 @@ export function StoreRegistrationPage() {
         {activeSection === "store" && !isStoreHydrating && (
           <>
             <div className="bg-white rounded-xl p-4">
-              <h2 className="text-[14px] text-gray-900 mb-1">지도에서 핀 지정</h2>
-              <p className="text-[12px] text-gray-400 mb-3">지도 클릭으로 가게 위치 핀을 먼저 찍어주세요.</p>
+              <h2 className="text-[14px] text-gray-900 mb-1">
+                지도에서 핀 지정 {isAdminNewStore && <span className="text-red-400">*</span>}
+              </h2>
+              <p className="text-[12px] text-gray-400 mb-3">
+                {isAdminNewStore
+                  ? "관리자 추가 시 지도 핀 지정이 필수입니다. 위치를 찍어야 저장할 수 있어요."
+                  : "지도 클릭으로 가게 위치 핀을 먼저 찍어주세요."}
+              </p>
               <div className="mb-3 flex gap-2 overflow-x-auto">
                 {(Object.entries(MARKET_VIEW_CONFIG) as Array<[MarketId, (typeof MARKET_VIEW_CONFIG)[MarketId]]>).map(([id, market]) => (
                   <button
@@ -2730,6 +2765,7 @@ export function StoreRegistrationPage() {
           </div>,
           document.body,
         )}
-    </div>
+      </div>
+    </>
   );
 }

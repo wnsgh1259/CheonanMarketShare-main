@@ -11,11 +11,24 @@ export type OwnerSignupApplication = {
   address: string;
   storeImage: string;
   marketId: OwnerSignupMarketId;
+  /** 가입 시 지도에서 찍은 상점 좌표 */
+  lat?: number;
+  lng?: number;
   status: "pending" | "approved" | "rejected";
   createdAt: string;
   rejectReason?: string;
   approvedStoreId?: number;
 };
+
+export function hasUsableSignupCoords(app: Pick<OwnerSignupApplication, "lat" | "lng">): boolean {
+  return (
+    typeof app.lat === "number" &&
+    typeof app.lng === "number" &&
+    Number.isFinite(app.lat) &&
+    Number.isFinite(app.lng) &&
+    !(app.lat === 0 && app.lng === 0)
+  );
+}
 
 export function loadOwnerSignupApplications(): OwnerSignupApplication[] {
   try {
@@ -71,6 +84,8 @@ export type OwnerSignupEditDraft = {
   address: string;
   storeImage: string;
   marketId: OwnerSignupMarketId;
+  lat?: number;
+  lng?: number;
 };
 
 export function saveOwnerSignupEditDraft(app: OwnerSignupApplication) {
@@ -82,6 +97,8 @@ export function saveOwnerSignupEditDraft(app: OwnerSignupApplication) {
     address: app.address,
     storeImage: app.storeImage,
     marketId: app.marketId,
+    lat: app.lat,
+    lng: app.lng,
   };
   sessionStorage.setItem(OWNER_SIGNUP_EDIT_DRAFT_KEY, JSON.stringify(draft));
 }
@@ -120,6 +137,8 @@ export function submitOwnerSignupApplication(input: {
   address: string;
   storeImage: string;
   marketId?: OwnerSignupMarketId;
+  lat: number;
+  lng: number;
 }): OwnerSignupApplication {
   const applications = loadOwnerSignupApplications();
   const phoneDigits = input.phone.replace(/\D/g, "");
@@ -136,6 +155,8 @@ export function submitOwnerSignupApplication(input: {
     address: input.address.trim(),
     storeImage: input.storeImage,
     marketId: input.marketId ?? "jungang",
+    lat: Number(input.lat.toFixed(6)),
+    lng: Number(input.lng.toFixed(6)),
     status: "pending",
     createdAt: new Date().toISOString(),
     rejectReason: undefined,
@@ -162,6 +183,8 @@ export async function submitOwnerSignupApplicationAndSync(input: {
   address: string;
   storeImage: string;
   marketId?: OwnerSignupMarketId;
+  lat: number;
+  lng: number;
 }): Promise<{ application: OwnerSignupApplication; synced: boolean }> {
   const application = submitOwnerSignupApplication(input);
   const { upsertOwnerSignupApplicationRemote } = await import("./ownerSignupApplicationsSync");
@@ -228,5 +251,5 @@ export function deleteOwnerSignupApplicationsByPhone(phone: string) {
 export const OWNER_SIGNUP_MARKET_LABELS: Record<OwnerSignupMarketId, string> = {
   jungang: "천안중앙시장",
   byeongcheon: "천안역전시장",
-  seonghwan: "성환시장",
+  seonghwan: "성환이화시장",
 };
