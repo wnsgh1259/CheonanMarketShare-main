@@ -18,6 +18,7 @@ import {
   ensureStoreFrontNodes,
   totalPathLengthMeters,
   upsertStoreFrontNode,
+  snapAllStoresToRoads,
   type WalkNode,
   type WalkNodeType,
   type WalkPathGraph,
@@ -59,7 +60,7 @@ const MODE_HINT: Record<EditorMode, string> = {
   add_entrance: "맵을 클릭해 시장 입구 노드를 추가합니다.",
   connect: "연결할 노드 두 개를 순서대로 클릭합니다.",
   select: "노드·간선을 선택한 뒤 삭제할 수 있습니다.",
-  link_store: "상점 마커를 클릭하면 상점 앞 노드로 붙고, 가까운 통로에 자동 연결됩니다.",
+  link_store: "상점 마커를 클릭하면 가장 가까운 길(막대) 위의 점에 연결됩니다. 길 중간이면 그 자리에 분기점이 생겨요.",
 };
 
 function parseMarket(raw: string | null): MarketId {
@@ -107,6 +108,7 @@ export function WalkPathEditorPage() {
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [labelStoreId, setLabelStoreId] = useState<number | null>(null);
   const [notice, setNotice] = useState("");
   const [history, setHistory] = useState<WalkPathGraph[]>([]);
 
@@ -347,7 +349,7 @@ export function WalkPathEditorPage() {
       const upsert = (prev: WalkPathGraph) =>
         upsertStoreFrontNode(prev, store.id, store.lat, store.lng, {
           label: store.name,
-          autoConnectMaxMeters: 45,
+          autoConnectMaxMeters: 60,
         });
       const preview = upsert(graphRef.current);
       const frontNode = preview.nodes.find((n) => n.type === "store_front" && n.storeId === store.id);
@@ -362,8 +364,8 @@ export function WalkPathEditorPage() {
       applyGraph(upsert);
       setNotice(
         connectedToPassage
-          ? `「${store.name}」 상점을 가까운 통로 노드에 연결했습니다.`
-          : `「${store.name}」 근처 45m 안에 통로 노드가 없어요. 가까운 곳에 교차점을 찍고 연결해 주세요.`,
+          ? `「${store.name}」 상점을 가장 가까운 길에 연결했습니다.`
+          : `「${store.name}」 근처 60m 안에 길이 없어요. 가까운 곳에 교차점을 찍고 연결해 주세요.`,
       );
     },
     [applyGraph],
@@ -466,29 +468,40 @@ export function WalkPathEditorPage() {
 
     storeMarkersRef.current = storePins.map((store) => {
       const linked = graph.nodes.some((n) => n.type === "store_front" && n.storeId === store.id);
+      const focused = labelStoreId === store.id;
+      const dotColor = linked ? "#EA580C" : "#111827";
+      const label = focused
+        ? `<div style="position:absolute;left:50%;bottom:16px;transform:translateX(-50%);padding:2px 6px;border-radius:6px;background:${dotColor};color:#fff;font-size:11px;font-weight:600;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.25);border:1px solid #fff;">${store.name}</div>`
+        : "";
       const marker = new naver.maps.Marker({
         map: mapRef.current,
         position: new naver.maps.LatLng(store.lat, store.lng),
         icon: {
-          content: `<div style="padding:2px 6px;border-radius:6px;background:${linked ? "#EA580C" : "#111827"};color:#fff;font-size:10px;font-weight:600;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.2);border:1px solid #fff;">${store.name}</div>`,
-          anchor: new naver.maps.Point(20, 10),
+          content: `<div style="position:relative;width:14px;height:14px;"><div style="width:14px;height:14px;border-radius:50%;background:${dotColor};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);box-sizing:border-box;"></div>${label}</div>`,
+          anchor: new naver.maps.Point(7, 7),
         },
-        zIndex: 50,
+        zIndex: focused ? 80 : 50,
         clickable: true,
       });
       naver.maps.Event.addListener(marker, "click", (e: any) => {
         e?.domEvent?.stopPropagation?.();
+        setLabelStoreId(store.id);
         onStoreClick(store);
       });
       return marker;
     });
-  }, [mode, mapReady, storePins, graph.nodes, onStoreClick]);
+  }, [mode, mapReady, storePins, graph.nodes, onStoreClick, labelStoreId]);
 
   const selectedNode = graph.nodes.find((n) => n.id === selectedNodeId) ?? null;
   const selectedEdge = graph.edges.find((e) => e.id === selectedEdgeId) ?? null;
   const registeredStoreCount = storePins.length;
   /** 직접 찍은 노드 수 (교차점·입구만, 상점 앞 노드 제외) */
-  const drawnNodeCount = graph.nodes.filter((n) => n.type !== "store_front").length;
+  const drawnNodeCount = graph.nodes.filter((n) => n.type !== "store_front" && !n.auto).length;
+
+  const snapAllStores = () => {
+    applyGraph((prev) => snapAllStoresToRoads(prev));
+    setNotice("모든 상점을 가장 가까운 길에 다시 연결했어요. 저장을 눌러 반영하세요.");
+  };
   const pathMeters = Math.round(totalPathLengthMeters(graph));
 
   const deleteSelected = () => {
@@ -590,6 +603,14 @@ export function WalkPathEditorPage() {
                 onClick={() => {
                   setMode(tool.id);
                   setConnectFromId(null);
+                  if (tool.id === "link_store") {
+                    // 상점연결 모드로 들어갈 때 바로 가까운 길 막대로 정리
+                    const fixed = ensureStoreFrontNodes(graphRef.current, storePins);
+                    if (fixed !== graphRef.current) {
+                      applyGraph(() => fixed);
+                      setNotice("상점을 가장 가까운 길에 맞춰 정리했어요. 저장을 눌러 반영하세요.");
+                    }
+                  }
                   if (tool.id !== "select") {
                     setSelectedNodeId(null);
                     setSelectedEdgeId(null);
@@ -612,6 +633,14 @@ export function WalkPathEditorPage() {
           >
             <Undo2 className="w-3.5 h-3.5" />
             실행취소
+          </button>
+          <button
+            type="button"
+            onClick={snapAllStores}
+            className="h-9 px-3 rounded-lg text-[12px] whitespace-nowrap flex items-center gap-1.5 bg-white text-gray-700 border border-gray-200"
+          >
+            <Store className="w-3.5 h-3.5" />
+            상점 길에 맞추기
           </button>
           <button
             type="button"

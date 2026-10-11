@@ -22,6 +22,7 @@ interface CartContextType {
   currentMarketId: MarketId | null;
   addItem: (item: CartItem) => "added" | "market_conflict";
   removeItem: (id: string) => void;
+  updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
   switchMarketAndAdd: (item: CartItem) => void;
   totalPrice: number;
@@ -64,6 +65,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const updateQuantity = (id: string, quantity: number) => {
+    if (quantity <= 0) {
+      removeItem(id);
+      return;
+    }
+    setItems((prev) =>
+      prev.map((i) => (i.id === id ? { ...i, quantity } : i)),
+    );
+  };
+
   const clearCart = () => {
     setItems([]);
     setCurrentMarketId(null);
@@ -74,7 +85,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   return (
     <CartContext.Provider
-      value={{ items, currentMarketId, addItem, removeItem, clearCart, switchMarketAndAdd, totalPrice, totalCount }}
+      value={{
+        items,
+        currentMarketId,
+        addItem,
+        removeItem,
+        updateQuantity,
+        clearCart,
+        switchMarketAndAdd,
+        totalPrice,
+        totalCount,
+      }}
     >
       {children}
     </CartContext.Provider>

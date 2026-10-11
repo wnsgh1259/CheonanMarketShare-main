@@ -2,6 +2,7 @@ import type { MarketId } from "../components/CartContext";
 import { STORES_BY_MARKET, type MenuItem, type StoreData } from "./storeData";
 import { loadOwnerCatalog } from "./ownerStoreData";
 import { syntheticSeedStoreId } from "./seedStoreIds";
+import { withNavTestMenus } from "./navTestMenus";
 import type { SharedDraftStore, SharedOwnerMenu } from "./ownerSharedStore";
 
 export type ProductStoreOffer = {
@@ -76,7 +77,7 @@ export function getSearchableStores(marketId: MarketId): StoreData[] {
       ...store,
       name: draft?.name ?? store.name,
       image: draft?.image || store.image,
-      menus: mergeStoreMenus(store, draft),
+      menus: withNavTestMenus(marketId, store.id, mergeStoreMenus(store, draft)),
     };
   });
 

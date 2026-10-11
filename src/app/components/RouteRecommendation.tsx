@@ -198,7 +198,7 @@ export function RouteRecommendation({ items, marketId }: Props) {
       )}
 
       <div className="space-y-2 mb-4">
-        {(["cheapest", "shortest", "balanced"] as RouteType[]).map((type) => {
+        {(["balanced", "cheapest", "shortest"] as RouteType[]).map((type) => {
           const r = routes[type];
           const m = ROUTE_META[type];
           const Icon = m.icon;

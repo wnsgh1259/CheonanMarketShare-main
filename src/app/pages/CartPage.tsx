@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import {
   ChevronLeft, Zap, Trash2, ShoppingCart,
   Search, CheckCircle2, PlusCircle, X, ChevronDown, ChevronUp, Route,
+  Minus, Plus,
 } from "lucide-react";
 import { useCart } from "../components/CartContext";
 import type { CartItem, MarketId } from "../components/CartContext";
@@ -82,7 +83,10 @@ const RECIPES: Record<string, RecipeIngredient[]> = {
 };
 
 export function CartPage() {
-  const { items, removeItem, clearCart, totalCount, currentMarketId, addItem, switchMarketAndAdd } = useCart();
+  const {
+    items, removeItem, updateQuantity, clearCart, totalCount, totalPrice,
+    currentMarketId, addItem, switchMarketAndAdd,
+  } = useCart();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const [searchMarket, setSearchMarket] = useState<MarketId>(currentMarketId ?? "jungang");
@@ -212,7 +216,11 @@ export function CartPage() {
   const marketName = currentMarketId ? MARKET_NAMES[currentMarketId] : "시장을 선택하세요";
   const directItems = items.filter((i) => !i.isQuickAdd);
   const quickItems  = items.filter((i) =>  i.isQuickAdd);
-  const totalPrice  = items.reduce((s, i) => s + i.price * i.quantity, 0);
+
+  const dismissProductSearch = () => {
+    setProductGroups(null);
+    setProductSearched(false);
+  };
 
   return (
     <div className="relative isolate min-h-screen bg-[#F7F6F1] pb-24">
@@ -289,13 +297,28 @@ export function CartPage() {
 
         {productSearched && productGroups !== null && (
           <div className="mt-3 border border-[#E5D9CB] rounded-lg overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 bg-[#FAF7F2] border-b border-[#E5D9CB]">
+              <span className="text-[12px] text-[#6B5142]">
+                {productGroups.length === 0
+                  ? "검색 결과 없음"
+                  : `검색 결과 ${productGroups.length}개`}
+              </span>
+              <button
+                type="button"
+                onClick={dismissProductSearch}
+                className="p-1 rounded-md text-[#8A776B] active:bg-[#EFE4D8]"
+                aria-label="검색 결과 닫기"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
             {productGroups.length === 0 ? (
               <div className="px-3 py-5 text-center">
                 <p className="text-[13px] text-[#6B5142]">상품정보가 없습니다</p>
                 <p className="text-[11px] text-[#8A776B] mt-1">장바구니에 추가할 수 없어요</p>
               </div>
             ) : (
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-gray-50 max-h-[42vh] overflow-y-auto">
                 {productGroups.map((group) => {
                   const unresolvedId = unresolvedCartItemId(activeSearchMarket, group.productName);
                   const unresolvedAdded = cartIdSet.has(unresolvedId);
@@ -354,7 +377,7 @@ export function CartPage() {
         )}
 
         {productNotice && (
-          <p className="mt-2 text-[12px] text-emerald-600">{productNotice}</p>
+          <p className="mt-2 text-[12px] text-emerald-600 text-center">{productNotice}</p>
         )}
       </div>
 
@@ -395,11 +418,29 @@ export function CartPage() {
                       <p className={`text-[12px] ${item.unresolved ? "text-amber-600" : "text-[#8A776B]"}`}>
                         {item.unresolved ? "상점 미지정 · 경로 추천 시 배정" : item.storeName}
                       </p>
-                      <div className="flex items-center gap-1.5 mt-0.5">
+                      <div className="flex items-center justify-between gap-2 mt-1">
                         <span className="text-[14px] text-[#46352C]">
                           {item.unresolved ? `${item.price.toLocaleString()}원~` : `${item.price.toLocaleString()}원`}
                         </span>
-                        <span className="text-[12px] text-[#8A776B]">× {item.quantity}</span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                            className="w-7 h-7 rounded-lg border border-[#E5D9CB] flex items-center justify-center text-[#6B5142] active:bg-[#F5F0E7]"
+                            aria-label="수량 줄이기"
+                          >
+                            <Minus className="w-3.5 h-3.5" />
+                          </button>
+                          <span className="w-7 text-center text-[13px] text-[#46352C] tabular-nums">{item.quantity}</span>
+                          <button
+                            type="button"
+                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                            className="w-7 h-7 rounded-lg border border-[#E5D9CB] flex items-center justify-center text-[#6B5142] active:bg-[#F5F0E7]"
+                            aria-label="수량 늘리기"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                     <button onClick={() => removeItem(item.id)} className="p-2 text-[#9A897F] active:text-red-500">
@@ -423,9 +464,27 @@ export function CartPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="text-[14px] text-[#46352C]">{item.name}</h3>
-                      <div className="flex items-center gap-1.5 mt-0.5">
+                      <div className="flex items-center justify-between gap-2 mt-1">
                         <span className="text-[14px] text-[#46352C]">{item.price.toLocaleString()}원</span>
-                        <span className="text-[12px] text-[#6B5142]">× {item.quantity}</span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                            className="w-7 h-7 rounded-lg border border-[#E5D9CB] flex items-center justify-center text-[#6B5142] active:bg-[#F5F0E7]"
+                            aria-label="수량 줄이기"
+                          >
+                            <Minus className="w-3.5 h-3.5" />
+                          </button>
+                          <span className="w-7 text-center text-[13px] text-[#46352C] tabular-nums">{item.quantity}</span>
+                          <button
+                            type="button"
+                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                            className="w-7 h-7 rounded-lg border border-[#E5D9CB] flex items-center justify-center text-[#6B5142] active:bg-[#F5F0E7]"
+                            aria-label="수량 늘리기"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                     <button onClick={() => removeItem(item.id)} className="p-2 text-[#9A897F] active:text-red-500">
