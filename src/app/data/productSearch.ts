@@ -3,6 +3,7 @@ import { STORES_BY_MARKET, type MenuItem, type StoreData } from "./storeData";
 import { loadOwnerCatalog } from "./ownerStoreData";
 import { syntheticSeedStoreId } from "./seedStoreIds";
 import { withNavTestMenus } from "./navTestMenus";
+import { loadAdminDeletedStoreIds } from "./deletedStoreIds";
 import type { SharedDraftStore, SharedOwnerMenu } from "./ownerSharedStore";
 
 export type ProductStoreOffer = {
@@ -52,7 +53,10 @@ function mergeStoreMenus(seed: StoreData, draft: SharedDraftStore | undefined): 
 /** 시드 + 카탈로그를 합친 검색용 상점 목록 */
 export function getSearchableStores(marketId: MarketId): StoreData[] {
   const catalog = loadOwnerCatalog();
-  const drafts = (catalog.stores ?? []).filter((s) => (s.marketId ?? marketId) === marketId);
+  const deleted = loadAdminDeletedStoreIds();
+  const drafts = (catalog.stores ?? []).filter(
+    (s) => (s.marketId ?? marketId) === marketId && !deleted.has(s.id),
+  );
   const draftBySynthetic = new Map<number, SharedDraftStore>();
   const draftBySeedId = new Map<number, SharedDraftStore>();
   const draftByName = new Map<string, SharedDraftStore>();
@@ -68,18 +72,21 @@ export function getSearchableStores(marketId: MarketId): StoreData[] {
   }
 
   const seed = STORES_BY_MARKET[marketId] ?? [];
-  const merged: StoreData[] = seed.map((store) => {
+  const merged: StoreData[] = [];
+  for (const store of seed) {
+    const syntheticId = syntheticSeedStoreId(marketId, store.id);
+    if (deleted.has(syntheticId)) continue;
     const draft =
       draftBySeedId.get(store.id) ??
-      draftBySynthetic.get(syntheticSeedStoreId(marketId, store.id)) ??
+      draftBySynthetic.get(syntheticId) ??
       draftByName.get(store.name);
-    return {
+    merged.push({
       ...store,
       name: draft?.name ?? store.name,
       image: draft?.image || store.image,
       menus: withNavTestMenus(marketId, store.id, mergeStoreMenus(store, draft)),
-    };
-  });
+    });
+  }
 
   const seedIds = new Set(seed.map((s) => s.id));
   const seedSynthetic = new Set(seed.map((s) => syntheticSeedStoreId(marketId, s.id)));

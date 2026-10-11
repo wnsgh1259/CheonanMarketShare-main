@@ -6,6 +6,7 @@ import {
   type SharedFacility,
   type SharedOwnerMenu,
 } from "./ownerSharedStore";
+import { loadAdminDeletedStoreIds } from "./deletedStoreIds";
 import type { StorePromotion } from "./storePromotion";
 
 export const OWNER_DRAFT_MIGRATED_KEY = "owner-draft-migrated-v1";
@@ -217,12 +218,21 @@ export function mergeOwnerCatalog(
   };
 }
 
+function stripDeletedStores(catalog: OwnerDashboardCatalog): OwnerDashboardCatalog {
+  const deleted = loadAdminDeletedStoreIds();
+  if (deleted.size === 0) return catalog;
+  const stores = (catalog.stores ?? []).filter((s) => !deleted.has(s.id));
+  if (stores.length === (catalog.stores ?? []).length) return catalog;
+  return { ...catalog, stores };
+}
+
 export async function refreshOwnerCatalogFromRemote(): Promise<OwnerDashboardCatalog> {
   const local = loadOwnerCatalog();
   const remote = await loadOwnerCatalogRemote();
-  if (!remote) return local;
-  const merged = mergeOwnerCatalog(local, remote);
+  if (!remote) return stripDeletedStores(local);
+  const merged = stripDeletedStores(mergeOwnerCatalog(local, remote));
   // 로컬·catalog가 비어 있어도 legacy에서 복구된 내용을 다시 catalog/local에 심는다
+  // 삭제된 상점은 빼고 다시 올려서 다른 기기에서 부활하지 않게 한다
   saveOwnerCatalog(merged);
   return merged;
 }

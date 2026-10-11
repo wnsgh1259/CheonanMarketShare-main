@@ -163,7 +163,7 @@ export function IdolEventPage() {
           </button>
           <div className="min-w-0 flex-1">
             <p className="text-[17px] font-extrabold text-[#302C40]">{IDOL.name} ({IDOL.group})</p>
-            <p className="text-[12px] text-[#625D76]">WINTER · 프로필을 누르면 다시 들려줘요</p>
+            <p className="text-[12px] text-[#625D76]">{IDOL.group} · 프로필을 누르면 다시 들려줘요</p>
           </div>
           <button
             type="button"

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import {
   ChevronLeft, Zap, Trash2, ShoppingCart,
@@ -106,6 +106,16 @@ export function CartPage() {
   const activeSearchMarket = currentMarketId ?? searchMarket;
 
   const cartIdSet = useMemo(() => new Set(items.map((i) => i.id)), [items]);
+
+  // 폰/PC에서 삭제한 상점이 검색·경로에 다시 안 뜨도록 동기화
+  useEffect(() => {
+    void import("../data/deletedStoreIds").then(({ refreshDeletedStoreIdsFromRemote }) =>
+      refreshDeletedStoreIdsFromRemote(),
+    );
+    void import("../data/ownerStoreData").then(({ refreshOwnerCatalogFromRemote }) =>
+      refreshOwnerCatalogFromRemote(),
+    );
+  }, []);
 
   const handleProductSearch = () => {
     const q = productQuery.trim();

@@ -82,8 +82,16 @@ create table if not exists public.owner_signup_applications (
   created_at timestamptz not null default now(),
   reject_reason text,
   approved_store_id bigint,
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  lat double precision,
+  lng double precision
 );
+
+-- 이미 테이블이 있는 경우(기존 프로젝트) 좌표 컬럼만 추가
+alter table public.owner_signup_applications
+  add column if not exists lat double precision;
+alter table public.owner_signup_applications
+  add column if not exists lng double precision;
 
 alter table public.owner_signup_applications enable row level security;
 

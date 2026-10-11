@@ -1,6 +1,7 @@
 import type { MarketId } from "../components/CartContext";
 import { STORES_BY_MARKET } from "../data/storeData";
 import { loadOwnerCatalog } from "../data/ownerStoreData";
+import { loadAdminDeletedStoreIds } from "../data/deletedStoreIds";
 import { syntheticSeedStoreId } from "../data/seedStoreIds";
 import { pickStoreDisplayLatLng } from "./storeMapPlacement";
 
@@ -11,18 +12,7 @@ export type MarketStorePin = {
   lng: number;
 };
 
-/** 관리자에서 삭제한 상점 id (AdminPage와 동일 키) */
-export function loadAdminDeletedStoreIds(): Set<number> {
-  try {
-    const raw = localStorage.getItem("admin-deleted-store-ids");
-    if (!raw) return new Set();
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return new Set();
-    return new Set(parsed.filter((n): n is number => typeof n === "number"));
-  } catch {
-    return new Set();
-  }
-}
+export { loadAdminDeletedStoreIds } from "../data/deletedStoreIds";
 
 /**
  * 관리자 「등록 상점」 목록과 같은 규칙으로 상점 핀을 만든다.

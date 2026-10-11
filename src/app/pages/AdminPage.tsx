@@ -21,6 +21,12 @@ import {
 import { refreshOwnerChangeRequestsFromRemote } from "../data/ownerChangeRequestsSync";
 import { refreshOwnerSignupApplicationsFromRemote } from "../data/ownerSignupApplicationsSync";
 import { refreshRegisteredUsersFromRemote } from "../data/registeredUsersSync";
+import {
+  loadAdminDeletedStoreIds,
+  markStoreDeleted,
+  refreshDeletedStoreIdsFromRemote,
+  unmarkStoreDeleted,
+} from "../data/deletedStoreIds";
 import { AdminRewardPanel } from "../components/AdminRewardPanel";
 import { refreshSubmissions } from "../data/rewards";
 import { refreshSnsPromos } from "../data/snsPromo";
@@ -288,12 +294,7 @@ export function AdminPage() {
   const [unregisteredDeleteInput, setUnregisteredDeleteInput] = useState("");
   const [unregisteredDeleteAllOpen, setUnregisteredDeleteAllOpen] = useState(false);
   const [unregisteredDeleteAllInput, setUnregisteredDeleteAllInput] = useState("");
-  const [deletedIds, setDeletedIds] = useState<Set<number>>(() => {
-    try {
-      const raw = localStorage.getItem("admin-deleted-store-ids");
-      return raw ? new Set(JSON.parse(raw) as number[]) : new Set();
-    } catch { return new Set(); }
-  });
+  const [deletedIds, setDeletedIds] = useState<Set<number>>(() => loadAdminDeletedStoreIds());
   const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("전체");
@@ -586,6 +587,9 @@ export function AdminPage() {
     migrateLegacyOwnerDraftIfNeeded();
     let cancelled = false;
     const load = async () => {
+      const deleted = await refreshDeletedStoreIdsFromRemote();
+      if (cancelled) return;
+      setDeletedIds(deleted);
       const merged = await refreshOwnerCatalogFromRemote();
       if (cancelled) return;
       setDraft(normalizeCatalogDraft(merged));
@@ -600,6 +604,9 @@ export function AdminPage() {
     if (adminPanelView !== "market") return;
     let cancelled = false;
     const refreshMarketData = async () => {
+      const deleted = await refreshDeletedStoreIdsFromRemote();
+      if (cancelled) return;
+      setDeletedIds(deleted);
       const [catalog, applications] = await Promise.all([
         refreshOwnerCatalogFromRemote(),
         refreshOwnerSignupApplicationsFromRemote(),
@@ -829,10 +836,8 @@ export function AdminPage() {
       status: "active",
     });
     if (deletedIds.has(newStoreId)) {
-      const nextDeletedIds = new Set(deletedIds);
-      nextDeletedIds.delete(newStoreId);
-      setDeletedIds(nextDeletedIds);
-      localStorage.setItem("admin-deleted-store-ids", JSON.stringify(Array.from(nextDeletedIds)));
+      const next = unmarkStoreDeleted(newStoreId);
+      setDeletedIds(new Set(next.ids));
     }
     setSignupApplications(approveOwnerSignupApplication(application, newStoreId));
     setRejectingSignupId(null);
@@ -898,10 +903,8 @@ export function AdminPage() {
   });
 
   const handleDeleteStore = (id: number) => {
-    const next = new Set(deletedIds);
-    next.add(id);
-    setDeletedIds(next);
-    localStorage.setItem("admin-deleted-store-ids", JSON.stringify(Array.from(next)));
+    const saved = markStoreDeleted(id);
+    setDeletedIds(new Set(saved.ids));
 
     const account = storeAccounts[id];
     if (account?.phone) {

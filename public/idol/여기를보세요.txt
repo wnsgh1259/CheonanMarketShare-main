@@ -1,0 +1,15 @@
+﻿리센느 음성 — ElevenLabs 보이스만 넣으면 됩니다
+
+[권장] 보이스 ID 한 번만 설정
+1. ElevenLabs → Voices 에서 아이돌용 보이스를 고르거나 Instant Voice Clone
+2. 해당 보이스의 Voice ID 복사 (긴 영문/숫자 ID)
+3. 프로젝트 루트 .env 에 추가:
+     ELEVEN_API_KEY=xi-...
+     ELEVEN_VOICE_ID=여기에_보이스_ID
+4. npm run dev 를 다시 켠 뒤 /idol 에서 재생
+   → 대사를 바꿔도 mp3를 다시 안 만들어도 됩니다.
+
+[배포용 mp3 미리 만들기]
+대사를 확정한 뒤 한 번만:
+  npm run idol:voice
+→ public/idol/*.mp3 가 생기고, 배포 후에도 그 파일이 재생됩니다.

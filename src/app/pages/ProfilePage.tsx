@@ -77,6 +77,27 @@ export function ProfilePage() {
     return () => window.clearTimeout(timer);
   }, []);
 
+  // URL ?tab= 변경 시 탭 동기화 (홈 → SNS 퀘스트 등)
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "events" || tab === "price" || tab === "coupons" || tab === "stamps") {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
+  // SNS 홍보 퀘스트 섹션으로 스크롤
+  useEffect(() => {
+    if (activeTab !== "events") return;
+    if (searchParams.get("section") !== "sns") return;
+    const timer = window.setTimeout(() => {
+      document.getElementById("sns-promo-quests")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [activeTab, searchParams]);
+
   const progress = loadProgress();
   const visited = uniqueCheckinCount(progress);
   const collectedCount = progress.claimedStamps.length;
@@ -389,7 +410,11 @@ export function ProfilePage() {
             { key: "basic", title: "이벤트 퀘스트", hint: "카드를 누르면 참여", defs: EVENT_DEFS.filter((event) => event.group !== "sns") },
             { key: "sns", title: "SNS 홍보 퀘스트", hint: "게시 화면을 캡처해서 보내요", defs: EVENT_DEFS.filter((event) => event.group === "sns") },
           ].map((section) => (
-          <div key={section.key} className="space-y-3">
+          <div
+            key={section.key}
+            id={section.key === "sns" ? "sns-promo-quests" : undefined}
+            className={`space-y-3${section.key === "sns" ? " scroll-mt-28" : ""}`}
+          >
           <div className="flex items-center justify-between px-1">
             <h3 className="text-[13px] font-semibold text-[#46352C]">{section.title}</h3>
             <span className="text-[11px] text-[#8A776B]">{section.hint}</span>

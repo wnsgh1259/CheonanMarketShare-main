@@ -4,8 +4,13 @@ import {
   type OwnerSignupApplication,
   type OwnerSignupMarketId,
 } from "./ownerSignupApplications";
+import { loadSharedOwnerDraftById, saveSharedOwnerDraftById } from "./ownerSharedStore";
 
 const OWNER_SIGNUP_APPLICATIONS_TABLE = "owner_signup_applications";
+/** lat/lng 컬럼이 없을 때도 좌표를 기기 간에 맞추기 위한 sidecar */
+const SIGNUP_COORDS_REMOTE_ID = "signup_application_coords";
+
+type SignupCoordsMap = Record<string, { lat: number; lng: number; updatedAt: string }>;
 
 let cachedClient: SupabaseClient | null = null;
 
@@ -132,18 +137,65 @@ async function upsertSignupRow(
   return !phoneUpsertError;
 }
 
+async function loadSignupCoordsSidecar(): Promise<SignupCoordsMap> {
+  const payload = await loadSharedOwnerDraftById(SIGNUP_COORDS_REMOTE_ID);
+  if (!payload || typeof payload !== "object") return {};
+  const out: SignupCoordsMap = {};
+  for (const [phone, value] of Object.entries(payload as Record<string, unknown>)) {
+    if (!value || typeof value !== "object") continue;
+    const v = value as { lat?: unknown; lng?: unknown; updatedAt?: unknown };
+    const lat = typeof v.lat === "number" ? v.lat : Number(v.lat);
+    const lng = typeof v.lng === "number" ? v.lng : Number(v.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    out[phone.replace(/\D/g, "")] = {
+      lat,
+      lng,
+      updatedAt: typeof v.updatedAt === "string" ? v.updatedAt : new Date().toISOString(),
+    };
+  }
+  return out;
+}
+
+async function pushSignupCoordsSidecar(phone: string, lat: number, lng: number) {
+  const key = phone.replace(/\D/g, "");
+  if (!key) return;
+  const current = await loadSignupCoordsSidecar();
+  current[key] = { lat, lng, updatedAt: new Date().toISOString() };
+  await saveSharedOwnerDraftById(SIGNUP_COORDS_REMOTE_ID, current);
+}
+
+function applySignupCoordsSidecar(
+  apps: OwnerSignupApplication[],
+  coords: SignupCoordsMap,
+): OwnerSignupApplication[] {
+  if (!apps.length || !Object.keys(coords).length) return apps;
+  return apps.map((app) => {
+    if (typeof app.lat === "number" && typeof app.lng === "number") return app;
+    const hit = coords[app.phone.replace(/\D/g, "")];
+    if (!hit) return app;
+    return { ...app, lat: hit.lat, lng: hit.lng };
+  });
+}
+
 export async function upsertOwnerSignupApplicationRemote(app: OwnerSignupApplication): Promise<boolean> {
   const client = getSupabaseClient();
-  if (!client) return false;
+  const hasCoords = typeof app.lat === "number" && typeof app.lng === "number";
+  // 컬럼이 없어도 좌표는 sidecar에 남겨 폰/PC 관리자가 볼 수 있게 한다
+  if (hasCoords) {
+    void pushSignupCoordsSidecar(app.phone, app.lat!, app.lng!);
+  }
+  if (!client) return hasCoords; // 로컬+sidecar만 있는 경우에도 좌표는 남김
   try {
     // lat/lng 컬럼이 있으면 함께 저장, 없으면(스키마 미반영) 좌표 없이 재시도
     if (await upsertSignupRow(client, applicationToRow(app, true))) return true;
-    return upsertSignupRow(client, applicationToRow(app, false));
+    const fallback = await upsertSignupRow(client, applicationToRow(app, false));
+    return fallback || hasCoords;
   } catch {
     try {
-      return await upsertSignupRow(client, applicationToRow(app, false));
+      const fallback = await upsertSignupRow(client, applicationToRow(app, false));
+      return fallback || hasCoords;
     } catch {
-      return false;
+      return hasCoords;
     }
   }
 }
@@ -241,11 +293,27 @@ export function mergeOwnerSignupApplications(
 }
 
 export async function refreshOwnerSignupApplicationsFromRemote(): Promise<OwnerSignupApplication[]> {
-  const remote = await loadOwnerSignupApplicationsFromRemote();
+  const [remote, coordsSidecar] = await Promise.all([
+    loadOwnerSignupApplicationsFromRemote(),
+    loadSignupCoordsSidecar(),
+  ]);
   const local = loadOwnerSignupApplicationsLocally();
-  if (!remote) return local;
-  const merged = mergeOwnerSignupApplications(local, remote);
+  if (!remote) {
+    const withCoords = applySignupCoordsSidecar(local, coordsSidecar);
+    if (withCoords !== local) saveOwnerSignupApplicationsLocally(withCoords);
+    return withCoords;
+  }
+  const merged = applySignupCoordsSidecar(
+    mergeOwnerSignupApplications(local, remote),
+    coordsSidecar,
+  );
   saveOwnerSignupApplicationsLocally(merged);
   void syncOwnerSignupApplicationsToRemote(merged);
+  // 로컬에만 있던 좌표도 sidecar에 올려 다른 기기로 맞춤
+  for (const app of merged) {
+    if (typeof app.lat === "number" && typeof app.lng === "number") {
+      void pushSignupCoordsSidecar(app.phone, app.lat, app.lng);
+    }
+  }
   return merged;
 }

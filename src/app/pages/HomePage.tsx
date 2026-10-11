@@ -325,7 +325,7 @@ export function HomePage() {
             >
               <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-white/65 text-[22px]">{IDOL.emoji}</span>
               <div className="min-w-0 flex-1">
-                <p className="text-[14px] font-bold text-[#6250A4]">에스파 {IDOL.name}의 시장 미션</p>
+                <p className="text-[14px] font-bold text-[#6250A4]">{IDOL.name}의 시장 미션</p>
                 <p className="mt-0.5 text-[11px] text-[#625D76]">
                   {idolStage >= IDOL_STAGE_COUNT
                     ? "미션을 모두 풀었어요"
@@ -335,7 +335,7 @@ export function HomePage() {
               <ChevronRight className="h-5 w-5 flex-shrink-0 text-[#6044A5]" />
             </Link>
             <Link
-              to="/profile?tab=events"
+              to="/profile?tab=events&section=sns"
               className="flex items-center gap-3 rounded-xl border border-[#D2E0EC] bg-[#E6EFF7] p-4 text-[#555B63] active:opacity-90"
             >
               <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-white/70 text-[22px]">📣</span>

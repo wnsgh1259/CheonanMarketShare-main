@@ -111,12 +111,13 @@ export function WalkPathEditorPage() {
   const [labelStoreId, setLabelStoreId] = useState<number | null>(null);
   const [notice, setNotice] = useState("");
   const [history, setHistory] = useState<WalkPathGraph[]>([]);
+  const [pinsTick, setPinsTick] = useState(0);
 
   const clientId = import.meta.env.VITE_NAVER_MAP_CLIENT_ID as string | undefined;
   const isPlaceholder = !clientId || clientId === "your_naver_map_client_id";
   const view = resolveMarketView(marketId);
   const baseView = MARKET_VIEW_CONFIG[marketId];
-  const storePins = useMemo(() => getMarketStorePins(marketId), [marketId]);
+  const storePins = useMemo(() => getMarketStorePins(marketId), [marketId, pinsTick]);
 
   graphRef.current = graph;
   modeRef.current = mode;
@@ -174,17 +175,23 @@ export function WalkPathEditorPage() {
     setConnectFromId(null);
     setNotice("");
     ensureWalkPathSeeded(marketId);
-    const pins = getMarketStorePins(marketId);
-    void loadWalkPathGraph(marketId).then((g) => {
+    void (async () => {
+      const { refreshDeletedStoreIdsFromRemote } = await import("../data/deletedStoreIds");
+      const { refreshOwnerCatalogFromRemote } = await import("../data/ownerStoreData");
+      await refreshDeletedStoreIdsFromRemote();
+      await refreshOwnerCatalogFromRemote();
       if (cancelled) return;
-      // 등록 상점마다 상점 앞 노드가 있도록 맞춤 (시드 18개만 있던 그래프에 추가 상점 반영)
+      setPinsTick((n) => n + 1);
+      const pins = getMarketStorePins(marketId);
+      const g = await loadWalkPathGraph(marketId);
+      if (cancelled) return;
       const synced = ensureStoreFrontNodes(g, pins);
       setGraph(synced);
       if (synced !== g) {
         setDirty(true);
         setNotice("등록 상점 목록에 맞춰 상점 앞 노드를 정리했어요. 저장을 눌러 반영하세요.");
       }
-    });
+    })();
     return () => {
       cancelled = true;
     };

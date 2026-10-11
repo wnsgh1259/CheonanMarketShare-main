@@ -20,6 +20,10 @@ import {
   migrateLegacyOwnerDraftIfNeeded,
   refreshOwnerCatalogFromRemote,
 } from "../data/ownerStoreData";
+import {
+  loadAdminDeletedStoreIds,
+  refreshDeletedStoreIdsFromRemote,
+} from "../data/deletedStoreIds";
 import { syntheticSeedStoreId } from "../data/seedStoreIds";
 import { buildFacilityMarkerIcon, buildStoreMarkerIcon } from "../map/naverMarkerIcons";
 import { MARKET_VIEW_CONFIG, pickStoreDisplayLatLng, toStoreLatLng } from "../map/storeMapPlacement";
@@ -885,6 +889,7 @@ export function MapPage() {
   const [sharedFacilities, setSharedFacilities] = useState<DraftFacilityPin[]>(
     () => (loadOwnerCatalog().facilities ?? []) as DraftFacilityPin[],
   );
+  const [deletedStoreIds, setDeletedStoreIds] = useState<Set<number>>(() => loadAdminDeletedStoreIds());
   const [listActiveSnap, setListActiveSnap] = useState<number | null>(LIST_SNAP_MIN_FALLBACK);
   /** 지도 드래그 중: 상점 목록·헤더줄 숨기고 핸들(위로 당기기)만 표시 */
   const [isMapDragging, setIsMapDragging] = useState(false);
@@ -960,6 +965,9 @@ export function MapPage() {
     migrateLegacyOwnerDraftIfNeeded();
     let cancelled = false;
     const load = async () => {
+      await refreshDeletedStoreIdsFromRemote();
+      if (cancelled) return;
+      setDeletedStoreIds(loadAdminDeletedStoreIds());
       const merged = await refreshOwnerCatalogFromRemote();
       if (cancelled) return;
       setSharedStores((merged.stores ?? []) as DraftStorePin[]);
@@ -972,19 +980,23 @@ export function MapPage() {
   }, []);
 
   const allStores = useMemo(() => {
+    const deleted = deletedStoreIds;
     const rawDrafts = sharedStores.filter(
       (s) =>
         s.marketId === selectedMarket &&
         typeof s.lat === "number" &&
         typeof s.lng === "number" &&
         usableLatLng(s.lat, s.lng) &&
-        s.name,
+        s.name &&
+        !deleted.has(s.id),
     );
 
     const maps = buildDraftOverridesForMarket(rawDrafts, selectedMarket);
 
-    // 기존 시드 상점 (draft 오버라이드 적용)
-    const seedStores = STORES_BY_MARKET[selectedMarket].map((store) => {
+    // 기존 시드 상점 (draft 오버라이드 적용) — 관리자 삭제분 제외
+    const seedStores = STORES_BY_MARKET[selectedMarket]
+      .filter((store) => !deleted.has(syntheticSeedStoreId(selectedMarket, store.id)))
+      .map((store) => {
       const override = resolveDraftOverride(selectedMarket, store, maps);
       if (!override) {
         const pos = pickStoreDisplayLatLng(selectedMarket, store);
@@ -1021,7 +1033,7 @@ export function MapPage() {
     });
 
     return [...seedStores, ...newStores];
-  }, [selectedMarket, sharedStores, now]);
+  }, [selectedMarket, sharedStores, now, deletedStoreIds]);
   const marketInfo = MARKET_INFO[selectedMarket];
   const facilities = useMemo(() => {
     return sharedFacilities.filter(

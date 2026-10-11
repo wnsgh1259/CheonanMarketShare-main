@@ -10,6 +10,8 @@ import {
 import { refreshOwnerSignupApplicationsFromRemote } from "../data/ownerSignupApplicationsSync";
 import { refreshStoreAccountsFromRemote } from "../data/storeAccountsSync";
 import { refreshRegisteredUsersFromRemote } from "../data/registeredUsersSync";
+import { refreshDeletedStoreIdsFromRemote } from "../data/deletedStoreIds";
+import { refreshOwnerCatalogFromRemote } from "../data/ownerStoreData";
 import { formatPhoneInput } from "../utils/phoneFormat";
 
 export function LoginPage() {
@@ -53,6 +55,8 @@ export function LoginPage() {
       refreshOwnerSignupApplicationsFromRemote(),
       refreshStoreAccountsFromRemote(),
       refreshRegisteredUsersFromRemote(),
+      refreshDeletedStoreIdsFromRemote(),
+      refreshOwnerCatalogFromRemote(),
     ]);
     const result = login(phoneDigits, pinValue);
     if (!result.ok) {
