@@ -1,33 +1,23 @@
 /**
- * ElevenLabs 보이스 ID 한 번만 설정하면, 대사 JSON을 전부 그 목소리 mp3로 만듭니다.
+ * idol-eleven.json 의 apiKey + voiceId 로 대사를 mp3로 만듭니다.
+ * 배포 후에도 들리게 하려면 이 스크립트로 public/idol/*.mp3 를 만들고 깃에 올리면 됩니다.
  *
- * 1) 프로젝트 루트 .env 에 추가:
- *      ELEVEN_API_KEY=...
- *      ELEVEN_VOICE_ID=...   ← ElevenLabs 보이스 라이브러리의 Voice ID
- * 2) 대사 수정: src/app/data/idolEventDefaults.json 의 voice
- * 3) 실행: npm run idol:voice
- *
- * 개발 중(npm run dev)에는 이 스크립트 없이도 /api/idol-tts 로 바로 읽습니다.
+ *   npm run idol:voice
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadEnvFiles } from "./loadEnv.mjs";
+import { readIdolElevenConfig } from "./idolElevenConfig.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 loadEnvFiles(root);
 
-const apiKey = process.env.ELEVEN_API_KEY;
-const voiceId = process.env.ELEVEN_VOICE_ID;
+const { apiKey, voiceId } = readIdolElevenConfig(root);
 
 if (!apiKey || !voiceId) {
-  console.error(`ELEVEN_API_KEY / ELEVEN_VOICE_ID 가 없습니다.
-
-프로젝트 루트 .env 에 아래를 넣고 다시 실행하세요.
-  ELEVEN_API_KEY=xi-...
-  ELEVEN_VOICE_ID=보이스ID
-`);
-  process.exit(1);
+  console.warn("idol-eleven.json 에 apiKey / voiceId 가 없어 음성 생성을 건너뜁니다.");
+  process.exit(0);
 }
 
 const defaults = JSON.parse(
@@ -65,4 +55,4 @@ for (const [key, text] of Object.entries(defaults.voice)) {
   console.log(`✓ ${key}.mp3`);
 }
 
-console.log("완료. 앱을 새로고침하면 리센느(설정 보이스) 음성이 재생됩니다.");
+console.log("완료. public/idol/*.mp3 를 깃에 올리면 배포된 곳에서도 재생됩니다.");
