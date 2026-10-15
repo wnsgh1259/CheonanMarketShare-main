@@ -1,0 +1,15 @@
+﻿아이돌 음성 설정
+
+1) 프로젝트 루트 idol-eleven.json 에 API 키와 Voice ID를 넣습니다.
+   {
+     "apiKey": "...",
+     "voiceId": "..."
+   }
+
+2) 로컬 개발 (npm run dev)
+   → 대사를 바꿔도 바로 그 보이스로 읽습니다.
+
+3) 배포/다른 기기에서도 들리게
+   → npm run idol:voice  실행 후
+   → public/idol/*.mp3 가 생기면 깃에 같이 올리면 됩니다.
+   (build 할 때도 voiceId가 있으면 자동 생성됩니다)
