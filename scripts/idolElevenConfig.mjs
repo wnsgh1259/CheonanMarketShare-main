@@ -15,7 +15,8 @@ export function readIdolElevenConfig(rootDir) {
       // ignore
     }
   }
-  if (process.env.ELEVEN_API_KEY) apiKey = process.env.ELEVEN_API_KEY;
-  if (process.env.ELEVEN_VOICE_ID) voiceId = process.env.ELEVEN_VOICE_ID;
+  // 파일 값이 우선. env 는 파일이 비어 있을 때만 사용
+  if (!apiKey && process.env.ELEVEN_API_KEY) apiKey = process.env.ELEVEN_API_KEY.trim();
+  if (!voiceId && process.env.ELEVEN_VOICE_ID) voiceId = process.env.ELEVEN_VOICE_ID.trim();
   return { apiKey, voiceId };
 }

@@ -49,6 +49,7 @@ for (const [key, text] of Object.entries(defaults.voice)) {
   });
   if (!response.ok) {
     console.error(`${key} 실패: ${response.status} ${await response.text()}`);
+    console.error("음성 생성을 중단합니다. (배포 빌드는 이 스크립트와 무관합니다)");
     process.exit(1);
   }
   await writeFile(join(outDir, `${key}.mp3`), Buffer.from(await response.arrayBuffer()));
