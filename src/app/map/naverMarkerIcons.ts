@@ -1,11 +1,9 @@
-import type { CategoryKey } from "../data/storeData";
+import { normalizeStoreCategory, type CategoryKey } from "../data/storeData";
 
 const CATEGORY_COLOR: Record<CategoryKey, { pin: string }> = {
   "전체": { pin: "#607D8B" },
   "먹거리·분식": { pin: "#FF9800" },
   "정육·계란": { pin: "#E53935" },
-  "채소": { pin: "#43A047" },
-  "과일": { pin: "#FB8C00" },
   "채소·과일": { pin: "#7CB342" },
   "수산물": { pin: "#1E88E5" },
   "반찬·건어물": { pin: "#8E24AA" },
@@ -16,8 +14,6 @@ const CATEGORY_EMOJI: Record<CategoryKey, string> = {
   "전체": "🏪",
   "먹거리·분식": "🍢",
   "정육·계란": "🥩",
-  "채소": "🥦",
-  "과일": "🍎",
   "채소·과일": "🥬",
   "수산물": "🐟",
   "반찬·건어물": "🍱",
@@ -25,8 +21,7 @@ const CATEGORY_EMOJI: Record<CategoryKey, string> = {
 };
 
 function asCategoryKey(c: string): CategoryKey {
-  if (c in CATEGORY_EMOJI) return c as CategoryKey;
-  return "기타·생활";
+  return normalizeStoreCategory(c);
 }
 
 export function escapeHtml(s: string) {

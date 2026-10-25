@@ -43,44 +43,459 @@ interface RecipeIngredient {
   emoji: string;
 }
 
+/** 중앙시장 시드 상점 기준 (네비게이션·장바구니 연동) */
+const S = {
+  meat:   { storeName: "신선정육점", storeId: 4 },
+  meat2:  { storeName: "중앙정육센터", storeId: 17 },
+  veg:    { storeName: "싱싱청과", storeId: 5 },
+  tofu:   { storeName: "두부콩나물집", storeId: 12 },
+  fruit:  { storeName: "황금과일가게", storeId: 13 },
+  fish:   { storeName: "중앙수산", storeId: 6 },
+  fish2:  { storeName: "남해수산", storeId: 14 },
+  banchan:{ storeName: "시장반찬가게", storeId: 7 },
+  dry:    { storeName: "통큰건어물", storeId: 15 },
+  rice:   { storeName: "천안쌀잡곡", storeId: 16 },
+  living: { storeName: "생활잡화코너", storeId: 8 },
+} as const;
+
+type StoreRef = (typeof S)[keyof typeof S];
+
+function ing(
+  prefix: string,
+  index: number,
+  name: string,
+  amount: string,
+  store: StoreRef,
+  price: number,
+  image: string,
+  emoji: string,
+): RecipeIngredient {
+  return {
+    id: `${prefix}-${index}`,
+    name,
+    amount,
+    storeName: store.storeName,
+    storeId: store.storeId,
+    marketId: "jungang",
+    price,
+    image,
+    emoji,
+  };
+}
+
+function recipe(
+  prefix: string,
+  items: Array<[string, string, StoreRef, number, string, string]>,
+): RecipeIngredient[] {
+  return items.map(([name, amount, store, price, image, emoji], i) =>
+    ing(prefix, i + 1, name, amount, store, price, image, emoji),
+  );
+}
+
 const RECIPES: Record<string, RecipeIngredient[]> = {
-  "김치찌개": [
-    { id: "rc-kc-1", name: "묵은지 김치",       amount: "300g",  storeName: "싱싱채소마트", storeId: 5, marketId: "jungang", price: 3500, image: VEG_IMG,    emoji: "🥬" },
-    { id: "rc-kc-2", name: "돼지고기 (앞다리살)", amount: "200g",  storeName: "신선정육점",   storeId: 4, marketId: "jungang", price: 6800, image: MEAT_IMG,   emoji: "🥩" },
-    { id: "rc-kc-3", name: "순두부",             amount: "1모",   storeName: "두부·콩나물마트",storeId:13, marketId:"jungang", price: 3000, image: VEG_IMG,   emoji: "⬜" },
-    { id: "rc-kc-4", name: "대파",               amount: "1/2대", storeName: "싱싱채소마트", storeId: 5, marketId: "jungang", price: 800,  image: ONION_IMG,  emoji: "🌿" },
-    { id: "rc-kc-5", name: "다진 마늘",          amount: "1큰술", storeName: "시장반찬가게", storeId: 8, marketId: "jungang", price: 1200, image: GARLIC_IMG, emoji: "🧄" },
-    { id: "rc-kc-6", name: "고춧가루",           amount: "1큰술", storeName: "시장반찬가게", storeId: 8, marketId: "jungang", price: 2500, image: SAUCE_IMG,  emoji: "🌶️" },
-    { id: "rc-kc-7", name: "참기름",             amount: "1작은술",storeName: "시장반찬가게",storeId: 8, marketId: "jungang", price: 3200, image: SAUCE_IMG,  emoji: "🫙" },
-  ],
-  "된장찌개": [
-    { id: "rc-dj-1", name: "된장",    amount: "2큰술",  storeName: "시장반찬가게",  storeId: 8, marketId: "jungang", price: 2800, image: SAUCE_IMG, emoji: "🫙" },
-    { id: "rc-dj-2", name: "두부",    amount: "1/2모",  storeName: "두부·콩나물마트",storeId:13, marketId:"jungang", price: 2500, image: VEG_IMG,   emoji: "⬜" },
-    { id: "rc-dj-3", name: "애호박",  amount: "1/3개",  storeName: "싱싱채소마트",  storeId: 5, marketId: "jungang", price: 1200, image: VEG_IMG,   emoji: "🥒" },
-    { id: "rc-dj-4", name: "감자",    amount: "1개",    storeName: "싱싱채소마트",  storeId: 5, marketId: "jungang", price: 900,  image: VEG_IMG,   emoji: "🥔" },
-    { id: "rc-dj-5", name: "양파",    amount: "1/2개",  storeName: "싱싱채소마트",  storeId: 5, marketId: "jungang", price: 700,  image: VEG_IMG,   emoji: "🧅" },
-    { id: "rc-dj-6", name: "대파",    amount: "1/2대",  storeName: "싱싱채소마트",  storeId: 5, marketId: "jungang", price: 800,  image: ONION_IMG, emoji: "🌿" },
-    { id: "rc-dj-7", name: "다진 마늘",amount:"1큰술",  storeName: "시장반찬가게",  storeId: 8, marketId: "jungang", price: 1200, image: GARLIC_IMG,emoji: "🧄" },
-  ],
-  "불고기": [
-    { id: "rc-bg-1", name: "소고기 (불고기용)", amount: "300g",  storeName: "신선정육점",  storeId: 4, marketId: "jungang", price: 14500, image: MEAT_IMG,   emoji: "🥩" },
-    { id: "rc-bg-2", name: "양파",              amount: "1개",   storeName: "싱싱채소마트",storeId: 5, marketId: "jungang", price: 700,   image: VEG_IMG,    emoji: "🧅" },
-    { id: "rc-bg-3", name: "대파",              amount: "1대",   storeName: "싱싱채소마트",storeId: 5, marketId: "jungang", price: 800,   image: ONION_IMG,  emoji: "🌿" },
-    { id: "rc-bg-4", name: "간장",              amount: "3큰술", storeName: "시장반찬가게",storeId: 8, marketId: "jungang", price: 2200,  image: SAUCE_IMG,  emoji: "🫙" },
-    { id: "rc-bg-5", name: "설탕",              amount: "1큰술", storeName: "시장반찬가게",storeId: 8, marketId: "jungang", price: 900,   image: SAUCE_IMG,  emoji: "🍬" },
-    { id: "rc-bg-6", name: "참기름",            amount: "1큰술", storeName: "시장반찬가게",storeId: 8, marketId: "jungang", price: 3200,  image: SAUCE_IMG,  emoji: "🫙" },
-    { id: "rc-bg-7", name: "다진 마늘",         amount: "1큰술", storeName: "시장반찬가게",storeId: 8, marketId: "jungang", price: 1200,  image: GARLIC_IMG, emoji: "🧄" },
-  ],
-  "순두부찌개": [
-    { id: "rc-sd-1", name: "순두부",            amount: "1팩",   storeName: "두부·콩나물마트",storeId:13,marketId:"jungang", price: 3000, image: VEG_IMG,   emoji: "⬜" },
-    { id: "rc-sd-2", name: "돼지고기 (다짐육)", amount: "100g",  storeName: "신선정육점",   storeId: 4, marketId:"jungang", price: 3500, image: MEAT_IMG,  emoji: "🥩" },
-    { id: "rc-sd-3", name: "달걀",              amount: "1개",   storeName: "싱싱채소마트", storeId: 5, marketId:"jungang", price: 500,  image: VEG_IMG,   emoji: "🥚" },
-    { id: "rc-sd-4", name: "대파",              amount: "1/2대", storeName: "싱싱채소마트", storeId: 5, marketId:"jungang", price: 800,  image: ONION_IMG, emoji: "🌿" },
-    { id: "rc-sd-5", name: "고춧가루",          amount: "2큰술", storeName: "시장반찬가게", storeId: 8, marketId:"jungang", price: 2500, image: SAUCE_IMG, emoji: "🌶️" },
-    { id: "rc-sd-6", name: "다진 마늘",         amount: "1큰술", storeName: "시장반찬가게", storeId: 8, marketId:"jungang", price: 1200, image: GARLIC_IMG,emoji: "🧄" },
-    { id: "rc-sd-7", name: "참기름",            amount: "1작은술",storeName: "시장반찬가게",storeId: 8, marketId:"jungang", price: 3200, image: SAUCE_IMG, emoji: "🫙" },
-  ],
+  "김치찌개": recipe("rc-kc", [
+    ["묵은지 김치", "300g", S.banchan, 3500, VEG_IMG, "🥬"],
+    ["돼지고기 (앞다리살)", "200g", S.meat, 6800, MEAT_IMG, "🥩"],
+    ["순두부", "1모", S.tofu, 3000, VEG_IMG, "⬜"],
+    ["대파", "1/2대", S.veg, 800, ONION_IMG, "🌿"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+    ["고춧가루", "1큰술", S.banchan, 2500, SAUCE_IMG, "🌶️"],
+    ["참기름", "1작은술", S.banchan, 3200, SAUCE_IMG, "🫙"],
+  ]),
+  "된장찌개": recipe("rc-dj", [
+    ["된장", "2큰술", S.banchan, 2800, SAUCE_IMG, "🫙"],
+    ["두부", "1/2모", S.tofu, 2500, VEG_IMG, "⬜"],
+    ["애호박", "1/3개", S.veg, 1200, VEG_IMG, "🥒"],
+    ["감자", "1개", S.veg, 900, VEG_IMG, "🥔"],
+    ["양파", "1/2개", S.veg, 700, VEG_IMG, "🧅"],
+    ["대파", "1/2대", S.veg, 800, ONION_IMG, "🌿"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+  ]),
+  "불고기": recipe("rc-bg", [
+    ["소고기 (불고기용)", "300g", S.meat, 14500, MEAT_IMG, "🥩"],
+    ["양파", "1개", S.veg, 700, VEG_IMG, "🧅"],
+    ["대파", "1대", S.veg, 800, ONION_IMG, "🌿"],
+    ["간장", "3큰술", S.banchan, 2200, SAUCE_IMG, "🫙"],
+    ["설탕", "1큰술", S.banchan, 900, SAUCE_IMG, "🍬"],
+    ["참기름", "1큰술", S.banchan, 3200, SAUCE_IMG, "🫙"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+  ]),
+  "순두부찌개": recipe("rc-sd", [
+    ["순두부", "1팩", S.tofu, 3000, VEG_IMG, "⬜"],
+    ["돼지고기 (다짐육)", "100g", S.meat, 3500, MEAT_IMG, "🥩"],
+    ["달걀", "1개", S.veg, 500, VEG_IMG, "🥚"],
+    ["대파", "1/2대", S.veg, 800, ONION_IMG, "🌿"],
+    ["고춧가루", "2큰술", S.banchan, 2500, SAUCE_IMG, "🌶️"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+    ["참기름", "1작은술", S.banchan, 3200, SAUCE_IMG, "🫙"],
+  ]),
+  "제육볶음": recipe("rc-jy", [
+    ["돼지 앞다리살", "400g", S.meat, 8000, MEAT_IMG, "🥩"],
+    ["양파", "1개", S.veg, 700, VEG_IMG, "🧅"],
+    ["대파", "1대", S.veg, 800, ONION_IMG, "🌿"],
+    ["고추장", "2큰술", S.banchan, 2500, SAUCE_IMG, "🌶️"],
+    ["고춧가루", "1큰술", S.banchan, 2500, SAUCE_IMG, "🌶️"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+    ["참기름", "1큰술", S.banchan, 3200, SAUCE_IMG, "🫙"],
+  ]),
+  "감자조림": recipe("rc-gj", [
+    ["감자", "4개", S.veg, 2500, VEG_IMG, "🥔"],
+    ["간장", "3큰술", S.banchan, 2200, SAUCE_IMG, "🫙"],
+    ["설탕", "1큰술", S.banchan, 900, SAUCE_IMG, "🍬"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+    ["참기름", "1작은술", S.banchan, 3200, SAUCE_IMG, "🫙"],
+    ["대파", "1/2대", S.veg, 800, ONION_IMG, "🌿"],
+  ]),
+  "계란말이": recipe("rc-eg", [
+    ["계란 30구", "4개분", S.meat, 7500, VEG_IMG, "🥚"],
+    ["대파", "1/2대", S.veg, 800, ONION_IMG, "🌿"],
+    ["당근", "1/4개", S.veg, 700, VEG_IMG, "🥕"],
+    ["참기름", "1작은술", S.banchan, 3200, SAUCE_IMG, "🫙"],
+    ["소금", "약간", S.banchan, 500, SAUCE_IMG, "🧂"],
+  ]),
+  "미역국": recipe("rc-my", [
+    ["미역", "20g", S.dry, 2500, VEG_IMG, "🌊"],
+    ["소고기 (국거리)", "150g", S.meat, 9000, MEAT_IMG, "🥩"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+    ["간장", "1큰술", S.banchan, 2200, SAUCE_IMG, "🫙"],
+    ["참기름", "1큰술", S.banchan, 3200, SAUCE_IMG, "🫙"],
+    ["대파", "1/2대", S.veg, 800, ONION_IMG, "🌿"],
+  ]),
+  "고등어구이": recipe("rc-go", [
+    ["고등어 2마리", "1마리", S.fish, 7000, MEAT_IMG, "🐟"],
+    ["대파", "1대", S.veg, 800, ONION_IMG, "🌿"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+    ["간장", "2큰술", S.banchan, 2200, SAUCE_IMG, "🫙"],
+    ["고춧가루", "1큰술", S.banchan, 2500, SAUCE_IMG, "🌶️"],
+  ]),
+  "갈치조림": recipe("rc-gc", [
+    ["갈치 1마리", "1마리", S.fish, 12000, MEAT_IMG, "🐟"],
+    ["무", "1/4개", S.veg, 1500, VEG_IMG, "⚪"],
+    ["양파", "1/2개", S.veg, 700, VEG_IMG, "🧅"],
+    ["고춧가루", "2큰술", S.banchan, 2500, SAUCE_IMG, "🌶️"],
+    ["간장", "3큰술", S.banchan, 2200, SAUCE_IMG, "🫙"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+  ]),
+  "오징어볶음": recipe("rc-oj", [
+    ["오징어 2마리", "1마리", S.fish, 8000, MEAT_IMG, "🦑"],
+    ["양파", "1개", S.veg, 700, VEG_IMG, "🧅"],
+    ["대파", "1대", S.veg, 800, ONION_IMG, "🌿"],
+    ["고추장", "2큰술", S.banchan, 2500, SAUCE_IMG, "🌶️"],
+    ["고춧가루", "1큰술", S.banchan, 2500, SAUCE_IMG, "🌶️"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+  ]),
+  "생선매운탕": recipe("rc-mt", [
+    ["매운탕 재료", "1세트", S.fish2, 12000, MEAT_IMG, "🍲"],
+    ["대파", "1대", S.veg, 800, ONION_IMG, "🌿"],
+    ["무", "1/4개", S.veg, 1500, VEG_IMG, "⚪"],
+    ["고춧가루", "2큰술", S.banchan, 2500, SAUCE_IMG, "🌶️"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+    ["두부", "1/2모", S.tofu, 2500, VEG_IMG, "⬜"],
+  ]),
+  "보쌈": recipe("rc-bs", [
+    ["보쌈용 수육 300g", "500g", S.meat2, 11000, MEAT_IMG, "🥩"],
+    ["배추 1포기", "1/2포기", S.veg, 4000, VEG_IMG, "🥬"],
+    ["새우젓 500g", "약간", S.dry, 7000, SAUCE_IMG, "🦐"],
+    ["마늘", "1통", S.banchan, 2000, GARLIC_IMG, "🧄"],
+    ["생강", "조금", S.banchan, 1500, VEG_IMG, "🫚"],
+  ]),
+  "삼겹살구이": recipe("rc-sg", [
+    ["돼지 삼겹살 500g", "500g", S.meat, 12000, MEAT_IMG, "🥩"],
+    ["상추 1봉", "1봉", S.veg, 3000, VEG_IMG, "🥬"],
+    ["마늘", "1통", S.banchan, 2000, GARLIC_IMG, "🧄"],
+    ["쌈장", "1통", S.banchan, 3500, SAUCE_IMG, "🫙"],
+    ["양파", "1개", S.veg, 700, VEG_IMG, "🧅"],
+  ]),
+  "콩나물국": recipe("rc-kn", [
+    ["콩나물 500g", "300g", S.tofu, 2000, VEG_IMG, "🌱"],
+    ["대파", "1/2대", S.veg, 800, ONION_IMG, "🌿"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+    ["멸치 1근", "조금", S.dry, 6500, SAUCE_IMG, "🐟"],
+    ["고춧가루", "1작은술", S.banchan, 2500, SAUCE_IMG, "🌶️"],
+  ]),
+  "두부조림": recipe("rc-tj", [
+    ["두부 1모", "1모", S.tofu, 2500, VEG_IMG, "⬜"],
+    ["간장", "3큰술", S.banchan, 2200, SAUCE_IMG, "🫙"],
+    ["고춧가루", "1큰술", S.banchan, 2500, SAUCE_IMG, "🌶️"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+    ["대파", "1/2대", S.veg, 800, ONION_IMG, "🌿"],
+    ["참기름", "1작은술", S.banchan, 3200, SAUCE_IMG, "🫙"],
+  ]),
+  "잡채": recipe("rc-jc", [
+    ["당면", "200g", S.rice, 3500, VEG_IMG, "🍜"],
+    ["돼지고기 (채썰기)", "150g", S.meat, 5000, MEAT_IMG, "🥩"],
+    ["시금치 1단", "1단", S.veg, 2200, VEG_IMG, "🥬"],
+    ["당근", "1/2개", S.veg, 700, VEG_IMG, "🥕"],
+    ["양파", "1개", S.veg, 700, VEG_IMG, "🧅"],
+    ["간장", "4큰술", S.banchan, 2200, SAUCE_IMG, "🫙"],
+    ["참기름", "2큰술", S.banchan, 3200, SAUCE_IMG, "🫙"],
+  ]),
+  "닭볶음탕": recipe("rc-dk", [
+    ["닭볶음탕용 1kg", "1마리", S.meat2, 9000, MEAT_IMG, "🍗"],
+    ["감자", "2개", S.veg, 1500, VEG_IMG, "🥔"],
+    ["당근", "1개", S.veg, 1000, VEG_IMG, "🥕"],
+    ["양파", "1개", S.veg, 700, VEG_IMG, "🧅"],
+    ["고추장", "3큰술", S.banchan, 2500, SAUCE_IMG, "🌶️"],
+    ["고춧가루", "2큰술", S.banchan, 2500, SAUCE_IMG, "🌶️"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+  ]),
+  "김치전": recipe("rc-kj", [
+    ["김치 1kg", "200g", S.banchan, 8000, VEG_IMG, "🥬"],
+    ["부침가루", "1컵", S.rice, 3000, VEG_IMG, "🌾"],
+    ["달걀", "1개", S.veg, 500, VEG_IMG, "🥚"],
+    ["대파", "1/2대", S.veg, 800, ONION_IMG, "🌿"],
+    ["식용유", "적당량", S.banchan, 4000, SAUCE_IMG, "🫙"],
+  ]),
+  "해물파전": recipe("rc-hp", [
+    ["새우 500g", "100g", S.fish, 10000, MEAT_IMG, "🦐"],
+    ["오징어 2마리", "1/2마리", S.fish, 8000, MEAT_IMG, "🦑"],
+    ["부추", "1단", S.veg, 2000, VEG_IMG, "🌿"],
+    ["부침가루", "1컵", S.rice, 3000, VEG_IMG, "🌾"],
+    ["달걀", "1개", S.veg, 500, VEG_IMG, "🥚"],
+    ["대파", "1대", S.veg, 800, ONION_IMG, "🌿"],
+  ]),
+  "북엇국": recipe("rc-bu", [
+    ["황태채 200g", "50g", S.dry, 8000, VEG_IMG, "🐟"],
+    ["두부", "1/2모", S.tofu, 2500, VEG_IMG, "⬜"],
+    ["달걀", "1개", S.veg, 500, VEG_IMG, "🥚"],
+    ["대파", "1/2대", S.veg, 800, ONION_IMG, "🌿"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+    ["참기름", "1작은술", S.banchan, 3200, SAUCE_IMG, "🫙"],
+  ]),
+  "비빔밥": recipe("rc-bb", [
+    ["쌀 5kg", "2인분", S.rice, 18000, VEG_IMG, "🍚"],
+    ["시금치 1단", "1단", S.veg, 2200, VEG_IMG, "🥬"],
+    ["콩나물 500g", "200g", S.tofu, 2000, VEG_IMG, "🌱"],
+    ["당근", "1/2개", S.veg, 700, VEG_IMG, "🥕"],
+    ["달걀", "2개", S.veg, 1000, VEG_IMG, "🥚"],
+    ["고추장", "2큰술", S.banchan, 2500, SAUCE_IMG, "🌶️"],
+    ["참기름", "1큰술", S.banchan, 3200, SAUCE_IMG, "🫙"],
+  ]),
+  "김치볶음밥": recipe("rc-kb", [
+    ["김치 1kg", "150g", S.banchan, 8000, VEG_IMG, "🥬"],
+    ["쌀 5kg", "2인분", S.rice, 18000, VEG_IMG, "🍚"],
+    ["돼지고기 (다짐육)", "100g", S.meat, 3500, MEAT_IMG, "🥩"],
+    ["달걀", "2개", S.veg, 1000, VEG_IMG, "🥚"],
+    ["김 1봉", "약간", S.dry, 4000, VEG_IMG, "🌊"],
+    ["참기름", "1큰술", S.banchan, 3200, SAUCE_IMG, "🫙"],
+  ]),
+  "시금치나물": recipe("rc-sgn", [
+    ["시금치 1단", "1단", S.veg, 2200, VEG_IMG, "🥬"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+    ["참기름", "1큰술", S.banchan, 3200, SAUCE_IMG, "🫙"],
+    ["간장", "1작은술", S.banchan, 2200, SAUCE_IMG, "🫙"],
+    ["깨소금", "약간", S.banchan, 1500, SAUCE_IMG, "🧂"],
+  ]),
+  "오이소박이": recipe("rc-os", [
+    ["오이", "5개", S.veg, 4000, VEG_IMG, "🥒"],
+    ["고춧가루", "3큰술", S.banchan, 2500, SAUCE_IMG, "🌶️"],
+    ["다진 마늘", "2큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+    ["대파", "1대", S.veg, 800, ONION_IMG, "🌿"],
+    ["멸치액젓", "2큰술", S.dry, 4500, SAUCE_IMG, "🫙"],
+  ]),
+  "감자채볶음": recipe("rc-gcj", [
+    ["감자", "3개", S.veg, 1800, VEG_IMG, "🥔"],
+    ["당근", "1/3개", S.veg, 700, VEG_IMG, "🥕"],
+    ["양파", "1/2개", S.veg, 700, VEG_IMG, "🧅"],
+    ["간장", "1큰술", S.banchan, 2200, SAUCE_IMG, "🫙"],
+    ["참기름", "1작은술", S.banchan, 3200, SAUCE_IMG, "🫙"],
+  ]),
+  "멸치볶음": recipe("rc-mr", [
+    ["멸치 1근", "100g", S.dry, 6500, SAUCE_IMG, "🐟"],
+    ["간장", "2큰술", S.banchan, 2200, SAUCE_IMG, "🫙"],
+    ["설탕", "1큰술", S.banchan, 900, SAUCE_IMG, "🍬"],
+    ["다진 마늘", "1작은술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+    ["참기름", "1작은술", S.banchan, 3200, SAUCE_IMG, "🫙"],
+  ]),
+  "주꾸미볶음": recipe("rc-jk", [
+    ["주꾸미 500g", "500g", S.fish2, 13000, MEAT_IMG, "🐙"],
+    ["양파", "1개", S.veg, 700, VEG_IMG, "🧅"],
+    ["대파", "1대", S.veg, 800, ONION_IMG, "🌿"],
+    ["고추장", "2큰술", S.banchan, 2500, SAUCE_IMG, "🌶️"],
+    ["고춧가루", "1큰술", S.banchan, 2500, SAUCE_IMG, "🌶️"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+  ]),
+  "깍두기": recipe("rc-kk", [
+    ["무", "1개", S.veg, 2000, VEG_IMG, "⚪"],
+    ["고춧가루", "4큰술", S.banchan, 2500, SAUCE_IMG, "🌶️"],
+    ["다진 마늘", "2큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+    ["새우젓 500g", "2큰술", S.dry, 7000, SAUCE_IMG, "🦐"],
+    ["대파", "1대", S.veg, 800, ONION_IMG, "🌿"],
+  ]),
+  "무생채": recipe("rc-ms", [
+    ["무", "1/2개", S.veg, 1500, VEG_IMG, "⚪"],
+    ["고춧가루", "2큰술", S.banchan, 2500, SAUCE_IMG, "🌶️"],
+    ["식초", "2큰술", S.banchan, 1800, SAUCE_IMG, "🫙"],
+    ["설탕", "1큰술", S.banchan, 900, SAUCE_IMG, "🍬"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+  ]),
+  "돼지국밥": recipe("rc-pg", [
+    ["보쌈용 수육 300g", "300g", S.meat2, 11000, MEAT_IMG, "🥩"],
+    ["대파", "1대", S.veg, 800, ONION_IMG, "🌿"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+    ["새우젓 500g", "약간", S.dry, 7000, SAUCE_IMG, "🦐"],
+    ["김치 1kg", "조금", S.banchan, 8000, VEG_IMG, "🥬"],
+  ]),
+  "소고기무국": recipe("rc-sm", [
+    ["소고기 (국거리)", "200g", S.meat, 10000, MEAT_IMG, "🥩"],
+    ["무", "1/3개", S.veg, 1500, VEG_IMG, "⚪"],
+    ["대파", "1/2대", S.veg, 800, ONION_IMG, "🌿"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+    ["간장", "1큰술", S.banchan, 2200, SAUCE_IMG, "🫙"],
+  ]),
+  "계란국": recipe("rc-egs", [
+    ["계란 30구", "2개분", S.meat, 7500, VEG_IMG, "🥚"],
+    ["대파", "1/2대", S.veg, 800, ONION_IMG, "🌿"],
+    ["김 1봉", "조금", S.dry, 4000, VEG_IMG, "🌊"],
+    ["다진 마늘", "1작은술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+    ["참기름", "1작은술", S.banchan, 3200, SAUCE_IMG, "🫙"],
+  ]),
+  "호박전": recipe("rc-hb", [
+    ["애호박", "1개", S.veg, 2000, VEG_IMG, "🥒"],
+    ["부침가루", "1컵", S.rice, 3000, VEG_IMG, "🌾"],
+    ["달걀", "1개", S.veg, 500, VEG_IMG, "🥚"],
+    ["식용유", "적당량", S.banchan, 4000, SAUCE_IMG, "🫙"],
+    ["소금", "약간", S.banchan, 500, SAUCE_IMG, "🧂"],
+  ]),
+  "동그랑땡": recipe("rc-dg", [
+    ["다진돼지 500g", "300g", S.meat, 7000, MEAT_IMG, "🥩"],
+    ["두부 1모", "1/2모", S.tofu, 2500, VEG_IMG, "⬜"],
+    ["당근", "1/4개", S.veg, 700, VEG_IMG, "🥕"],
+    ["양파", "1/2개", S.veg, 700, VEG_IMG, "🧅"],
+    ["달걀", "2개", S.veg, 1000, VEG_IMG, "🥚"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+  ]),
+  "김치찜": recipe("rc-kz", [
+    ["묵은지 김치", "1포기", S.banchan, 5000, VEG_IMG, "🥬"],
+    ["돼지 삼겹살 500g", "400g", S.meat, 12000, MEAT_IMG, "🥩"],
+    ["두부", "1/2모", S.tofu, 2500, VEG_IMG, "⬜"],
+    ["대파", "1대", S.veg, 800, ONION_IMG, "🌿"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+  ]),
+  "오징어채무침": recipe("rc-oc", [
+    ["오징어채", "150g", S.dry, 5500, VEG_IMG, "🦑"],
+    ["고추장", "2큰술", S.banchan, 2500, SAUCE_IMG, "🌶️"],
+    ["설탕", "1큰술", S.banchan, 900, SAUCE_IMG, "🍬"],
+    ["참기름", "1큰술", S.banchan, 3200, SAUCE_IMG, "🫙"],
+    ["다진 마늘", "1작은술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+  ]),
+  "콩나물무침": recipe("rc-knm", [
+    ["콩나물 500g", "300g", S.tofu, 2000, VEG_IMG, "🌱"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+    ["참기름", "1큰술", S.banchan, 3200, SAUCE_IMG, "🫙"],
+    ["고춧가루", "1작은술", S.banchan, 2500, SAUCE_IMG, "🌶️"],
+    ["깨소금", "약간", S.banchan, 1500, SAUCE_IMG, "🧂"],
+  ]),
+  "파전": recipe("rc-pj", [
+    ["대파", "3대", S.veg, 2000, ONION_IMG, "🌿"],
+    ["부침가루", "1컵", S.rice, 3000, VEG_IMG, "🌾"],
+    ["달걀", "1개", S.veg, 500, VEG_IMG, "🥚"],
+    ["식용유", "적당량", S.banchan, 4000, SAUCE_IMG, "🫙"],
+    ["간장", "찍어먹기", S.banchan, 2200, SAUCE_IMG, "🫙"],
+  ]),
+  "간장게장": recipe("rc-gg", [
+    ["꽃게 2마리", "2마리", S.fish2, 15000, MEAT_IMG, "🦀"],
+    ["간장", "2컵", S.banchan, 2200, SAUCE_IMG, "🫙"],
+    ["마늘", "1통", S.banchan, 2000, GARLIC_IMG, "🧄"],
+    ["대파", "1대", S.veg, 800, ONION_IMG, "🌿"],
+    ["설탕", "2큰술", S.banchan, 900, SAUCE_IMG, "🍬"],
+  ]),
+  "된장국": recipe("rc-djk", [
+    ["된장", "2큰술", S.banchan, 2800, SAUCE_IMG, "🫙"],
+    ["두부", "1/2모", S.tofu, 2500, VEG_IMG, "⬜"],
+    ["애호박", "1/3개", S.veg, 1200, VEG_IMG, "🥒"],
+    ["대파", "1/2대", S.veg, 800, ONION_IMG, "🌿"],
+    ["멸치 1근", "조금", S.dry, 6500, SAUCE_IMG, "🐟"],
+  ]),
+  "감자국": recipe("rc-gjk", [
+    ["감자", "3개", S.veg, 1800, VEG_IMG, "🥔"],
+    ["대파", "1/2대", S.veg, 800, ONION_IMG, "🌿"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+    ["멸치 1근", "조금", S.dry, 6500, SAUCE_IMG, "🐟"],
+    ["간장", "1큰술", S.banchan, 2200, SAUCE_IMG, "🫙"],
+  ]),
+  "애호박볶음": recipe("rc-ah", [
+    ["애호박", "1개", S.veg, 2000, VEG_IMG, "🥒"],
+    ["양파", "1/2개", S.veg, 700, VEG_IMG, "🧅"],
+    ["다진 마늘", "1작은술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+    ["참기름", "1작은술", S.banchan, 3200, SAUCE_IMG, "🫙"],
+    ["소금", "약간", S.banchan, 500, SAUCE_IMG, "🧂"],
+  ]),
+  "소시지야채볶음": recipe("rc-sy", [
+    ["돼지불고기 500g", "200g", S.meat, 9000, MEAT_IMG, "🥩"],
+    ["양파", "1개", S.veg, 700, VEG_IMG, "🧅"],
+    ["당근", "1/2개", S.veg, 700, VEG_IMG, "🥕"],
+    ["양배추", "조금", S.veg, 2000, VEG_IMG, "🥬"],
+    ["간장", "2큰술", S.banchan, 2200, SAUCE_IMG, "🫙"],
+  ]),
+  "김치만두전골": recipe("rc-km", [
+    ["김치만두 10개", "10개", S.banchan, 6000, VEG_IMG, "🥟"],
+    ["김치 1kg", "200g", S.banchan, 8000, VEG_IMG, "🥬"],
+    ["두부", "1/2모", S.tofu, 2500, VEG_IMG, "⬜"],
+    ["대파", "1대", S.veg, 800, ONION_IMG, "🌿"],
+    ["고춧가루", "1큰술", S.banchan, 2500, SAUCE_IMG, "🌶️"],
+  ]),
+  "계란볶음밥": recipe("rc-erb", [
+    ["쌀 5kg", "2인분", S.rice, 18000, VEG_IMG, "🍚"],
+    ["달걀", "3개", S.veg, 1500, VEG_IMG, "🥚"],
+    ["당근", "1/4개", S.veg, 700, VEG_IMG, "🥕"],
+    ["양파", "1/2개", S.veg, 700, VEG_IMG, "🧅"],
+    ["간장", "1큰술", S.banchan, 2200, SAUCE_IMG, "🫙"],
+    ["참기름", "1큰술", S.banchan, 3200, SAUCE_IMG, "🫙"],
+  ]),
+  "시래기국": recipe("rc-sr", [
+    ["시금치 1단", "시래기 대용", S.veg, 2200, VEG_IMG, "🥬"],
+    ["된장", "2큰술", S.banchan, 2800, SAUCE_IMG, "🫙"],
+    ["대파", "1/2대", S.veg, 800, ONION_IMG, "🌿"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+    ["멸치 1근", "조금", S.dry, 6500, SAUCE_IMG, "🐟"],
+  ]),
+  "갈비찜": recipe("rc-gr", [
+    ["갈비살 500g", "500g", S.meat, 14000, MEAT_IMG, "🥩"],
+    ["무", "1/4개", S.veg, 1500, VEG_IMG, "⚪"],
+    ["당근", "1개", S.veg, 1000, VEG_IMG, "🥕"],
+    ["간장", "4큰술", S.banchan, 2200, SAUCE_IMG, "🫙"],
+    ["설탕", "2큰술", S.banchan, 900, SAUCE_IMG, "🍬"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+  ]),
+  "오징어순대": recipe("rc-osd", [
+    ["오징어 2마리", "2마리", S.fish, 8000, MEAT_IMG, "🦑"],
+    ["당면", "100g", S.rice, 3500, VEG_IMG, "🍜"],
+    ["당근", "1/4개", S.veg, 700, VEG_IMG, "🥕"],
+    ["양파", "1/2개", S.veg, 700, VEG_IMG, "🧅"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+  ]),
+  "바지락칼국수": recipe("rc-pk", [
+    ["바지락 1kg", "500g", S.fish2, 8000, MEAT_IMG, "🐚"],
+    ["칼국수면", "2인분", S.rice, 4000, VEG_IMG, "🍜"],
+    ["애호박", "1/3개", S.veg, 1200, VEG_IMG, "🥒"],
+    ["대파", "1대", S.veg, 800, ONION_IMG, "🌿"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+  ]),
+  "알탕": recipe("rc-at", [
+    ["매운탕 재료", "1세트", S.fish2, 12000, MEAT_IMG, "🍲"],
+    ["두부", "1/2모", S.tofu, 2500, VEG_IMG, "⬜"],
+    ["대파", "1대", S.veg, 800, ONION_IMG, "🌿"],
+    ["고춧가루", "2큰술", S.banchan, 2500, SAUCE_IMG, "🌶️"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+  ]),
+  "깻잎장아찌": recipe("rc-kkj", [
+    ["깻잎", "2속", S.veg, 2500, VEG_IMG, "🍃"],
+    ["간장", "1컵", S.banchan, 2200, SAUCE_IMG, "🫙"],
+    ["설탕", "2큰술", S.banchan, 900, SAUCE_IMG, "🍬"],
+    ["다진 마늘", "1큰술", S.banchan, 1200, GARLIC_IMG, "🧄"],
+    ["식초", "2큰술", S.banchan, 1800, SAUCE_IMG, "🫙"],
+  ]),
+  "두부김치": recipe("rc-tk", [
+    ["두부 1모", "1모", S.tofu, 2500, VEG_IMG, "⬜"],
+    ["김치 1kg", "200g", S.banchan, 8000, VEG_IMG, "🥬"],
+    ["돼지고기 (다짐육)", "100g", S.meat, 3500, MEAT_IMG, "🥩"],
+    ["대파", "1/2대", S.veg, 800, ONION_IMG, "🌿"],
+    ["참기름", "1큰술", S.banchan, 3200, SAUCE_IMG, "🫙"],
+  ]),
 };
+
+const RECIPE_NAMES = Object.keys(RECIPES);
 
 export function CartPage() {
   const {
@@ -102,10 +517,27 @@ export function CartPage() {
   const [addedIds, setAddedIds]           = useState<Set<string>>(new Set());
   const [conflictMsg, setConflictMsg]     = useState("");
   const [resultsCollapsed, setResultsCollapsed] = useState(false);
+  const [recipeListOpen, setRecipeListOpen] = useState(false);
 
   const activeSearchMarket = currentMarketId ?? searchMarket;
 
   const cartIdSet = useMemo(() => new Set(items.map((i) => i.id)), [items]);
+
+  const filteredRecipeNames = useMemo(() => {
+    const q = recipeQuery.trim();
+    if (!q) return RECIPE_NAMES;
+    return RECIPE_NAMES.filter((name) => name.includes(q) || q.includes(name));
+  }, [recipeQuery]);
+
+  const selectRecipe = (name: string) => {
+    setRecipeQuery(name);
+    setRecipeTitle(name);
+    setRecipeResults(RECIPES[name]);
+    setAddedIds(new Set());
+    setConflictMsg("");
+    setResultsCollapsed(false);
+    setRecipeListOpen(false);
+  };
 
   // 폰/PC에서 삭제한 상점이 검색·경로에 다시 안 뜨도록 동기화
   useEffect(() => {
@@ -165,19 +597,19 @@ export function CartPage() {
 
   const handleRecipeSearch = () => {
     const q = recipeQuery.trim();
-    if (!q) return;
+    if (!q) {
+      setRecipeListOpen(true);
+      return;
+    }
     const match = Object.entries(RECIPES).find(([key]) => key.includes(q) || q.includes(key));
     if (match) {
-      setRecipeTitle(match[0]);
-      setRecipeResults(match[1]);
-      setAddedIds(new Set());
-      setConflictMsg("");
-      setResultsCollapsed(false);
+      selectRecipe(match[0]);
     } else {
       setRecipeTitle("");
       setRecipeResults([]);
       setConflictMsg("");
       setResultsCollapsed(false);
+      setRecipeListOpen(false);
     }
   };
 
@@ -527,39 +959,81 @@ export function CartPage() {
           <h2 className="text-[14px] text-[#46352C]">빠른 장보기</h2>
         </div>
         <p className="text-[12px] text-[#6B5142] mb-3">요리명을 검색하면 재료를 자동 추가해요</p>
-        <div className="flex gap-2 mb-2">
-          <input
-            type="text" value={recipeQuery}
-            onChange={(e) => setRecipeQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleRecipeSearch()}
-            placeholder="요리명을 입력하세요"
-            className="flex-1 px-3 py-2.5 bg-[#F7F2E8] rounded-xl text-[14px] focus:outline-none focus:ring-2 focus:ring-[#B89A7D] placeholder:text-[#6B5142]"
-          />
-          <button
-            onClick={handleRecipeSearch}
-            className="px-4 py-2.5 bg-[#5B4335] text-white rounded-xl text-[13px] active:bg-[#46352C] transition-colors flex items-center gap-1"
-          >
-            <Search className="w-3.5 h-3.5" />검색
-          </button>
-        </div>
-        <div className="flex gap-1.5 flex-wrap mb-3">
-          {Object.keys(RECIPES).map((name) => (
-            <button
-              key={name}
-              onClick={() => {
-                setRecipeQuery(name);
-                const match = RECIPES[name];
-                setRecipeTitle(name);
-                setRecipeResults(match);
-                setAddedIds(new Set());
-                setConflictMsg("");
-                setResultsCollapsed(false);
+        <div className="relative mb-2">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={recipeQuery}
+              onChange={(e) => {
+                setRecipeQuery(e.target.value);
+                setRecipeListOpen(true);
               }}
-              className="px-3 py-1.5 bg-[#F5F0E7] text-[#6B5142] rounded-full text-[12px] active:bg-[#EDE1D5] transition-colors"
+              onFocus={() => setRecipeListOpen(true)}
+              onClick={() => setRecipeListOpen(true)}
+              onBlur={() => {
+                window.setTimeout(() => setRecipeListOpen(false), 120);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleRecipeSearch();
+                if (e.key === "Escape") setRecipeListOpen(false);
+              }}
+              placeholder="요리명을 입력하세요"
+              className="flex-1 px-3 py-2.5 bg-[#F7F2E8] rounded-xl text-[14px] focus:outline-none focus:ring-2 focus:ring-[#B89A7D] placeholder:text-[#6B5142]"
+            />
+            <button
+              type="button"
+              onClick={handleRecipeSearch}
+              className="px-4 py-2.5 bg-[#5B4335] text-white rounded-xl text-[13px] active:bg-[#46352C] transition-colors flex items-center gap-1"
             >
-              {name}
+              <Search className="w-3.5 h-3.5" />검색
             </button>
-          ))}
+          </div>
+          {recipeListOpen && (
+            <div
+              className="absolute left-0 right-0 z-20 mt-1.5 overflow-hidden rounded-xl bg-white shadow-[0_12px_28px_-12px_rgba(70,53,44,0.35)] ring-1 ring-[#EDE5D8]"
+              onMouseDown={(e) => e.preventDefault()}
+            >
+              <div className="flex items-center justify-between border-b border-[#F0EBE3] bg-[#FAF7F1] px-3 py-2">
+                <span className="text-[12px] text-[#6B5142]">
+                  요리 목록 {filteredRecipeNames.length}개
+                </span>
+                <button
+                  type="button"
+                  aria-label="목록 닫기"
+                  onClick={() => setRecipeListOpen(false)}
+                  className="rounded-full p-1 text-[#6B5142] active:bg-[#EDE1D5]"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="max-h-[220px] overflow-y-auto overscroll-contain">
+                {filteredRecipeNames.length === 0 ? (
+                  <p className="px-3 py-3 text-[13px] text-[#6B5142]">맞는 요리가 없어요</p>
+                ) : (
+                  filteredRecipeNames.map((name) => {
+                    const selected = recipeTitle === name && recipeResults !== null;
+                    return (
+                      <button
+                        key={name}
+                        type="button"
+                        onClick={() => selectRecipe(name)}
+                        className={`flex w-full items-center justify-between border-b border-[#F0EBE3] px-3 py-2.5 text-left text-[14px] last:border-b-0 ${
+                          selected
+                            ? "bg-[#F7F2E8] text-[#46352C]"
+                            : "text-[#5B4335] active:bg-[#FAF7F1]"
+                        }`}
+                      >
+                        <span>{name}</span>
+                        <span className="text-[11px] text-[#8A6A52]">
+                          {RECIPES[name].length}개 재료
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {recipeResults !== null && (

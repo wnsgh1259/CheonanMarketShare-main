@@ -46,8 +46,16 @@ function draftMenusToMenuItems(menus: SharedOwnerMenu[] | undefined): MenuItem[]
 function mergeStoreMenus(seed: StoreData, draft: SharedDraftStore | undefined): MenuItem[] {
   const draftMenus = draftMenusToMenuItems(draft?.menus);
   if (draftMenus.length === 0) return seed.menus;
-  // draft wins when present
-  return draftMenus;
+  // draft 메뉴가 너무 적으면 시드(풍부한 네비용 메뉴)를 기준으로 두고, 같은 상품명은 draft 가격 우선
+  if (draftMenus.length < 3) {
+    const byName = new Map(draftMenus.map((m) => [normalizeName(m.name), m]));
+    const merged = seed.menus.map((m) => byName.get(normalizeName(m.name)) ?? m);
+    const seedNames = new Set(seed.menus.map((m) => normalizeName(m.name)));
+    return [...merged, ...draftMenus.filter((m) => !seedNames.has(normalizeName(m.name)))];
+  }
+  // draft가 충분하면 draft 우선 + 시드에만 있는 상품 보강
+  const draftNames = new Set(draftMenus.map((m) => normalizeName(m.name)));
+  return [...draftMenus, ...seed.menus.filter((m) => !draftNames.has(normalizeName(m.name)))];
 }
 
 /** 시드 + 카탈로그를 합친 검색용 상점 목록 */

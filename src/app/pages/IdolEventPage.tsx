@@ -152,7 +152,7 @@ export function IdolEventPage() {
       </div>
 
       <div className="mx-auto max-w-md space-y-3 px-4 pt-4">
-        <div className="flex items-center gap-3 rounded-2xl border border-[#D7D3E8] bg-[#E4E2EF] p-4 shadow-sm">
+        <div className="flex items-center gap-3 rounded-2xl border border-[#F5C6D8] bg-[#FCE8F0] p-4 shadow-sm">
           <button
             type="button"
             onClick={replayLast}
@@ -168,7 +168,7 @@ export function IdolEventPage() {
           <button
             type="button"
             onClick={toggleVoice}
-            className="flex h-9 items-center gap-1.5 rounded-xl border border-[#D7D3E8] bg-white/80 px-3 text-[12px] text-[#51446F]"
+            className="flex h-9 items-center gap-1.5 rounded-xl border border-[#F5C6D8] bg-white/80 px-3 text-[12px] text-[#8A5A6E]"
           >
             {voiceOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
             {voiceOn ? "ON" : "OFF"}
@@ -177,9 +177,9 @@ export function IdolEventPage() {
 
         <div className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 shadow-sm">
           {Array.from({ length: IDOL_STAGE_COUNT }, (_, index) => (
-            <div key={index} className={`h-2 flex-1 rounded-full ${index < progress.stage ? "bg-[#6250A4]" : "bg-[#D2CEE3]"}`} />
+            <div key={index} className={`h-2 flex-1 rounded-full ${index < progress.stage ? "bg-[#E85A8C]" : "bg-[#F5C6D8]"}`} />
           ))}
-          <span className="ml-1 text-[12px] font-semibold text-[#6250A4]">{Math.min(progress.stage, IDOL_STAGE_COUNT)}/{IDOL_STAGE_COUNT}</span>
+          <span className="ml-1 text-[12px] font-semibold text-[#E85A8C]">{Math.min(progress.stage, IDOL_STAGE_COUNT)}/{IDOL_STAGE_COUNT}</span>
         </div>
 
         <div
@@ -197,7 +197,7 @@ export function IdolEventPage() {
               <div
                 className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-[14px] leading-relaxed ${
                   message.role === "user"
-                    ? "rounded-br-sm bg-[#E4E2EF] text-[#493B70]"
+                    ? "rounded-br-sm bg-[#FCE8F0] text-[#8A5A6E]"
                     : "rounded-bl-sm border border-gray-100 bg-white text-gray-800"
                 }`}
               >
@@ -207,7 +207,7 @@ export function IdolEventPage() {
           ))}
         </div>
 
-        <div className="space-y-2.5 rounded-2xl border border-[#D7D3E8] bg-[#E4E2EF] p-4 shadow-sm">
+        <div className="space-y-2.5 rounded-2xl border border-[#F5C6D8] bg-[#FCE8F0] p-4 shadow-sm">
           {progress.claimed ? (
             <div className="text-center">
               <p className="text-[14px] font-semibold text-gray-800">미션 완료!</p>
@@ -220,7 +220,7 @@ export function IdolEventPage() {
             <button
               type="button"
               onClick={handleClaim}
-              className="h-12 w-full rounded-xl bg-[#6250A4] text-[14px] font-bold text-white active:opacity-80"
+              className="h-12 w-full rounded-xl bg-[#E85A8C] text-[14px] font-bold text-white active:opacity-80"
             >
               포인트 {IDOL_REWARD_POINTS}P와 추첨권 받기
             </button>
@@ -228,7 +228,7 @@ export function IdolEventPage() {
             <button
               type="button"
               onClick={handleHint}
-              className="h-12 w-full rounded-xl bg-[#6250A4] text-[14px] font-bold text-white active:opacity-80"
+              className="h-12 w-full rounded-xl bg-[#E85A8C] text-[14px] font-bold text-white active:opacity-80"
             >
               {stageIndex + 1}단계 힌트 듣기
             </button>
@@ -241,7 +241,7 @@ export function IdolEventPage() {
                 inputMode="numeric"
                 maxLength={4}
                 placeholder="코드 4자리"
-                className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 text-[14px] tracking-widest outline-none focus:border-[#6250A4]"
+                className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 text-[14px] tracking-widest outline-none focus:border-[#E85A8C]"
               />
               <div className="flex gap-2">
                 <input
@@ -249,12 +249,12 @@ export function IdolEventPage() {
                   onChange={(event) => { setAnswer(event.target.value); setError(""); }}
                   onKeyDown={(event) => { if (event.key === "Enter") handleSubmit(); }}
                   placeholder="정답"
-                  className="h-11 min-w-0 flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 text-[14px] outline-none focus:border-[#6250A4]"
+                  className="h-11 min-w-0 flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 text-[14px] outline-none focus:border-[#E85A8C]"
                 />
                 <button
                   type="button"
                   onClick={handleSubmit}
-                  className="flex h-11 w-12 items-center justify-center rounded-xl bg-[#6250A4] text-white active:opacity-80"
+                  className="flex h-11 w-12 items-center justify-center rounded-xl bg-[#E85A8C] text-white active:opacity-80"
                   aria-label="정답 확인"
                 >
                   <Send className="h-4 w-4" />

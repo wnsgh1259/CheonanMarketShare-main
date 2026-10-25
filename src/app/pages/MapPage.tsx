@@ -13,6 +13,10 @@ import { Drawer, DrawerContent, DrawerTitle } from "../components/ui/drawer";
 import { cn } from "../components/ui/utils";
 import {
   STORES_BY_MARKET, MARKET_INFO,
+  ensureStoreMenus,
+  isPlaceholderLocation,
+  isPlaceholderStoreName,
+  normalizeStoreCategory,
   type CategoryKey, type StoreData, type MenuItem,
 } from "../data/storeData";
 import {
@@ -43,7 +47,7 @@ import {
 } from "../data/storePromotion";
 
 const CATEGORIES: CategoryKey[] = [
-  "전체", "먹거리·분식", "정육·계란", "채소", "과일", "채소·과일", "수산물", "반찬·건어물", "기타·생활",
+  "전체", "먹거리·분식", "정육·계란", "채소·과일", "수산물", "반찬·건어물", "기타·생활",
 ];
 
 const CATEGORY_BUTTON_STYLE: Record<CategoryKey, { active: string; hover: string }> = {
@@ -58,14 +62,6 @@ const CATEGORY_BUTTON_STYLE: Record<CategoryKey, { active: string; hover: string
   "정육·계란": {
     active: "bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200",
     hover: "hover:bg-rose-50 hover:text-rose-700 hover:ring-1 hover:ring-inset hover:ring-rose-200",
-  },
-  "채소": {
-    active: "bg-[#EDF1E7] text-[#63734F] ring-1 ring-inset ring-[#DCE5D2]",
-    hover: "hover:bg-[#EDF1E7] hover:text-[#63734F] hover:ring-1 hover:ring-inset hover:ring-[#DCE5D2]",
-  },
-  "과일": {
-    active: "bg-purple-50 text-purple-700 ring-1 ring-inset ring-purple-200",
-    hover: "hover:bg-purple-50 hover:text-purple-700 hover:ring-1 hover:ring-inset hover:ring-purple-200",
   },
   "채소·과일": {
     active: "bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-200",
@@ -238,27 +234,34 @@ function draftOnlyToStoreData(drafts: DraftStorePin[], marketId: MarketId): impo
       if (seedNames.has(d.name)) return false;
       return true;
     })
-    .map((d) => ({
-      id: d.id!,
-      name: d.name,
-      category: (d.category as import("../data/storeData").CategoryKey) || "기타·생활",
-      location: d.location || "",
-      hours: d.hours || "",
-      phone: d.phone || "",
-      rating: 0,
-      bookmark: false,
-      image: d.image || "https://images.unsplash.com/photo-1594021113115-f1b48e63ef06?w=400",
-      mx: 50,
-      my: 50,
-      lat: d.lat,
-      lng: d.lng,
-      description: d.description || "",
-      menus: uniqueMenuIds(d.menus?.map((m) => ({
+    .map((d) => {
+      const name = isPlaceholderStoreName(d.name) ? `시장상점 ${d.id}` : d.name;
+      const category = normalizeStoreCategory(d.category);
+      const draftMenus = uniqueMenuIds(d.menus?.map((m) => ({
         id: String(m.id),
         name: m.name,
         price: Number(m.price) || 0,
-      })) ?? []),
-    }));
+      })) ?? []);
+      return {
+        id: d.id!,
+        name,
+        category,
+        location: isPlaceholderLocation(d.location)
+          ? `${MARKET_INFO[marketId].name} ${Math.max(1, d.id! % 40)}호`
+          : d.location!,
+        hours: d.hours?.trim() ? d.hours : "09:00 - 21:00",
+        phone: d.phone?.trim() ? d.phone : `041-555-${String(1000 + (d.id! % 9000)).padStart(4, "0")}`,
+        rating: 0,
+        bookmark: false,
+        image: d.image || "https://images.unsplash.com/photo-1594021113115-f1b48e63ef06?w=400",
+        mx: 50,
+        my: 50,
+        lat: d.lat,
+        lng: d.lng,
+        description: d.description || "",
+        menus: ensureStoreMenus(name, category, draftMenus, `d${d.id}`),
+      };
+    });
 }
 
 function uniqueMenuIds(menus: MenuItem[]): MenuItem[] {
@@ -1003,26 +1006,36 @@ export function MapPage() {
         return { ...store, lat: pos.lat, lng: pos.lng };
       }
       const nextName = override.name?.trim();
+      const useSeedName = !nextName || isPlaceholderStoreName(nextName);
+      const displayName = useSeedName ? store.name : nextName;
+      const category = normalizeStoreCategory(
+        useSeedName && !override.category ? store.category : override.category || store.category,
+      );
+      const overrideMenus = override.menus?.length
+        ? uniqueMenuIds(override.menus.map((menu) => ({
+            id: String(menu.id),
+            name: menu.name,
+            price: Number(menu.price) || 0,
+          })))
+        : [];
       const pos = pickStoreDisplayLatLng(selectedMarket, store, override);
       return applyLiveDeal({
         ...store,
-        name: nextName || store.name,
+        name: displayName,
         lat: pos.lat,
         lng: pos.lng,
         image: override.image || store.image,
         description: override.description || store.description,
-        location: override.location || store.location,
-        hours: override.hours || store.hours,
-        phone: override.phone || store.phone,
-        category: (override.category as CategoryKey) || store.category,
-        menus:
-          override.menus?.length
-            ? uniqueMenuIds(override.menus.map((menu) => ({
-                id: String(menu.id),
-                name: menu.name,
-                price: Number(menu.price) || 0,
-              })))
-            : store.menus,
+        location: isPlaceholderLocation(override.location) ? store.location : (override.location || store.location),
+        hours: override.hours?.trim() ? override.hours : store.hours,
+        phone: override.phone?.trim() ? override.phone : store.phone,
+        category,
+        menus: ensureStoreMenus(
+          displayName,
+          category,
+          overrideMenus.length >= 3 ? overrideMenus : store.menus,
+          `j${store.id}`,
+        ),
       }, override.promotion, now);
     });
 
@@ -1047,7 +1060,7 @@ export function MapPage() {
     () =>
       allStores.filter((s) => {
         const matchFav = !showFavoritesOnly || likedStores.has(s.id);
-        const matchCat = showFavoritesOnly || selectedCategory === "전체" || s.category === selectedCategory;
+        const matchCat = showFavoritesOnly || selectedCategory === "전체" || normalizeStoreCategory(s.category) === selectedCategory;
         const matchSearch =
           !searchQuery || s.name.includes(searchQuery) || s.category.includes(searchQuery) || s.location.includes(searchQuery);
         return matchFav && matchCat && matchSearch;

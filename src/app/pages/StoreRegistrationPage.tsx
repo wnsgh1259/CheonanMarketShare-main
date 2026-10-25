@@ -16,7 +16,7 @@ import { useAuth } from "../context/AuthContext";
 import { restoreAdminSessionFromBackup } from "../data/authSession";
 import { peekAdminReturnState, buildAdminReturnUrl } from "../data/adminNavigation";
 import { saveUserEmail, isValidEmail, findRegisteredUserByPhone } from "../data/userAccounts";
-import { STORES_BY_MARKET } from "../data/storeData";
+import { STORES_BY_MARKET, STORE_CATEGORY_OPTIONS } from "../data/storeData";
 import { MARKET_VIEW_CONFIG } from "../map/storeMapPlacement";
 import { hydrateMarketArea, resolveMarketView } from "../data/marketArea";
 import {
@@ -241,7 +241,7 @@ const MARKET_TAB_LABELS: Record<MarketId, string> = {
   byeongcheon: "천안역전시장",
   seonghwan: "성환이화시장",
 };
-const CATEGORY_OPTIONS = ["먹거리·분식", "정육·계란", "채소", "과일", "채소·과일", "수산물", "반찬·건어물", "기타·생활"];
+const CATEGORY_OPTIONS = [...STORE_CATEGORY_OPTIONS];
 const PAYMENT_OPTIONS = ["카드", "현금", "지역화폐", "온누리상품권"];
 declare global {
   interface Window {

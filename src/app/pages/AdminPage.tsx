@@ -52,7 +52,14 @@ const FACILITY_COLOR_ICON: Record<string, React.ComponentType<{ className?: stri
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { useAuth } from "../context/AuthContext";
 import { AdminPreviewMap, type AdminPreviewStorePin } from "../components/AdminPreviewMap";
-import { STORES_BY_MARKET, type StoreData } from "../data/storeData";
+import {
+  STORES_BY_MARKET,
+  ensureStoreMenus,
+  isPlaceholderLocation,
+  isPlaceholderStoreName,
+  normalizeStoreCategory,
+  type StoreData,
+} from "../data/storeData";
 import { SEED_MARKET_ORDER, syntheticSeedStoreId } from "../data/seedStoreIds";
 import { pickStoreDisplayLatLng, spreadOverlappingLatLngs } from "../map/storeMapPlacement";
 import { hydrateMarketArea, resolveMarketView } from "../data/marketArea";
@@ -143,8 +150,6 @@ const MAP_CATEGORY_OPTIONS = [
   "전체",
   "먹거리·분식",
   "정육·계란",
-  "채소",
-  "과일",
   "채소·과일",
   "수산물",
   "반찬·건어물",
@@ -640,7 +645,7 @@ export function AdminPage() {
         return {
           id: marketIndex * 10000 + store.id,
           name: store.name,
-          category: store.category,
+          category: normalizeStoreCategory(store.category),
           location: store.location,
           hours: store.hours,
           phone: store.phone,
@@ -670,16 +675,69 @@ export function AdminPage() {
     draft.stores.forEach((store) => {
       const base = byId.get(store.id);
       if (base) {
+        const name = isPlaceholderStoreName(store.name) ? base.name : store.name;
+        const category = normalizeStoreCategory(
+          isPlaceholderStoreName(store.name) && !store.category ? base.category : store.category || base.category,
+        );
+        const location = isPlaceholderLocation(store.location) ? base.location : store.location;
+        const sourceMenus = (store.menus && store.menus.length >= 3 ? store.menus : base.menus) ?? [];
+        const menus = ensureStoreMenus(
+          name,
+          category,
+          sourceMenus.map((menu) => ({
+            id: String(menu.id),
+            name: menu.name,
+            price: Number(menu.price) || 0,
+          })),
+          `admin-${store.id}`,
+        ).map((menu, index) => ({
+          id: Number(String(menu.id).replace(/\D/g, "")) || store.id * 100 + index + 1,
+          name: menu.name,
+          price: String(menu.price),
+          photoName: "",
+        }));
         byId.set(store.id, {
           ...base,
           ...store,
+          name,
+          category,
+          location,
           // draft에 marketId가 없으면 시드 데이터의 marketId 유지
           marketId: store.marketId ?? base.marketId,
           image: store.image || base.image,
-          menus: store.menus?.length ? store.menus : base.menus,
+          hours: store.hours?.trim() ? store.hours : base.hours,
+          phone: store.phone?.trim() ? store.phone : base.phone,
+          menus,
         });
       } else {
-        byId.set(store.id, store);
+        const name = isPlaceholderStoreName(store.name) ? `시장상점 ${store.id}` : store.name;
+        const category = normalizeStoreCategory(store.category);
+        const menus = ensureStoreMenus(
+          name,
+          category,
+          store.menus?.map((menu) => ({
+            id: String(menu.id),
+            name: menu.name,
+            price: Number(menu.price) || 0,
+          })),
+          `admin-new-${store.id}`,
+        ).map((menu, index) => ({
+          id: Number(String(menu.id).replace(/\D/g, "")) || store.id * 100 + index + 1,
+          name: menu.name,
+          price: String(menu.price),
+          photoName: "",
+        }));
+        byId.set(store.id, {
+          ...store,
+          name,
+          category,
+          location: isPlaceholderLocation(store.location)
+            ? `시장 ${Math.max(1, store.id % 40)}호`
+            : store.location,
+          hours: store.hours?.trim() ? store.hours : "09:00 - 21:00",
+          phone: store.phone?.trim() ? store.phone : `041-555-${String(1000 + (store.id % 9000)).padStart(4, "0")}`,
+          menus,
+        });
       }
     });
 

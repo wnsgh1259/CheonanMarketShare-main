@@ -235,7 +235,7 @@ export function HomePage() {
       {/* Selected Market Feature */}
       <section className="relative z-10 px-4 pt-5">
         <div className="relative h-[210px] overflow-hidden rounded-[28px] bg-[#3E4E3A] shadow-[0_14px_34px_-20px_rgba(45,54,39,0.55)]">
-          <img src={selectedMarket.image} alt={selectedMarket.name} className="absolute inset-0 h-full w-full object-cover opacity-65" />
+          <img src={selectedMarket.image} alt={selectedMarket.name} draggable={false} className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-65 [-webkit-user-drag:none]" />
           <div className="absolute inset-0 bg-gradient-to-t from-[#17241D]/95 via-[#17241D]/35 to-black/5" />
           <div className="relative flex h-full flex-col justify-end p-4 text-white">
             <div className="mb-auto flex items-start justify-between pt-1">
@@ -262,7 +262,7 @@ export function HomePage() {
             <div><p className="text-[11px] font-medium text-[#46352C]">LOCAL FAVORITES</p><h2 className="text-[19px] font-bold tracking-tight text-[#3F4140]">시장 한 바퀴, 여기부터</h2></div>
           </div>
           <div
-            className="flex cursor-grab select-none gap-2.5 overflow-x-auto pb-1 active:cursor-grabbing touch-pan-x [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="flex cursor-grab select-none gap-2.5 overflow-x-auto overscroll-x-contain pb-1 active:cursor-grabbing touch-pan-x touch-pan-y [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&_img]:pointer-events-none [&_img]:[-webkit-user-drag:none]"
             onPointerDown={(event) => {
               if (event.pointerType !== "mouse" || event.button !== 0) return;
               suppressSpotClickUntilRef.current = 0;
@@ -310,7 +310,7 @@ export function HomePage() {
                 <p className="mb-2 flex w-full items-center gap-1 px-1 text-left text-[10px] leading-snug text-[#8A7B68]">
                   <MapPin className="h-3 w-3 flex-shrink-0" />{spot.location}
                 </p>
-                <img src={spot.image} alt={spot.name} className="mb-3 h-[124px] w-[124px] rounded-full object-cover shadow-[0_6px_18px_-12px_rgba(70,53,44,0.35)]" />
+                <img src={spot.image} alt={spot.name} draggable={false} className="mb-3 h-[124px] w-[124px] rounded-full object-cover shadow-[0_6px_18px_-12px_rgba(70,53,44,0.35)]" />
                 <p className="w-full px-1 text-center text-[13px] font-semibold leading-snug text-[#3F4140]">{spot.name}</p>
               </Link>
             ))}
@@ -321,18 +321,18 @@ export function HomePage() {
           <div className="mb-6 space-y-3">
             <Link
               to="/idol"
-              className="flex items-center gap-3 rounded-xl border border-[#D7D3E8] bg-[#E4E2EF] p-4 text-[#302C40] active:opacity-90"
+              className="flex items-center gap-3 rounded-xl border border-[#F5C6D8] bg-[#FCE8F0] p-4 text-[#4A2A38] active:opacity-90"
             >
-              <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-white/65 text-[22px]">{IDOL.emoji}</span>
+              <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-white/70 text-[22px]">{IDOL.emoji}</span>
               <div className="min-w-0 flex-1">
-                <p className="text-[14px] font-bold text-[#6250A4]">{IDOL.name}의 시장 미션</p>
-                <p className="mt-0.5 text-[11px] text-[#625D76]">
+                <p className="text-[14px] font-bold text-[#E85A8C]">{IDOL.name}의 시장 미션</p>
+                <p className="mt-0.5 text-[11px] text-[#8A5A6E]">
                   {idolStage >= IDOL_STAGE_COUNT
                     ? "미션을 모두 풀었어요"
                     : `힌트를 찾아 문제를 풀면 포인트와 굿즈 추첨권 · ${idolStage}/${IDOL_STAGE_COUNT}`}
                 </p>
               </div>
-              <ChevronRight className="h-5 w-5 flex-shrink-0 text-[#6044A5]" />
+              <ChevronRight className="h-5 w-5 flex-shrink-0 text-[#E85A8C]" />
             </Link>
             <Link
               to="/profile?tab=events&section=sns"
@@ -369,7 +369,7 @@ export function HomePage() {
                     <p className="mt-1 text-[11px] text-[#8A7B68]">{selectedMarket.name}</p>
                   </div>
                   <div className="relative h-[104px] w-[148px] flex-shrink-0">
-                    <img src={course.image} alt="" className="h-full w-full rounded-[32px] object-cover" />
+                    <img src={course.image} alt="" draggable={false} className="pointer-events-none h-full w-full rounded-[32px] object-cover [-webkit-user-drag:none]" />
                   </div>
                 </Link>
               ))}

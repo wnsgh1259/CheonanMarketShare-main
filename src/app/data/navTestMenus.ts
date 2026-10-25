@@ -12,7 +12,7 @@ import type { MenuItem } from "./storeData";
  *     localStorage.removeItem("nav-test-menus")      // 기본값(개발 서버에서만 켜짐)
  *
  * 상점 id 는 storeData.ts 의 시드 상점 id 이다.
- * (이미 같은 상품명이 있는 상점은 기존 메뉴를 그대로 쓰므로 여기에는 넣지 않았다.)
+ * (이미 같은 상품명이 있는 상점은 기존 메뉴 가격을 쓰므로 여기에는 넣지 않았다.)
  */
 export const NAV_TEST_MENU_KEY = "nav-test-menus";
 
@@ -37,43 +37,29 @@ const t = (id: string, name: string, price: number, originalPrice?: number): Men
 });
 
 /**
- * 천안중앙시장 (기본 입구는 남쪽, 시드 좌표 기준 my 값이 클수록 남쪽)
+ * 천안중앙시장 — 시드에 이미 겹치는 상품(계란·대파·두부·고등어·김치·사과 등)이 있음.
+ * 여기에 추가 가격 변형을 얹어 경로 차이가 더 잘 나게 한다.
  *
- *  북쪽(입구에서 멂): 13 두부·콩나물마트, 10 천안만두가게, 7 중앙수산
- *  중간            : 8 시장반찬가게
- *  남쪽(입구에 가까움): 5 싱싱채소마트, 14 황금채소마트, 15 남해수산, 16 통큰건어물, 6 천안과일나라, 4 신선정육점
- *
- * 기존 메뉴(그대로 사용)
- *  - 계란 30구: 4 신선정육점 7,500 (할인)
- *  - 대파 1단 : 5 싱싱채소마트 2,500
- *  - 두부 1모 : 13 두부·콩나물마트 2,500
- *  - 고등어 2마리: 7 중앙수산 7,000
- *  - 김치 1kg : 8 시장반찬가게 8,000
- *  - 딸기 1팩 : 6 천안과일나라 6,000 (25% 할인)
+ *  북쪽: 9 천안만두가게, 12 두부콩나물집, 13 황금과일가게
+ *  중간: 5 싱싱청과, 6 중앙수산, 7 시장반찬가게
+ *  남쪽: 4 신선정육점, 14 남해수산, 15 통큰건어물, 17 중앙정육센터
  */
 const JUNGANG: Record<number, MenuItem[]> = {
-  // 북쪽: 계란·대파가 가장 싸다 → 최저가 경로는 북쪽 한 곳
-  13: [t("t-j13-egg", "계란 30구", 5500), t("t-j13-leek", "대파 1단", 1500)],
-  // 남쪽: 계란·두부를 조금 더 비싸게 → 최단 경로 후보
-  14: [t("t-j14-egg", "계란 30구", 6900), t("t-j14-tofu", "두부 1모", 3000)],
-  5: [
-    t("t-j5-egg", "계란 30구", 7200),
-    t("t-j5-tofu", "두부 1모", 3200),
-    t("t-j5-berry", "딸기 1팩", 5500),
-  ],
-  // 고등어는 남쪽이 싸고, 김치는 북쪽이 싸다 → 최저가 경로는 남↔북 왕복
-  15: [t("t-j15-mackerel", "고등어 2마리", 5500)],
-  16: [t("t-j16-kimchi", "김치 1kg", 7500)],
-  10: [t("t-j10-kimchi", "김치 1kg", 6000)],
+  3: [t("t-j3-dumpling", "만두 6개", 4800), t("t-j3-kimchi", "김치 1kg", 7200)],
+  8: [t("t-j8-bag", "장바구니", 4200), t("t-j8-glove", "고무장갑 3켤레", 2500)],
+  11: [t("t-j11-tteok", "떡볶이", 4000), t("t-j11-sundae", "순대", 3800)],
+  16: [t("t-j16-rice", "쌀 5kg", 17000), t("t-j16-mixed", "잡곡 1kg", 4500)],
+  18: [t("t-j18-oden", "어묵 3개", 2800), t("t-j18-kimbap", "야채김밥", 2800)],
 };
 
 /**
- * 천안역전시장(병천 시드 id 1~5) — 가볍게 비교할 수 있는 상품만
- * 기존: 2 어묵·튀김코너 "어묵 3개" 3,000 (할인), 1 병천순대본가 "순대국밥" 9,000
+ * 천안역전시장 — 계란·대파·고등어·김치·어묵·순대국밥 등 비교용
  */
 const BYEONGCHEON: Record<number, MenuItem[]> = {
-  1: [t("t-b1-oden", "어묵 3개", 3500)],
-  2: [t("t-b2-sundae", "순대국밥", 8500)],
+  3: [t("t-b3-kimchi", "김치 1kg", 7000), t("t-b3-egg", "계란 30구", 6800)],
+  8: [t("t-b8-bag", "장바구니", 4000), t("t-b8-glove", "고무장갑", 2200)],
+  9: [t("t-b9-tteok", "떡볶이", 4200), t("t-b9-sundae", "순대", 3800)],
+  14: [t("t-b14-mixed", "잡곡 500g", 3500), t("t-b14-rice", "현미 1kg", 4200)],
 };
 
 /** 성환이화시장은 아직 실험용 메뉴 없음 */
@@ -95,5 +81,9 @@ export function withNavTestMenus(
   const extra = NAV_TEST_MENUS[marketId]?.[storeId];
   if (!extra?.length) return menus;
   const ids = new Set(menus.map((m) => m.id));
-  return [...menus, ...extra.filter((m) => !ids.has(m.id))];
+  const names = new Set(menus.map((m) => m.name.trim().toLowerCase()));
+  return [
+    ...menus,
+    ...extra.filter((m) => !ids.has(m.id) && !names.has(m.name.trim().toLowerCase())),
+  ];
 }
