@@ -90,6 +90,18 @@ function pointInMarketRing(lat: number, lng: number, ring: Array<{ lat: number; 
 }
 
 export function isLatLngInsideMarketArea(marketId: MarketId, lat: number, lng: number): boolean {
+  // 관리자가 저장한 시장영역이 있으면 그 경로를 쓰고, 없으면 기본 사각형을 쓴다.
+  try {
+    const raw = localStorage.getItem(`market-area-v1:${marketId}`);
+    if (raw) {
+      const parsed = JSON.parse(raw) as { rings?: Array<Array<{ lat: number; lng: number }>> };
+      if (Array.isArray(parsed.rings) && parsed.rings.length > 0) {
+        return parsed.rings.some((path) => Array.isArray(path) && pointInMarketRing(lat, lng, path));
+      }
+    }
+  } catch {
+    /* ignore */
+  }
   return MARKET_VIEW_CONFIG[marketId].areaPaths.some((path) => pointInMarketRing(lat, lng, path));
 }
 

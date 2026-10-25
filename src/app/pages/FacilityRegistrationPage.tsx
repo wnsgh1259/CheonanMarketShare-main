@@ -6,6 +6,7 @@ import { restoreAdminSessionFromBackup } from "../data/authSession";
 import { peekAdminReturnState, buildAdminReturnUrl } from "../data/adminNavigation";
 import type { MarketId } from "../components/CartContext";
 import { MARKET_VIEW_CONFIG } from "../map/storeMapPlacement";
+import { hydrateMarketArea, resolveMarketView } from "../data/marketArea";
 import {
   OWNER_EDIT_FACILITY_KEY,
 } from "../data/ownerSharedStore";
@@ -111,7 +112,18 @@ export function FacilityRegistrationPage() {
 
   const clientId = import.meta.env.VITE_NAVER_MAP_CLIENT_ID as string | undefined;
   const isPlaceholderClientId = !clientId || clientId === "your_naver_map_client_id";
-  const selectedMarketView = MARKET_VIEW_CONFIG[selectedMarket];
+  const [selectedMarketView, setSelectedMarketView] = useState(() => resolveMarketView(initialMarket));
+
+  useEffect(() => {
+    setSelectedMarketView(resolveMarketView(selectedMarket));
+    let cancelled = false;
+    void hydrateMarketArea(selectedMarket).then(() => {
+      if (!cancelled) setSelectedMarketView(resolveMarketView(selectedMarket));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedMarket]);
 
   const formColorRef = useRef(form.color);
   formColorRef.current = form.color;
@@ -189,7 +201,7 @@ export function FacilityRegistrationPage() {
       if (cancelled || !window.naver?.maps || !mapContainerRef.current) return;
       setMapReady(false);
       const naver = window.naver;
-      const view = MARKET_VIEW_CONFIG[selectedMarket];
+      const view = resolveMarketView(selectedMarket);
       const map = new naver.maps.Map(mapContainerRef.current, {
         center: new naver.maps.LatLng(view.center.lat, view.center.lng),
         zoom: view.zoom,
@@ -199,7 +211,13 @@ export function FacilityRegistrationPage() {
         mapDataControl: false,
       });
       mapRef.current = map;
-      marketPolygonsRef.current.forEach((polygon) => polygon.setMap(null));
+      marketPolygonsRef.current.forEach((polygon) => {
+        try {
+          polygon.setMap(null);
+        } catch {
+          /* ignore */
+        }
+      });
       marketPolygonsRef.current = view.areaPaths.map(
         (path) =>
           new naver.maps.Polygon({
@@ -214,6 +232,10 @@ export function FacilityRegistrationPage() {
             clickable: false,
           }),
       );
+      void hydrateMarketArea(selectedMarket).then(() => {
+        if (cancelled || !mapRef.current) return;
+        setSelectedMarketView(resolveMarketView(selectedMarket));
+      });
       setMapReady(true);
       setMapError(false);
 
@@ -290,7 +312,13 @@ export function FacilityRegistrationPage() {
     const view = selectedMarketView;
     map.setCenter(new naver.maps.LatLng(view.center.lat, view.center.lng));
     map.setZoom(view.zoom);
-    marketPolygonsRef.current.forEach((polygon) => polygon.setMap(null));
+    marketPolygonsRef.current.forEach((polygon) => {
+      try {
+        polygon.setMap(null);
+      } catch {
+        /* ignore */
+      }
+    });
     marketPolygonsRef.current = view.areaPaths.map(
       (path) =>
         new naver.maps.Polygon({
@@ -353,20 +381,20 @@ export function FacilityRegistrationPage() {
       marketId: selectedMarket,
     };
 
-    const base = readStorageDraftRecord();
-    const prevFac = (Array.isArray(base.facilities) ? base.facilities : []) as DraftFacility[];
+    const prevFac = (loadOwnerCatalog().facilities ?? []) as DraftFacility[];
     const nextFacilities =
       editingFacilityId !== null && prevFac.some((f) => f.id === editingFacilityId)
         ? prevFac.map((f) => (f.id === editingFacilityId ? next : f))
         : [...prevFac, next];
 
     persistDraftFacilities(nextFacilities);
+    setEditingFacilityId(next.id);
+    setSaveNotice("저장되었습니다.");
 
     if (returnToAdmin) {
-      goBackToAdmin();
+      window.setTimeout(() => goBackToAdmin(), 250);
       return;
     }
-    setSaveNotice("저장되었습니다.");
     window.setTimeout(() => setSaveNotice(""), 1800);
   };
 

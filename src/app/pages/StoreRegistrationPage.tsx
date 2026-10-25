@@ -17,6 +17,8 @@ import { restoreAdminSessionFromBackup } from "../data/authSession";
 import { peekAdminReturnState, buildAdminReturnUrl } from "../data/adminNavigation";
 import { saveUserEmail, isValidEmail, findRegisteredUserByPhone } from "../data/userAccounts";
 import { STORES_BY_MARKET } from "../data/storeData";
+import { MARKET_VIEW_CONFIG } from "../map/storeMapPlacement";
+import { hydrateMarketArea, resolveMarketView } from "../data/marketArea";
 import {
   OWNER_EDIT_STORE_KEY,
 } from "../data/ownerSharedStore";
@@ -234,63 +236,10 @@ function resolveInitialStoreLabel(storeId: number | null, isAdminNewStore: boole
   return "~~사장님";
 }
 
-const MARKET_VIEW_CONFIG: Record<MarketId, {
-  label: string;
-  center: { lat: number; lng: number };
-  zoom: number;
-  fillColor: string;
-  areaPaths: Array<Array<{ lat: number; lng: number }>>;
-}> = {
-  jungang: {
-    label: "천안중앙시장",
-    center: { lat: 36.80222, lng: 127.149411 },
-    zoom: 15.4,
-    fillColor: "#2563EB",
-    areaPaths: [
-      [
-        { lat: 36.804099, lng: 127.148671 },
-        { lat: 36.804099, lng: 127.149905 },
-        { lat: 36.800137, lng: 127.149905 },
-        { lat: 36.800137, lng: 127.148671 },
-      ],
-      [
-        { lat: 36.803683, lng: 127.149905 },
-        { lat: 36.803683, lng: 127.150225 },
-        { lat: 36.803487, lng: 127.150225 },
-        { lat: 36.803487, lng: 127.149905 },
-      ],
-      [
-        { lat: 36.803035, lng: 127.149905 },
-        { lat: 36.803035, lng: 127.150314 },
-        { lat: 36.802786, lng: 127.150314 },
-        { lat: 36.802786, lng: 127.149905 },
-      ],
-    ],
-  },
-  byeongcheon: {
-    label: "천안역전시장",
-    center: { lat: 36.810152, lng: 127.149018 },
-    zoom: 17,
-    fillColor: "#16A34A",
-    areaPaths: [[
-      { lat: 36.809302, lng: 127.148552 },
-      { lat: 36.810976, lng: 127.149064 },
-      { lat: 36.810871, lng: 127.149528 },
-      { lat: 36.809180, lng: 127.148898 },
-    ]],
-  },
-  seonghwan: {
-    label: "성환이화시장",
-    center: { lat: 36.918910, lng: 127.130431 },
-    zoom: 17,
-    fillColor: "#EA580C",
-    areaPaths: [[
-      { lat: 36.918485, lng: 127.130249 },
-      { lat: 36.918721, lng: 127.129787 },
-      { lat: 36.919403, lng: 127.130168 },
-      { lat: 36.918936, lng: 127.131198 },
-    ]],
-  },
+const MARKET_TAB_LABELS: Record<MarketId, string> = {
+  jungang: "천안중앙시장",
+  byeongcheon: "천안역전시장",
+  seonghwan: "성환이화시장",
 };
 const CATEGORY_OPTIONS = ["먹거리·분식", "정육·계란", "채소", "과일", "채소·과일", "수산물", "반찬·건어물", "기타·생활"];
 const PAYMENT_OPTIONS = ["카드", "현금", "지역화폐", "온누리상품권"];
@@ -533,7 +482,18 @@ export function StoreRegistrationPage() {
 
   const clientId = import.meta.env.VITE_NAVER_MAP_CLIENT_ID as string | undefined;
   const isPlaceholderClientId = !clientId || clientId === "your_naver_map_client_id";
-  const selectedMarketView = MARKET_VIEW_CONFIG[selectedMarket];
+  const [selectedMarketView, setSelectedMarketView] = useState(() => resolveMarketView(initialMarket));
+
+  useEffect(() => {
+    setSelectedMarketView(resolveMarketView(selectedMarket));
+    let cancelled = false;
+    void hydrateMarketArea(selectedMarket).then(() => {
+      if (!cancelled) setSelectedMarketView(resolveMarketView(selectedMarket));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedMarket]);
 
   const getScaledPinSize = (baseSize: number) => {
     const baseZoom = selectedMarketView.zoom;
@@ -963,7 +923,7 @@ export function StoreRegistrationPage() {
       if (cancelled || !window.naver?.maps || !mapContainerRef.current) return;
       setMapReady(false);
       const naver = window.naver;
-      const view = MARKET_VIEW_CONFIG[selectedMarket];
+      const view = resolveMarketView(selectedMarket);
       const map = new naver.maps.Map(mapContainerRef.current, {
         center: new naver.maps.LatLng(view.center.lat, view.center.lng),
         zoom: view.zoom,
@@ -977,14 +937,20 @@ export function StoreRegistrationPage() {
       naver.maps.Event.addListener(map, "zoom_changed", (zoom: number) => {
         setMapZoomLevel(Number(zoom));
       });
-      marketPolygonsRef.current.forEach((polygon) => polygon.setMap(null));
+      marketPolygonsRef.current.forEach((polygon) => {
+        try {
+          polygon.setMap(null);
+        } catch {
+          /* ignore */
+        }
+      });
       marketPolygonsRef.current = view.areaPaths.map(
         (path) =>
           new naver.maps.Polygon({
             map,
             paths: path.map((point) => new naver.maps.LatLng(point.lat, point.lng)),
             fillColor: view.fillColor,
-            fillOpacity: 0.28,
+            fillOpacity: 0.14,
             strokeColor: view.fillColor,
             strokeOpacity: 0,
             strokeWeight: 0,
@@ -994,6 +960,10 @@ export function StoreRegistrationPage() {
       );
       setMapReady(true);
       setMapError(false);
+      void hydrateMarketArea(selectedMarket).then(() => {
+        if (cancelled || !mapRef.current) return;
+        setSelectedMarketView(resolveMarketView(selectedMarket));
+      });
 
       naver.maps.Event.addListener(map, "click", (e: any) => {
         const lat = typeof e?.coord?.lat === "function" ? e.coord.lat() : e?.coord?.y;
@@ -1081,14 +1051,20 @@ export function StoreRegistrationPage() {
     map.setCenter(new naver.maps.LatLng(view.center.lat, view.center.lng));
     map.setZoom(view.zoom);
     setMapZoomLevel(view.zoom);
-    marketPolygonsRef.current.forEach((polygon) => polygon.setMap(null));
+    marketPolygonsRef.current.forEach((polygon) => {
+      try {
+        polygon.setMap(null);
+      } catch {
+        /* ignore */
+      }
+    });
     marketPolygonsRef.current = view.areaPaths.map(
       (path) =>
         new naver.maps.Polygon({
           map,
           paths: path.map((point) => new naver.maps.LatLng(point.lat, point.lng)),
           fillColor: view.fillColor,
-          fillOpacity: 0.28,
+          fillOpacity: 0.14,
           strokeColor: view.fillColor,
           strokeOpacity: 0,
           strokeWeight: 0,
@@ -1795,7 +1771,7 @@ export function StoreRegistrationPage() {
                   : "지도 클릭으로 가게 위치 핀을 먼저 찍어주세요."}
               </p>
               <div className="mb-3 flex gap-2 overflow-x-auto">
-                {(Object.entries(MARKET_VIEW_CONFIG) as Array<[MarketId, (typeof MARKET_VIEW_CONFIG)[MarketId]]>).map(([id, market]) => (
+                {(Object.keys(MARKET_TAB_LABELS) as MarketId[]).map((id) => (
                   <button
                     key={id}
                     type="button"
@@ -1810,7 +1786,7 @@ export function StoreRegistrationPage() {
                         : "bg-gray-100 text-gray-700"
                     }`}
                   >
-                    {market.label}
+                    {MARKET_TAB_LABELS[id]}
                   </button>
                 ))}
               </div>
