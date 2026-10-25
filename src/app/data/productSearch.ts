@@ -1,5 +1,12 @@
 import type { MarketId } from "../components/CartContext";
-import { STORES_BY_MARKET, type MenuItem, type StoreData } from "./storeData";
+import {
+  STORES_BY_MARKET,
+  ensureStoreMenus,
+  isPlaceholderStoreName,
+  normalizeStoreCategory,
+  type MenuItem,
+  type StoreData,
+} from "./storeData";
 import { loadOwnerCatalog } from "./ownerStoreData";
 import { syntheticSeedStoreId } from "./seedStoreIds";
 import { withNavTestMenus } from "./navTestMenus";
@@ -43,19 +50,23 @@ function draftMenusToMenuItems(menus: SharedOwnerMenu[] | undefined): MenuItem[]
   });
 }
 
+function resolvedDraftName(draftName: string | undefined, fallback: string): string {
+  const t = draftName?.trim() ?? "";
+  if (!t || isPlaceholderStoreName(t)) return fallback;
+  return t;
+}
+
 function mergeStoreMenus(seed: StoreData, draft: SharedDraftStore | undefined): MenuItem[] {
+  const displayName = resolvedDraftName(draft?.name, seed.name);
+  const category = normalizeStoreCategory(draft?.category || seed.category);
   const draftMenus = draftMenusToMenuItems(draft?.menus);
-  if (draftMenus.length === 0) return seed.menus;
-  // draft 메뉴가 너무 적으면 시드(풍부한 네비용 메뉴)를 기준으로 두고, 같은 상품명은 draft 가격 우선
-  if (draftMenus.length < 3) {
-    const byName = new Map(draftMenus.map((m) => [normalizeName(m.name), m]));
-    const merged = seed.menus.map((m) => byName.get(normalizeName(m.name)) ?? m);
-    const seedNames = new Set(seed.menus.map((m) => normalizeName(m.name)));
-    return [...merged, ...draftMenus.filter((m) => !seedNames.has(normalizeName(m.name)))];
-  }
-  // draft가 충분하면 draft 우선 + 시드에만 있는 상품 보강
-  const draftNames = new Set(draftMenus.map((m) => normalizeName(m.name)));
-  return [...draftMenus, ...seed.menus.filter((m) => !draftNames.has(normalizeName(m.name)))];
+  // 상점명과 안 맞는 메뉴(예: 떡볶이집에 순대국밥)는 ensureStoreMenus가 이름 기준으로 교체
+  return ensureStoreMenus(
+    displayName,
+    category,
+    draftMenus.length >= 3 ? draftMenus : seed.menus,
+    `ps-${seed.id}`,
+  );
 }
 
 /** 시드 + 카탈로그를 합친 검색용 상점 목록 */
@@ -70,7 +81,7 @@ export function getSearchableStores(marketId: MarketId): StoreData[] {
   const draftByName = new Map<string, SharedDraftStore>();
 
   for (const d of drafts) {
-    draftByName.set(d.name, d);
+    if (!isPlaceholderStoreName(d.name)) draftByName.set(d.name, d);
     if (typeof d.id === "number") {
       draftBySynthetic.set(d.id, d);
       // 시드 id로도 매칭 (관리자 시드 id = marketIndex*10000 + seedId)
@@ -90,7 +101,7 @@ export function getSearchableStores(marketId: MarketId): StoreData[] {
       draftByName.get(store.name);
     merged.push({
       ...store,
-      name: draft?.name ?? store.name,
+      name: resolvedDraftName(draft?.name, store.name),
       image: draft?.image || store.image,
       menus: withNavTestMenus(marketId, store.id, mergeStoreMenus(store, draft)),
     });
@@ -103,11 +114,13 @@ export function getSearchableStores(marketId: MarketId): StoreData[] {
   for (const d of drafts) {
     if (typeof d.id !== "number") continue;
     if (seedSynthetic.has(d.id) || seedIds.has(d.id) || seedNames.has(d.name)) continue;
-    if (!d.name) continue;
+    // 테스트용 이름(1, 2, 트라이 등)은 상품 검색에 노출하지 않음
+    if (isPlaceholderStoreName(d.name)) continue;
+    const category = normalizeStoreCategory(d.category);
     merged.push({
       id: d.id,
       name: d.name,
-      category: (d.category as StoreData["category"]) || "기타·생활",
+      category,
       location: d.location || "",
       hours: d.hours || "",
       phone: d.phone || "",
@@ -119,7 +132,7 @@ export function getSearchableStores(marketId: MarketId): StoreData[] {
       lat: d.lat,
       lng: d.lng,
       description: d.description || "",
-      menus: draftMenusToMenuItems(d.menus),
+      menus: ensureStoreMenus(d.name, category, draftMenusToMenuItems(d.menus), `ps-d${d.id}`),
     });
   }
 

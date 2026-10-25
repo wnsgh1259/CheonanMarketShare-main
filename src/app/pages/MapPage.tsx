@@ -232,10 +232,12 @@ function draftOnlyToStoreData(drafts: DraftStorePin[], marketId: MarketId): impo
       if (typeof d.id !== "number") return false;
       if (seedSyntheticIds.has(d.id)) return false;
       if (seedNames.has(d.name)) return false;
+      // 테스트용 이름(1, 2, 트라이 등)은 지도·검색에 올리지 않음
+      if (isPlaceholderStoreName(d.name)) return false;
       return true;
     })
     .map((d) => {
-      const name = isPlaceholderStoreName(d.name) ? `시장상점 ${d.id}` : d.name;
+      const name = d.name;
       const category = normalizeStoreCategory(d.category);
       const draftMenus = uniqueMenuIds(d.menus?.map((m) => ({
         id: String(m.id),
