@@ -12,6 +12,7 @@ import {
   type RoutingContext,
   type StartSource,
 } from "./walkRouting";
+import { haversineMeters } from "./walkPathGraph";
 
 export type RouteType = "cheapest" | "shortest" | "balanced";
 
@@ -233,6 +234,7 @@ function tourLength(
   storeIds: number[],
   storesById: Map<number, StoreData>,
   marketId: MarketId,
+  mode: "walk" | "straight" = "walk",
 ): number {
   let cur: Pos = { lat: ctx.entrance.lat, lng: ctx.entrance.lng };
   let total = 0;
@@ -243,7 +245,10 @@ function tourLength(
     rem.forEach((id, i) => {
       const s = storesById.get(id)!;
       const p = storePos(marketId, s);
-      const d = routeDistanceMeters(ctx, cur, p);
+      const d =
+        mode === "straight"
+          ? haversineMeters(cur, p)
+          : routeDistanceMeters(ctx, cur, p);
       if (d < bd) {
         bd = d;
         bi = i;
@@ -316,7 +321,8 @@ function assignShortest(marketId: MarketId, items: CartItem[], ctx: RoutingConte
     for (const offer of offers) {
       const nextIds = new Set(chosenStoreIds);
       nextIds.add(offer.store.id);
-      const len = tourLength(ctx, [...nextIds], storesById, marketId);
+      // 직선 거리로 배정 — 보행 그래프 왜곡으로 먼 저가 상점이 최단으로 잡히는 일 방지
+      const len = tourLength(ctx, [...nextIds], storesById, marketId, "straight");
       // slight preference for already-visited stores (len equal)
       const preferSame = chosenStoreIds.has(offer.store.id) ? -1 : 0;
       if (len + preferSame < bestLen) {
@@ -331,11 +337,15 @@ function assignShortest(marketId: MarketId, items: CartItem[], ctx: RoutingConte
   return { items: out, assigned, skipped };
 }
 
-/** 추천(밸런스): 가격·입구거리 가중 */
+/** 추천(밸런스): 중간 가격대 상점 + 이미 가는 상점 묶기 (최저가·최단과 확실히 갈라지게) */
 function assignBalanced(marketId: MarketId, items: CartItem[], ctx: RoutingContext): AssignmentResult {
   const out: CartItem[] = [];
   let assigned = 0;
   let skipped = 0;
+  const chosenStoreIds = new Set(
+    items.filter((i) => !i.unresolved && i.storeId > 0).map((i) => i.storeId),
+  );
+
   for (const item of items) {
     if (!item.unresolved) {
       out.push(item);
@@ -346,22 +356,23 @@ function assignBalanced(marketId: MarketId, items: CartItem[], ctx: RoutingConte
       skipped += 1;
       continue;
     }
-    const prices = offers.map((o) => o.price);
-    const dists = offers.map((o) =>
-      distanceFromEntrance(ctx, storePos(marketId, o.store)),
-    );
-    const maxP = Math.max(...prices, 1);
-    const maxD = Math.max(...dists, 1);
-    let best = offers[0];
-    let bestScore = Infinity;
-    offers.forEach((o, i) => {
-      const score = (prices[i] / maxP) * 0.5 + (dists[i] / maxD) * 0.5;
-      if (score < bestScore) {
-        bestScore = score;
-        best = o;
-      }
+    const byPrice = [...offers].sort((a, b) => {
+      if (a.price !== b.price) return a.price - b.price;
+      return (
+        distanceFromEntrance(ctx, storePos(marketId, a.store)) -
+        distanceFromEntrance(ctx, storePos(marketId, b.store))
+      );
     });
+    const median = byPrice[Math.floor(byPrice.length / 2)];
+    const consolidate = offers
+      .filter((o) => chosenStoreIds.has(o.store.id))
+      .sort((a, b) => a.price - b.price)[0];
+    // 이미 가는 상점이 중간가 이하이면 묶어서 추천이 최저가와 달라 보이게
+    const best =
+      consolidate && consolidate.price <= median.price * 1.2 ? consolidate : median;
+
     out.push(cloneItemToStore(item, best.store, best.menuId, best.price));
+    chosenStoreIds.add(best.store.id);
     assigned += 1;
   }
   return { items: out, assigned, skipped };

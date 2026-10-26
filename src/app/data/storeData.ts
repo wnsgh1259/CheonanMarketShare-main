@@ -344,11 +344,11 @@ export const STORES_BY_MARKET: Record<MarketId, StoreData[]> = {
     {
       id: 5, name: "송현농원", category: "채소·과일",
       location: "천안시 동남구 문화동 15, 역전시장 청과동 1호", hours: HOURS, phone: "041-566-1301",
-      rating: 4.7, badge: "신선", bookmark: true, mx: 50, my: 36,
-      lat: 36.81065, lng: 127.14918,
+      rating: 4.7, badge: "신선", bookmark: true, mx: 50, my: 29,
+      lat: 36.81076, lng: 127.14914,
       image: IMG_VEG, description: "농원 직송 채소·과일.",
       menus: menus("b5", [
-        ["사과", 9000], ["대파", 3600], ["시금치 1단", 2000], ["당근 1봉", 3000],
+        ["사과", 9200], ["대파", 3800], ["시금치 1단", 2000], ["당근 1봉", 3000],
         ["감자 1kg", 3500], ["무 1개", 2000], ["양배추 1포기", 3500], ["오이 3개", 2500],
       ]),
     },
@@ -377,11 +377,11 @@ export const STORES_BY_MARKET: Record<MarketId, StoreData[]> = {
     {
       id: 8, name: "푸줏간골목", category: "정육·계란",
       location: "천안시 동남구 대흥로 68, 역전시장 정육골목 6호", hours: HOURS, phone: "041-566-1601",
-      rating: 4.1, bookmark: false, mx: 46, my: 38,
-      lat: 36.81058, lng: 127.14910,
+      rating: 4.1, bookmark: false, mx: 48, my: 30,
+      lat: 36.81075, lng: 127.14912,
       image: IMG_MEAT, description: "시장 골목 한돈 정육.",
       menus: menus("b8", [
-        ["삼겹살", 13500], ["한돈 목살 500g", 12000], ["다짐육 500g", 7000],
+        ["삼겹살", 14800], ["한돈 목살 500g", 12000], ["다짐육 500g", 7000],
         ["계란 30구", 7500], ["특란 15구", 4500], ["돼지불고기용 500g", 9000],
       ]),
     },
@@ -412,19 +412,19 @@ export const STORES_BY_MARKET: Record<MarketId, StoreData[]> = {
     {
       id: 11, name: "과일나라", category: "채소·과일",
       location: "천안시 동남구 문화동 16, 역전시장 청과동 5호", hours: HOURS, phone: "041-566-1302",
-      rating: 4.5, bookmark: false, mx: 38, my: 78,
-      lat: 36.80948, lng: 127.14872,
+      rating: 4.5, bookmark: false, mx: 36, my: 88,
+      lat: 36.80928, lng: 127.14862,
       image: IMG_FRUIT, description: "제철 과일·대파 소분.",
       menus: menus("b11", [
-        ["사과", 6500], ["대파", 1800], ["바나나 1송이", 3500], ["귤 1kg", 6500],
+        ["사과", 6200], ["대파", 1600], ["바나나 1송이", 3500], ["귤 1kg", 6500],
         ["키위 5개", 5000], ["감 5개", 7000], ["파인애플 1개", 6000],
       ]),
     },
     {
       id: 12, name: "한돈축산", category: "정육·계란",
       location: "천안시 동남구 문화동 13, 역전시장 남쪽 정육 8호", hours: HOURS, phone: "041-566-1202",
-      rating: 4.3, bookmark: false, mx: 32, my: 74,
-      lat: 36.80958, lng: 127.14865,
+      rating: 4.3, bookmark: false, mx: 30, my: 86,
+      lat: 36.80932, lng: 127.14858,
       image: IMG_MEAT, description: "한돈 특가·계란.",
       menus: menus("b12", [
         ["삼겹살", 10500], ["특란 30구", 8000], ["유정란 10구", 6000],
@@ -446,8 +446,8 @@ export const STORES_BY_MARKET: Record<MarketId, StoreData[]> = {
     {
       id: 14, name: "햇과일가게", category: "채소·과일",
       location: "천안시 동남구 대흥로 75, 역전시장 중앙통로 7호", hours: HOURS, phone: "041-566-1602",
-      rating: 4.4, bookmark: false, mx: 48, my: 55,
-      lat: 36.81005, lng: 127.14900,
+      rating: 4.4, bookmark: false, mx: 42, my: 62,
+      lat: 36.80995, lng: 127.14888,
       image: IMG_FRUIT, description: "과일·대파·견과 소분.",
       menus: menus("b14", [
         ["사과", 7800], ["대파", 2500], ["아몬드 200g", 5000], ["호두 150g", 6000],
