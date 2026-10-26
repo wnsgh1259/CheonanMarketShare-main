@@ -9,6 +9,14 @@ import {
 import { BottomNav, OWNER_MODE_KEY, OwnerBackToStoreButton } from "../components/BottomNav";
 import { INITIAL_POSTS, postStore, savePostStore } from "../data/postStore";
 import type { PostItem } from "../data/postStore";
+import { readAuthSession } from "../data/authSession";
+import {
+  PICKUP_ORDERS_CHANGED,
+  formatPickupItemsSummary,
+  listPickupOrdersForCustomer,
+  pickupStatusLabel,
+  resolveCustomerPickupKey,
+} from "../data/pickupOrders";
 
 interface ChatRoom { id: string; storeName: string; lastMessage: string; time: string; unread: number; image: string; read: boolean; }
 interface Message { id: string; text?: string; imageUrl?: string; sender: "user" | "store"; time: string; }
@@ -167,6 +175,76 @@ export function ChatPage() {
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, activeChatId]);
   useEffect(() => { if (searchOpen) setTimeout(() => searchInputRef.current?.focus(), 100); }, [searchOpen]);
+
+  // 사장님이 보낸 픽업 확인/거절 메시지를 채팅방에 반영
+  useEffect(() => {
+    const syncPickupChats = () => {
+      const session = readAuthSession();
+      const orders = listPickupOrdersForCustomer(resolveCustomerPickupKey(session.phone)).filter(
+        (o) => o.status !== "requested" && o.ownerMessage.trim(),
+      );
+      if (orders.length === 0) return;
+
+      setChatRooms((prev) => {
+        let next = [...prev];
+        for (const order of orders) {
+          const roomId = `chat-${order.storeName}`;
+          const preview = `[픽업 ${pickupStatusLabel(order.status)}] ${order.ownerMessage}`;
+          const existing = next.find((r) => r.id === roomId);
+          if (existing) {
+            next = next.map((r) =>
+              r.id === roomId
+                ? { ...r, lastMessage: preview, time: "방금", unread: r.read ? 0 : r.unread + 1, read: false }
+                : r,
+            );
+          } else {
+            next = [
+              {
+                id: roomId,
+                storeName: order.storeName,
+                lastMessage: preview,
+                time: "방금",
+                unread: 1,
+                image: STORE_IMAGES[order.storeName] || "https://images.unsplash.com/photo-1594021113115-f1b48e63ef06?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=200",
+                read: false,
+              },
+              ...next,
+            ];
+          }
+        }
+        return next;
+      });
+
+      setMessages((prev) => {
+        const next = { ...prev };
+        for (const order of orders) {
+          const roomId = `chat-${order.storeName}`;
+          const msgId = `pickup-${order.id}`;
+          const roomMsgs = next[roomId] || [];
+          if (roomMsgs.some((m) => m.id === msgId)) continue;
+          const text = `📦 픽업 ${pickupStatusLabel(order.status)}\n${formatPickupItemsSummary(order)}\n\n${order.ownerMessage}`;
+          next[roomId] = [
+            ...roomMsgs,
+            {
+              id: msgId,
+              text,
+              sender: "store",
+              time: new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }),
+            },
+          ];
+        }
+        return next;
+      });
+    };
+
+    syncPickupChats();
+    window.addEventListener(PICKUP_ORDERS_CHANGED, syncPickupChats);
+    window.addEventListener("focus", syncPickupChats);
+    return () => {
+      window.removeEventListener(PICKUP_ORDERS_CHANGED, syncPickupChats);
+      window.removeEventListener("focus", syncPickupChats);
+    };
+  }, []);
 
   useEffect(() => {
     if (!phonePopupOpen) return;

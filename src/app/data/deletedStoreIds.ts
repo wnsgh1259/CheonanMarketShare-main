@@ -89,12 +89,14 @@ function mergeDeletedStates(
 ): DeletedStoreIdsState {
   const lt = Date.parse(local.updatedAt) || 0;
   const rt = Date.parse(remote.updatedAt) || 0;
-  if (rt > lt) return remote;
-  if (lt > rt) return local;
-  // 시각이 같거나 비어 있으면 합집합(삭제가 빠지지 않게)
+  // 삭제는 항상 합집합 — 한쪽(빈 원격 등)이 최신이어도 이미 지운 상점이 지도에 되살아나지 않게
+  const ids = normalizeIds([...local.ids, ...remote.ids]);
   return {
-    ids: normalizeIds([...local.ids, ...remote.ids]),
-    updatedAt: local.updatedAt || remote.updatedAt || new Date().toISOString(),
+    ids,
+    updatedAt:
+      lt >= rt
+        ? local.updatedAt || remote.updatedAt || new Date().toISOString()
+        : remote.updatedAt || local.updatedAt || new Date().toISOString(),
   };
 }
 

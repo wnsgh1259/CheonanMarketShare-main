@@ -10,6 +10,7 @@ import {
   getUserLatLng,
   type LatLng,
 } from "../data/walkRouting";
+import { getMarketStorePins } from "../map/marketStorePins";
 import { pickStoreDisplayLatLng } from "../map/storeMapPlacement";
 import { getSearchableStores } from "../data/productSearch";
 
@@ -56,7 +57,7 @@ interface Props {
 
 export function RouteRecommendation({ items, marketId }: Props) {
   const navigate = useNavigate();
-  const [selected, setSelected] = useState<RouteType>("balanced");
+  const [selected, setSelected] = useState<RouteType>("cheapest");
   const [gps, setGps] = useState<LatLng | null>(null);
   const [gpsReady, setGpsReady] = useState(false);
 
@@ -118,14 +119,19 @@ export function RouteRecommendation({ items, marketId }: Props) {
       gps: gpsReady ? gps : null,
       focusPoints: focusPoints.length > 0 ? focusPoints : undefined,
     });
-    const stops = planned.path.map((s, i) => ({
-      storeId: s.store.id,
-      storeName: s.store.name,
-      lat: s.lat,
-      lng: s.lng,
-      order: i + 1,
-      itemNames: s.cartItems.map((c) => c.name),
-    }));
+    // 지도 핀 좌표로 한 번 더 맞춰 번호 마커·폴리라인이 실제 상점에 붙게 함
+    const pins = getMarketStorePins(marketId);
+    const stops = planned.path.map((s, i) => {
+      const pin = pins.find((p) => p.id === s.store.id);
+      return {
+        storeId: s.store.id,
+        storeName: pin?.name ?? s.store.name,
+        lat: pin?.lat ?? s.lat,
+        lng: pin?.lng ?? s.lng,
+        order: i + 1,
+        itemNames: s.cartItems.map((c) => c.name),
+      };
+    });
     const pathLatLng = buildTourLatLngPath(
       ctx,
       stops.map((s) => ({ lat: s.lat, lng: s.lng, storeId: s.storeId })),
@@ -197,19 +203,39 @@ export function RouteRecommendation({ items, marketId }: Props) {
         </div>
       )}
 
+      {(() => {
+        const priceGap = Math.abs(routes.cheapest.totalPrice - routes.shortest.totalPrice);
+        const distGap = Math.abs(routes.cheapest.distance - routes.shortest.distance);
+        if (priceGap < 100 && distGap < 20) return null;
+        return (
+          <div className="mb-3 px-3 py-2.5 bg-[#F7F5F1] rounded-lg text-[11px] text-[#6B5142] leading-relaxed">
+            최저가와 최단거리가 달라요.
+            {priceGap >= 100 && (
+              <span className="text-[#46352C]"> 가격 차 {priceGap.toLocaleString()}원</span>
+            )}
+            {distGap >= 20 && (
+              <span className="text-[#46352C]"> · 거리 차 {distGap}m</span>
+            )}
+            — 원하는 기준을 골라 보세요.
+          </div>
+        );
+      })()}
+
       <div className="space-y-2 mb-4">
-        {(["balanced", "cheapest", "shortest"] as RouteType[]).map((type) => {
+        {(["cheapest", "shortest", "balanced"] as RouteType[]).map((type) => {
           const r = routes[type];
           const m = ROUTE_META[type];
           const Icon = m.icon;
           const isActive = selected === type;
+          const vsCheap = type !== "cheapest" && r.totalPrice > routes.cheapest.totalPrice;
+          const vsShort = type !== "shortest" && r.distance > routes.shortest.distance;
           return (
             <button
               key={type}
               type="button"
               onClick={() => setSelected(type)}
               className={`w-full p-3 rounded-xl border-2 transition-all text-left ${
-                isActive ? `${m.border} bg-white` : "border-[#EDE5D8] bg-white"
+                isActive ? `${m.border} bg-white shadow-sm` : "border-[#EDE5D8] bg-white"
               }`}
             >
               <div className="flex items-center gap-3">
@@ -217,19 +243,36 @@ export function RouteRecommendation({ items, marketId }: Props) {
                   <Icon className="w-4 h-4" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-0.5">
+                  <div className="flex items-center justify-between mb-0.5 gap-2">
                     <h3 className="text-[14px] text-[#46352C]">
                       {m.label} {m.title}
                     </h3>
-                    {r.savings > 0 && (
-                      <span className="text-[10px] bg-red-50 text-red-600 px-2 py-0.5 rounded-full flex-shrink-0">
-                        할인 {r.savings.toLocaleString()}원
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {type === "cheapest" && (
+                        <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">
+                          가장 저렴
+                        </span>
+                      )}
+                      {type === "shortest" && (
+                        <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
+                          가장 짧음
+                        </span>
+                      )}
+                      {type === "balanced" && (
+                        <span className="text-[10px] bg-orange-50 text-orange-700 px-2 py-0.5 rounded-full">
+                          균형 추천
+                        </span>
+                      )}
+                      {r.savings > 0 && (
+                        <span className="text-[10px] bg-red-50 text-red-600 px-2 py-0.5 rounded-full">
+                          할인 {r.savings.toLocaleString()}원
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <p className="text-[11px] text-[#6B5142] mb-1.5">{m.desc}</p>
-                  <div className="flex gap-3 text-[12px] text-[#6B5142]">
-                    <span className="text-[#46352C]">{r.totalPrice.toLocaleString()}원</span>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-[#6B5142]">
+                    <span className="text-[#46352C] font-medium">{r.totalPrice.toLocaleString()}원</span>
                     <span className="flex items-center gap-0.5">
                       <Navigation className="w-3 h-3" />
                       {r.distance}m
@@ -242,6 +285,13 @@ export function RouteRecommendation({ items, marketId }: Props) {
                       {r.path.length}곳
                     </span>
                   </div>
+                  {(vsCheap || vsShort) && (
+                    <p className="mt-1 text-[10px] text-[#9A897F]">
+                      {vsCheap && `최저가보다 +${(r.totalPrice - routes.cheapest.totalPrice).toLocaleString()}원`}
+                      {vsCheap && vsShort && " · "}
+                      {vsShort && `최단보다 +${r.distance - routes.shortest.distance}m`}
+                    </p>
+                  )}
                 </div>
                 <ChevronRight className={`w-4 h-4 flex-shrink-0 ${isActive ? m.textColor : "text-[#9A897F]"}`} />
               </div>

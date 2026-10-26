@@ -16,6 +16,7 @@ import { useAuth } from "../context/AuthContext";
 import { restoreAdminSessionFromBackup } from "../data/authSession";
 import { peekAdminReturnState, buildAdminReturnUrl } from "../data/adminNavigation";
 import { saveUserEmail, isValidEmail, findRegisteredUserByPhone } from "../data/userAccounts";
+import type { MarketId } from "../components/CartContext";
 import { STORES_BY_MARKET, STORE_CATEGORY_OPTIONS } from "../data/storeData";
 import { MARKET_VIEW_CONFIG } from "../map/storeMapPlacement";
 import { hydrateMarketArea, resolveMarketView } from "../data/marketArea";
@@ -57,6 +58,15 @@ import {
   type DiscountMode,
   type StorePromotion,
 } from "../data/storePromotion";
+import {
+  PICKUP_ORDERS_CHANGED,
+  formatPickupItemsSummary,
+  listPickupOrdersForOwner,
+  pickupOrderTotal,
+  pickupStatusLabel,
+  respondPickupOrder,
+  type PickupOrder,
+} from "../data/pickupOrders";
 
 type NaverMapRef = {
   setCenter: (latLng: unknown) => void;
@@ -90,12 +100,13 @@ type DraftStore = {
   checkinCode?: string;
 };
 
-type OwnerSection = "store" | "product" | "qr" | "communication" | "customerMode" | "community" | "promotion" | "sns" | "settings";
+type OwnerSection = "store" | "product" | "pickup" | "qr" | "communication" | "customerMode" | "community" | "promotion" | "sns" | "settings";
 
 function parseOwnerSection(value: string | null): OwnerSection | null {
   if (
     value === "store" ||
     value === "product" ||
+    value === "pickup" ||
     value === "qr" ||
     value === "communication" ||
     value === "customerMode" ||
@@ -353,6 +364,10 @@ export function StoreRegistrationPage() {
   const [reviewReply, setReviewReply] = useState("");
   const [inquiryReply, setInquiryReply] = useState("");
   const [saveNotice, setSaveNotice] = useState("");
+  const [pickupOrders, setPickupOrders] = useState<PickupOrder[]>([]);
+  const [pickupRespondTarget, setPickupRespondTarget] = useState<PickupOrder | null>(null);
+  const [pickupRespondAction, setPickupRespondAction] = useState<"accepted" | "rejected" | null>(null);
+  const [pickupOwnerMessage, setPickupOwnerMessage] = useState("");
   type EditorBaseline = {
     marketId: MarketId;
     form: {
@@ -451,6 +466,21 @@ export function StoreRegistrationPage() {
     }, 0);
   };
   const [pageTitle, setPageTitle] = useState(() => resolveInitialStoreLabel(editStoreId, isAdminNewStore));
+
+  useEffect(() => {
+    const storeName = pageTitle !== "~~사장님" ? pageTitle : form.name.trim();
+    const refresh = () => setPickupOrders(listPickupOrdersForOwner(resolvedStoreId, storeName));
+    refresh();
+    window.addEventListener(PICKUP_ORDERS_CHANGED, refresh);
+    window.addEventListener("storage", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.removeEventListener(PICKUP_ORDERS_CHANGED, refresh);
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [resolvedStoreId, pageTitle, form.name, activeSection]);
+
   const [approvedStoreName, setApprovedStoreName] = useState(() => {
     if (isAdminNewStore) return "";
     if (editStoreId !== null) {
@@ -1716,6 +1746,7 @@ export function StoreRegistrationPage() {
           {[
             { key: "store" as OwnerSection, label: "상점 관리" },
             { key: "product" as OwnerSection, label: "상품 관리" },
+            { key: "pickup" as OwnerSection, label: "픽업 목록" },
             { key: "qr" as OwnerSection, label: "QR" },
             { key: "communication" as OwnerSection, label: "고객 소통" },
             { key: "customerMode" as OwnerSection, label: "상점 모드" },
@@ -2000,6 +2031,89 @@ export function StoreRegistrationPage() {
 
         {activeSection === "qr" && (
           <StoreCheckinPanel storeId={resolvedStoreId} />
+        )}
+
+        {activeSection === "pickup" && (
+          <div className="bg-white rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-[14px] text-gray-900">픽업 목록</h2>
+              <span className="text-[12px] text-gray-500">
+                요청중 {pickupOrders.filter((o) => o.status === "requested").length}건
+              </span>
+            </div>
+            {pickupOrders.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-gray-200 px-4 py-8 text-center">
+                <p className="text-[13px] text-gray-500">아직 들어온 픽업 요청이 없어요.</p>
+                <p className="text-[12px] text-gray-400 mt-1">손님이 장바구니에서 픽업하기를 누르면 여기에 표시됩니다.</p>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {pickupOrders.map((order) => (
+                  <div key={order.id} className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-semibold text-gray-900">{order.customerName || "손님"}</p>
+                        <p className="text-[11px] text-gray-500 mt-0.5">
+                          {order.customerPhone
+                            ? formatPhoneDisplay(order.customerPhone)
+                            : "연락처 없음"}
+                        </p>
+                      </div>
+                      <span
+                        className={`shrink-0 text-[11px] font-semibold px-2 py-1 rounded-full ${
+                          order.status === "requested"
+                            ? "bg-amber-100 text-amber-800"
+                            : order.status === "accepted"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : "bg-red-100 text-red-700"
+                        }`}
+                      >
+                        {pickupStatusLabel(order.status)}
+                      </span>
+                    </div>
+                    <div className="rounded-lg bg-white px-2.5 py-2">
+                      <p className="text-[12px] text-gray-800">{formatPickupItemsSummary(order)}</p>
+                      <p className="text-[12px] font-semibold text-gray-900 mt-1">
+                        {pickupOrderTotal(order).toLocaleString()}원
+                      </p>
+                    </div>
+                    {order.customerMessage && (
+                      <p className="text-[11px] text-gray-600">손님 메시지: {order.customerMessage}</p>
+                    )}
+                    {order.ownerMessage && (
+                      <p className="text-[11px] text-gray-600">보낸 메시지: {order.ownerMessage}</p>
+                    )}
+                    {order.status === "requested" && (
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPickupRespondTarget(order);
+                            setPickupRespondAction("rejected");
+                            setPickupOwnerMessage("");
+                          }}
+                          className="h-9 rounded-lg bg-red-50 text-red-600 text-[13px] border border-red-100"
+                        >
+                          거절
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPickupRespondTarget(order);
+                            setPickupRespondAction("accepted");
+                            setPickupOwnerMessage("");
+                          }}
+                          className="h-9 rounded-lg bg-gray-900 text-white text-[13px]"
+                        >
+                          확인
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
 
         {activeSection === "sns" && (
@@ -2705,6 +2819,71 @@ export function StoreRegistrationPage() {
 
         
       </div>
+
+      {pickupRespondTarget && pickupRespondAction &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 px-6">
+            <div
+              role="dialog"
+              aria-modal="true"
+              className="relative z-[10000] w-full max-w-[320px] rounded-2xl bg-white p-5 shadow-xl"
+            >
+              <p className="text-[15px] font-semibold text-gray-900 text-center">
+                {pickupRespondAction === "accepted" ? "픽업 확인" : "픽업 거절"}
+              </p>
+              <p className="mt-1 text-[12px] text-gray-500 text-center">
+                {pickupRespondTarget.customerName} · {formatPickupItemsSummary(pickupRespondTarget)}
+              </p>
+              <textarea
+                value={pickupOwnerMessage}
+                onChange={(e) => setPickupOwnerMessage(e.target.value)}
+                placeholder={
+                  pickupRespondAction === "accepted"
+                    ? "손님에게 보낼 메시지 (예: 30분 뒤 찾아주세요)"
+                    : "거절 사유를 적어 주세요"
+                }
+                rows={3}
+                className="mt-3 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-[13px] text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 resize-none"
+              />
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPickupRespondTarget(null);
+                    setPickupRespondAction(null);
+                    setPickupOwnerMessage("");
+                  }}
+                  className="h-11 rounded-xl bg-gray-100 text-[14px] font-medium text-gray-700"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!pickupRespondTarget || !pickupRespondAction) return;
+                    respondPickupOrder(pickupRespondTarget.id, pickupRespondAction, pickupOwnerMessage);
+                    const storeName = pageTitle !== "~~사장님" ? pageTitle : form.name.trim();
+                    setPickupOrders(listPickupOrdersForOwner(resolvedStoreId, storeName));
+                    setPickupRespondTarget(null);
+                    setPickupRespondAction(null);
+                    setPickupOwnerMessage("");
+                    setSaveNotice(
+                      pickupRespondAction === "accepted"
+                        ? "픽업을 확인했고 손님에게 메시지를 보냈어요."
+                        : "픽업을 거절했고 손님에게 메시지를 보냈어요.",
+                    );
+                  }}
+                  className={`h-11 rounded-xl text-[14px] font-medium text-white ${
+                    pickupRespondAction === "accepted" ? "bg-gray-900" : "bg-red-500"
+                  }`}
+                >
+                  보내기
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
 
       {sectionLeavePrompt &&
         createPortal(

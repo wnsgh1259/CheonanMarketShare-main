@@ -193,8 +193,14 @@ export type PointEntry = {
 /** base: 내역 기능이 생기기 전에 쌓인 포인트. paid: 승인 보상을 이미 지급한 제출 id. */
 type PointMeta = { base: number; paid: string[] };
 
-/** 아이돌 시장 미션 진행. stage: 통과한 단계 수(0~3). */
-export type IdolProgress = { stage: number; claimed: boolean };
+/**
+ * 아이돌 시장 미션 진행. stage: 통과한 단계 수(0~3).
+ * gen 이 바뀌면(문제·흐름 변경) 이전 테스트 진행을 버리고 1단계부터 다시 시작.
+ */
+export type IdolProgress = { stage: number; claimed: boolean; gen?: number };
+
+/** QR·코드/정답만 입력 흐름으로 바뀐 뒤 진행도 초기화용 */
+const IDOL_PROGRESS_GEN = 2;
 
 type UserRewardState = {
   progress: RewardProgress;
@@ -206,13 +212,23 @@ type UserRewardState = {
 
 const IDOL_KEY = "user_idol_progress_v1";
 
+function normalizeIdolProgress(raw?: Partial<IdolProgress> | null): IdolProgress {
+  if (!raw || raw.gen !== IDOL_PROGRESS_GEN) {
+    return { stage: 0, claimed: false, gen: IDOL_PROGRESS_GEN };
+  }
+  return {
+    stage: Math.max(0, Number(raw.stage) || 0),
+    claimed: Boolean(raw.claimed),
+    gen: IDOL_PROGRESS_GEN,
+  };
+}
+
 export function loadIdolProgress(userId = rewardUserId()): IdolProgress {
-  const saved = readMap<IdolProgress>(IDOL_KEY)[userId];
-  return { stage: saved?.stage ?? 0, claimed: Boolean(saved?.claimed) };
+  return normalizeIdolProgress(readMap<IdolProgress>(IDOL_KEY)[userId]);
 }
 
 export function saveIdolProgress(progress: IdolProgress, userId = rewardUserId()) {
-  writeMapEntry(IDOL_KEY, userId, progress);
+  writeMapEntry(IDOL_KEY, userId, normalizeIdolProgress(progress));
   scheduleRewardSync();
 }
 
@@ -413,10 +429,15 @@ function mergeUserState(local: UserRewardState, remote: Partial<UserRewardState>
     progress,
     ledger,
     coupons,
-    idol: {
-      stage: Math.max(local.idol.stage, remote.idol?.stage ?? 0),
-      claimed: local.idol.claimed || Boolean(remote.idol?.claimed),
-    },
+    idol: (() => {
+      const localIdol = normalizeIdolProgress(local.idol);
+      const remoteIdol = normalizeIdolProgress(remote.idol);
+      return {
+        stage: Math.max(localIdol.stage, remoteIdol.stage),
+        claimed: localIdol.claimed || remoteIdol.claimed,
+        gen: IDOL_PROGRESS_GEN,
+      };
+    })(),
     meta: {
       base: Math.max(local.meta.base, remote.meta?.base ?? 0),
       paid: union(local.meta.paid, remote.meta?.paid),
@@ -437,7 +458,18 @@ async function syncUserOnce(userId: string) {
   const remote = (data?.payload ?? undefined) as Partial<UserRewardState> | undefined;
   const merged = mergeUserState(local, remote);
   writeUserState(userId, merged);
-  const remoteNormalized = remote ? mergeUserState({ progress: emptyProgress(), meta: { base: 0, paid: [] }, ledger: [], coupons: [], idol: { stage: 0, claimed: false } }, remote) : undefined;
+  const remoteNormalized = remote
+    ? mergeUserState(
+        {
+          progress: emptyProgress(),
+          meta: { base: 0, paid: [] },
+          ledger: [],
+          coupons: [],
+          idol: { stage: 0, claimed: false, gen: IDOL_PROGRESS_GEN },
+        },
+        remote,
+      )
+    : undefined;
   if (remoteNormalized && JSON.stringify(remoteNormalized) === JSON.stringify(merged)) return;
   await client.from(TABLE).upsert({ id, payload: merged, updated_at: new Date().toISOString() }, { onConflict: "id" });
 }

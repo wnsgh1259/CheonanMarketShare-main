@@ -2,6 +2,7 @@ import type { MarketId } from "../components/CartContext";
 import { STORES_BY_MARKET } from "../data/storeData";
 import { loadOwnerCatalog } from "../data/ownerStoreData";
 import { loadAdminDeletedStoreIds } from "../data/deletedStoreIds";
+import { isDemoNavStore } from "../data/navTestMenus";
 import { syntheticSeedStoreId } from "../data/seedStoreIds";
 import { pickStoreDisplayLatLng } from "./storeMapPlacement";
 
@@ -37,19 +38,21 @@ export function getMarketStorePins(marketId: MarketId): MarketStorePin[] {
 
   for (const store of seed) {
     const syntheticId = syntheticSeedStoreId(marketId, store.id);
-    if (deleted.has(syntheticId)) continue;
+    const demoStore = isDemoNavStore(marketId, store.id);
+    // 시연 상점은 삭제돼도 핀·경로에 유지 (장바구니 검색과 동일)
+    if (deleted.has(syntheticId) && !demoStore) continue;
     const byId = draftBySyntheticIdAll.get(syntheticId);
     // 관리자에서 다른 시장으로 옮긴 시드 상점은 이 시장에서 제외 (관리자 목록과 동일)
-    if (byId && byId.marketId && byId.marketId !== marketId) continue;
+    if (byId && byId.marketId && byId.marketId !== marketId && !demoStore) continue;
     const draft = byId ?? draftByName.get(store.name);
 
     if (draft && typeof draft.id === "number") usedDraftIds.add(draft.id);
 
-    const { lat, lng } = pickStoreDisplayLatLng(marketId, store, draft);
-    // 라우팅·상점연결은 시드 id를 기준으로 통일 (장바구니/맵과 동일)
+    // 시연 상점은 시드 좌표·이름 고정 (옛 초안 좌표에 경로가 붙는 일 방지)
+    const { lat, lng } = pickStoreDisplayLatLng(marketId, store, demoStore ? null : draft);
     pins.push({
       id: store.id,
-      name: draft?.name ?? store.name,
+      name: demoStore ? store.name : (draft?.name ?? store.name),
       lat,
       lng,
     });

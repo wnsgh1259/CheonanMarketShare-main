@@ -17,6 +17,7 @@ import {
   isPlaceholderLocation,
   isPlaceholderStoreName,
   normalizeStoreCategory,
+  normalizeStoreNameKey,
   type CategoryKey, type StoreData, type MenuItem,
 } from "../data/storeData";
 import {
@@ -28,8 +29,10 @@ import {
   loadAdminDeletedStoreIds,
   refreshDeletedStoreIdsFromRemote,
 } from "../data/deletedStoreIds";
+import { isDemoNavStore, withNavTestMenus } from "../data/navTestMenus";
 import { syntheticSeedStoreId } from "../data/seedStoreIds";
 import { buildFacilityMarkerIcon, buildStoreMarkerIcon } from "../map/naverMarkerIcons";
+import { getMarketStorePins } from "../map/marketStorePins";
 import { MARKET_VIEW_CONFIG, pickStoreDisplayLatLng, toStoreLatLng } from "../map/storeMapPlacement";
 import { clearMarketAreaOverlays, drawMarketAreaOverlays, type MarketAreaOverlays } from "../map/drawMarketArea";
 import { hydrateMarketArea, resolveMarketView } from "../data/marketArea";
@@ -225,13 +228,13 @@ function draftOnlyToStoreData(drafts: DraftStorePin[], marketId: MarketId): impo
   const seedSyntheticIds = new Set(
     STORES_BY_MARKET[marketId].map((s) => syntheticSeedStoreId(marketId, s.id)),
   );
-  const seedNames = new Set(STORES_BY_MARKET[marketId].map((s) => s.name));
+  const seedNames = new Set(STORES_BY_MARKET[marketId].map((s) => normalizeStoreNameKey(s.name)));
 
   return drafts
     .filter((d) => {
       if (typeof d.id !== "number") return false;
       if (seedSyntheticIds.has(d.id)) return false;
-      if (seedNames.has(d.name)) return false;
+      if (seedNames.has(normalizeStoreNameKey(d.name))) return false;
       // 테스트용 이름(1, 2, 트라이 등)은 지도·검색에 올리지 않음
       if (isPlaceholderStoreName(d.name)) return false;
       return true;
@@ -763,15 +766,30 @@ function NaverMarketMap({
       }),
     );
 
+    // 저장된 좌표 대신 현재 상점 핀에 맞춰 번호 마커를 찍어 상점과 어긋나지 않게 함
+    const livePins = getMarketStorePins(selectedMarket);
     activeNavRoute.stops.forEach((stop) => {
+      const pin = livePins.find((p) => p.id === stop.storeId);
+      const lat = pin?.lat ?? stop.lat;
+      const lng = pin?.lng ?? stop.lng;
+      const label = pin?.name || stop.storeName || `${stop.order}번`;
+      const safeLabel = label
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/"/g, "&quot;");
+      const color = activeNavRoute.lineColor;
       routeStopMarkersRef.current.push(
         new naver.maps.Marker({
           map,
-          position: new naver.maps.LatLng(stop.lat, stop.lng),
+          position: new naver.maps.LatLng(lat, lng),
           zIndex: 91,
+          title: label,
           icon: {
-            content: `<div style="width:24px;height:24px;border-radius:999px;background:${activeNavRoute.lineColor};color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.25);">${stop.order}</div>`,
-            anchor: new naver.maps.Point(12, 12),
+            content: `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;transform:translateY(-4px);">
+              <div style="width:26px;height:26px;border-radius:999px;background:${color};color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.28);">${stop.order}</div>
+              <div style="max-width:110px;padding:2px 6px;border-radius:8px;background:rgba(255,255,255,.95);color:#1f2937;font-size:10px;font-weight:700;line-height:1.2;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.18);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${safeLabel}</div>
+            </div>`,
+            anchor: new naver.maps.Point(13, 13),
           },
         }),
       );
@@ -979,8 +997,24 @@ export function MapPage() {
       setSharedFacilities((merged.facilities ?? []) as DraftFacilityPin[]);
     };
     void load();
+
+    // 관리자에서 상점 삭제한 뒤 지도로 돌아올 때 삭제 목록을 다시 맞춤
+    const syncDeleted = () => {
+      setDeletedStoreIds(loadAdminDeletedStoreIds());
+    };
+    const onVis = () => {
+      if (document.visibilityState === "visible") {
+        void refreshDeletedStoreIdsFromRemote().then(() => {
+          if (!cancelled) syncDeleted();
+        });
+      }
+    };
+    window.addEventListener("focus", syncDeleted);
+    document.addEventListener("visibilitychange", onVis);
     return () => {
       cancelled = true;
+      window.removeEventListener("focus", syncDeleted);
+      document.removeEventListener("visibilitychange", onVis);
     };
   }, []);
 
@@ -999,10 +1033,30 @@ export function MapPage() {
     const maps = buildDraftOverridesForMarket(rawDrafts, selectedMarket);
 
     // 기존 시드 상점 (draft 오버라이드 적용) — 관리자 삭제분 제외
+    // 시연(사과·삼겹살·대파) 상점은 삭제돼도 지도·경로에 유지
     const seedStores = STORES_BY_MARKET[selectedMarket]
-      .filter((store) => !deleted.has(syntheticSeedStoreId(selectedMarket, store.id)))
+      .filter((store) => {
+        const syn = syntheticSeedStoreId(selectedMarket, store.id);
+        if (isDemoNavStore(selectedMarket, store.id)) return true;
+        return !deleted.has(syn) && !deleted.has(store.id);
+      })
       .map((store) => {
+      const demoStore = isDemoNavStore(selectedMarket, store.id);
       const override = resolveDraftOverride(selectedMarket, store, maps);
+      if (demoStore) {
+        const pos = pickStoreDisplayLatLng(selectedMarket, store, null);
+        return {
+          ...store,
+          lat: pos.lat,
+          lng: pos.lng,
+          image: override?.image || store.image,
+          menus: withNavTestMenus(
+            selectedMarket,
+            store.id,
+            ensureStoreMenus(store.name, store.category, store.menus, `j${store.id}`),
+          ),
+        };
+      }
       if (!override) {
         const pos = pickStoreDisplayLatLng(selectedMarket, store);
         return { ...store, lat: pos.lat, lng: pos.lng };

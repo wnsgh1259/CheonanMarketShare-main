@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import {
   ChevronLeft, Zap, Trash2, ShoppingCart,
   Search, CheckCircle2, PlusCircle, X, ChevronDown, ChevronUp, Route,
-  Minus, Plus,
+  Minus, Plus, Package,
 } from "lucide-react";
 import { useCart } from "../components/CartContext";
 import type { CartItem, MarketId } from "../components/CartContext";
@@ -16,6 +16,19 @@ import {
   type ProductSearchGroup,
   type ProductStoreOffer,
 } from "../data/productSearch";
+import { readAuthSession } from "../data/authSession";
+import {
+  PICKUP_ORDERS_CHANGED,
+  cancelPickupOrder,
+  createPickupOrders,
+  formatPickupItemsSummary,
+  listPickupOrdersForCustomer,
+  pickupOrderTotal,
+  pickupStatusLabel,
+  resolveCustomerPickupKey,
+  updatePickupCustomerMessage,
+  type PickupOrder,
+} from "../data/pickupOrders";
 
 const MARKET_NAMES: Record<MarketId, string> = {
   jungang: "천안중앙시장",
@@ -503,6 +516,14 @@ export function CartPage() {
     currentMarketId, addItem, switchMarketAndAdd,
   } = useCart();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [pickupModalOpen, setPickupModalOpen] = useState(false);
+  const [pickupMessage, setPickupMessage] = useState("");
+  const [pickupNotice, setPickupNotice] = useState("");
+  const [editingPickupId, setEditingPickupId] = useState<string | null>(null);
+  const [myPickups, setMyPickups] = useState<PickupOrder[]>(() => {
+    const session = readAuthSession();
+    return listPickupOrdersForCustomer(resolveCustomerPickupKey(session.phone));
+  });
 
   const [searchMarket, setSearchMarket] = useState<MarketId>(currentMarketId ?? "jungang");
   const [productQuery, setProductQuery] = useState("");
@@ -537,6 +558,97 @@ export function CartPage() {
     setConflictMsg("");
     setResultsCollapsed(false);
     setRecipeListOpen(false);
+  };
+
+  const refreshMyPickups = () => {
+    const session = readAuthSession();
+    setMyPickups(listPickupOrdersForCustomer(resolveCustomerPickupKey(session.phone)));
+  };
+
+  useEffect(() => {
+    refreshMyPickups();
+    const onChange = () => refreshMyPickups();
+    window.addEventListener(PICKUP_ORDERS_CHANGED, onChange);
+    window.addEventListener("storage", onChange);
+    window.addEventListener("focus", onChange);
+    return () => {
+      window.removeEventListener(PICKUP_ORDERS_CHANGED, onChange);
+      window.removeEventListener("storage", onChange);
+      window.removeEventListener("focus", onChange);
+    };
+  }, []);
+
+  const pickupableItems = useMemo(
+    () => items.filter((item) => !item.unresolved && item.storeId > 0 && item.storeName.trim()),
+    [items],
+  );
+
+  const requestedPickups = useMemo(
+    () => myPickups.filter((o) => o.status === "requested"),
+    [myPickups],
+  );
+
+  const openEditPickup = (order: PickupOrder) => {
+    setEditingPickupId(order.id);
+    setPickupMessage(order.customerMessage || "");
+    setPickupModalOpen(true);
+  };
+
+  const handleCancelPickup = (orderId: string) => {
+    cancelPickupOrder(orderId);
+    refreshMyPickups();
+    setPickupNotice("픽업 요청을 취소했어요.");
+  };
+
+  const submitPickupRequest = () => {
+    // 메시지 수정 모드
+    if (editingPickupId) {
+      updatePickupCustomerMessage(editingPickupId, pickupMessage);
+      setEditingPickupId(null);
+      setPickupMessage("");
+      setPickupModalOpen(false);
+      refreshMyPickups();
+      setPickupNotice("픽업 요청 메시지를 수정했어요.");
+      return;
+    }
+
+    if (pickupableItems.length === 0) {
+      setPickupNotice("상점이 지정된 상품만 픽업 요청할 수 있어요.");
+      setPickupModalOpen(false);
+      return;
+    }
+    const session = readAuthSession();
+    const customerKey = resolveCustomerPickupKey(session.phone);
+    const marketId = (currentMarketId ?? pickupableItems[0]?.marketId ?? "jungang") as MarketId;
+    const byStore = new Map<string, typeof pickupableItems>();
+    for (const item of pickupableItems) {
+      const key = `${item.storeId}::${item.storeName}`;
+      const list = byStore.get(key) ?? [];
+      list.push(item);
+      byStore.set(key, list);
+    }
+    const groups = [...byStore.entries()].map(([, storeItems]) => ({
+      storeId: storeItems[0].storeId,
+      storeName: storeItems[0].storeName,
+      items: storeItems.map((item) => ({
+        menuId: item.id,
+        menuName: item.name,
+        quantity: item.quantity,
+        price: item.price,
+      })),
+    }));
+    createPickupOrders({
+      marketId,
+      customerName: session.name || "손님",
+      customerPhone: customerKey,
+      customerMessage: pickupMessage,
+      groups,
+    });
+    setPickupMessage("");
+    setPickupModalOpen(false);
+    refreshMyPickups();
+    setPickupNotice("픽업 요청이 접수됐어요. 사장님 확인을 기다려 주세요.");
+    for (const item of pickupableItems) removeItem(item.id);
   };
 
   // 폰/PC에서 삭제한 상점이 검색·경로에 다시 안 뜨도록 동기화
@@ -693,10 +805,7 @@ export function CartPage() {
       <main className="relative z-10">
       {/* Product search */}
       <div className="mx-4 mt-3 rounded-2xl border border-[#E5D9CB] bg-white p-4 shadow-[0_8px_24px_-22px_rgba(70,53,44,0.28)]">
-        <h2 className="text-[14px] text-[#46352C] mb-1">상품 검색</h2>
-        <p className="text-[12px] text-[#8A776B] mb-3">
-          사고 싶은 상품을 검색한 뒤, 상점을 고르거나 상점 무관으로 담으세요
-        </p>
+        <h2 className="text-[14px] text-[#46352C] mb-3">상품 검색</h2>
 
         {!currentMarketId && (
           <div className="flex gap-1.5 mb-2.5 overflow-x-auto">
@@ -775,15 +884,21 @@ export function CartPage() {
                       >
                         <div className="min-w-0">
                           <p className="text-[13px] text-[#46352C] font-medium truncate">{group.productName}</p>
-                          <p className="text-[11px] text-[#8A776B]">상점 무관 · 최저 {group.minPrice.toLocaleString()}원~</p>
+                          <p className="text-[11px] text-[#8A776B]">
+                            상점 무관 · {group.offers.length}곳 ·{" "}
+                            {group.minPrice === group.maxPrice
+                              ? `${group.minPrice.toLocaleString()}원`
+                              : `${group.minPrice.toLocaleString()}~${group.maxPrice.toLocaleString()}원`}
+                          </p>
                         </div>
                         <span className={`text-[11px] shrink-0 ${unresolvedAdded ? "text-[#0EA5E9]" : "text-[#6B5142]"}`}>
                           {unresolvedAdded ? "담김" : "담기"}
                         </span>
                       </button>
 
-                      {group.offers.map((offer) => {
+                      {group.offers.map((offer, offerIdx) => {
                         const added = cartIdSet.has(offer.menuId);
+                        const isCheapest = offerIdx === 0 && group.offers.length > 1;
                         return (
                           <button
                             key={`${offer.storeId}-${offer.menuId}`}
@@ -795,7 +910,9 @@ export function CartPage() {
                           >
                             <div className="min-w-0 pl-1">
                               <p className="text-[13px] text-[#46352C] truncate">{offer.storeName}</p>
-                              {offer.originalPrice != null && offer.originalPrice > offer.price ? (
+                              {isCheapest ? (
+                                <p className="text-[11px] text-emerald-600">최저가</p>
+                              ) : offer.originalPrice != null && offer.originalPrice > offer.price ? (
                                 <p className="text-[11px] text-emerald-600">할인중</p>
                               ) : (
                                 <p className="text-[11px] text-[#8A776B]">등록 메뉴</p>
@@ -942,6 +1059,26 @@ export function CartPage() {
                 <span className="text-[18px] text-[#46352C]">{totalPrice.toLocaleString()}원</span>
               </div>
             )}
+            {pickupableItems.length > 0 && requestedPickups.length === 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingPickupId(null);
+                  setPickupMessage("");
+                  setPickupNotice("");
+                  setPickupModalOpen(true);
+                }}
+                className="mt-3 flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-[#5B4335] text-white text-[14px] font-semibold active:bg-[#6B5142]"
+              >
+                <Package className="w-4 h-4" />
+                픽업하기
+              </button>
+            )}
+            {items.some((i) => i.unresolved) && (
+              <p className="mt-2 text-[11px] text-amber-600 text-center">
+                상점 미지정 상품은 픽업 요청에서 제외돼요.
+              </p>
+            )}
             <Link
               to="/map"
               className="mt-3 flex items-center justify-center w-full py-2.5 border border-dashed border-[#E5D9CB] rounded-lg text-[13px] text-[#6B5142]"
@@ -951,6 +1088,74 @@ export function CartPage() {
           </>
         )}
       </div>
+
+      {/* 픽업 요청 현황 — 요청중이면 상태·수정·취소 버튼 유지 */}
+      {myPickups.length > 0 && (
+        <div className="mx-4 mt-3 rounded-2xl border border-[#E5D9CB] bg-white p-4 shadow-[0_8px_24px_-22px_rgba(70,53,44,0.28)]">
+          <div className="flex items-center gap-2 mb-3">
+            <Package className="w-4 h-4 text-[#A9652D]" />
+            <h2 className="text-[14px] text-[#46352C]">픽업 요청 현황</h2>
+          </div>
+          <div className="space-y-2.5">
+            {myPickups.slice(0, 8).map((order) => (
+              <div key={order.id} className="rounded-xl bg-[#F7F5F1] p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold text-[#46352C] truncate">{order.storeName}</p>
+                    <p className="text-[11px] text-[#6B5142] mt-0.5">{formatPickupItemsSummary(order)}</p>
+                  </div>
+                  <span
+                    className={`shrink-0 text-[11px] font-semibold px-2 py-1 rounded-full ${
+                      order.status === "requested"
+                        ? "bg-amber-100 text-amber-800"
+                        : order.status === "accepted"
+                          ? "bg-emerald-100 text-emerald-800"
+                          : "bg-red-100 text-red-700"
+                    }`}
+                  >
+                    {pickupStatusLabel(order.status)}
+                  </span>
+                </div>
+                <p className="text-[12px] text-[#46352C] mt-1.5">{pickupOrderTotal(order).toLocaleString()}원</p>
+                {order.customerMessage && (
+                  <p className="text-[11px] text-[#6B5142] mt-1">내 메시지: {order.customerMessage}</p>
+                )}
+                {order.ownerMessage && (
+                  <div className="mt-2 rounded-lg bg-white border border-[#E5D9CB] px-2.5 py-2">
+                    <p className="text-[10px] text-[#8A776B] mb-0.5">사장님 메시지</p>
+                    <p className="text-[12px] text-[#46352C] whitespace-pre-wrap">{order.ownerMessage}</p>
+                  </div>
+                )}
+                {order.status === "requested" && (
+                  <div className="mt-3 grid grid-cols-[1.2fr_1fr_1fr] gap-2">
+                    <div className="flex items-center justify-center h-10 rounded-xl bg-amber-100 text-amber-900 text-[12px] font-semibold">
+                      픽업요청중
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openEditPickup(order)}
+                      className="h-10 rounded-xl border border-[#E5D9CB] bg-white text-[13px] font-medium text-[#5B4335] active:bg-[#F7F2E8]"
+                    >
+                      수정
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCancelPickup(order.id)}
+                      className="h-10 rounded-xl bg-red-50 text-[13px] font-medium text-red-600 border border-red-100 active:bg-red-100"
+                    >
+                      취소
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {pickupNotice && (
+        <p className="mx-4 mt-2 text-[12px] text-emerald-700 text-center">{pickupNotice}</p>
+      )}
 
       {/* Quick Shopping */}
       <div className="bg-white mx-4 mt-3 rounded-2xl p-4 ring-1 ring-inset ring-[#EAE8DF] shadow-[0_8px_24px_-22px_rgba(70,53,44,0.28)]">
@@ -1150,7 +1355,7 @@ export function CartPage() {
           <h2 className="text-[14px] text-[#46352C]">맞춤형 경로 추천</h2>
         </div>
         <p className="text-[12px] text-[#6B5142] mb-4">
-          장바구니 상품 기반으로 3가지 최적 동선을 계산해요
+          상점 무관으로 담으면 최저가 · 최단거리 · 추천 경로가 서로 다르게 나와요
         </p>
         <RouteRecommendation items={items} marketId={currentMarketId as MarketId | null} />
       </div>
@@ -1189,6 +1394,57 @@ export function CartPage() {
                 className="flex-1 py-3.5 text-[14px] font-semibold text-red-500 active:bg-red-50 transition-colors"
               >
                 초기화
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* 픽업 요청/수정 팝업 */}
+      {pickupModalOpen && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/40 z-[200]"
+            onClick={() => {
+              setPickupModalOpen(false);
+              setEditingPickupId(null);
+            }}
+          />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[210] w-[min(320px,calc(100vw-32px))] bg-white rounded-[24px] shadow-2xl ring-1 ring-inset ring-[#EAE8DF] overflow-hidden">
+            <div className="px-5 pt-5 pb-4">
+              <p className="text-[16px] font-bold text-[#46352C] text-center mb-1">
+                {editingPickupId ? "픽업 요청 수정" : "픽업요청을 하시겠습니까?"}
+              </p>
+              <p className="text-[12px] text-[#6B5142] text-center mb-3">
+                {editingPickupId
+                  ? "사장님께 전할 메시지를 수정할 수 있어요"
+                  : `${pickupableItems.length}개 상품 · ${new Set(pickupableItems.map((i) => i.storeName)).size}개 상점`}
+              </p>
+              <textarea
+                value={pickupMessage}
+                onChange={(e) => setPickupMessage(e.target.value)}
+                placeholder="사장님께 전할 메시지 (예: 오후 5시쯤 찾으러 갈게요)"
+                rows={3}
+                className="w-full rounded-xl border border-[#E5D9CB] bg-[#F7F5F1] px-3 py-2.5 text-[13px] text-[#46352C] placeholder:text-[#9A897F] focus:outline-none focus:ring-2 focus:ring-[#B89A7D] resize-none"
+              />
+            </div>
+            <div className="flex border-t border-[#EDE5D8]">
+              <button
+                type="button"
+                onClick={() => {
+                  setPickupModalOpen(false);
+                  setEditingPickupId(null);
+                }}
+                className="flex-1 py-3.5 text-[14px] text-[#6B5142] active:bg-[#FAF0E3] transition-colors border-r border-[#EDE5D8]"
+              >
+                닫기
+              </button>
+              <button
+                type="button"
+                onClick={submitPickupRequest}
+                className="flex-1 py-3.5 text-[14px] font-semibold text-[#5B4335] active:bg-[#F7F2E8] transition-colors"
+              >
+                {editingPickupId ? "저장" : "확인"}
               </button>
             </div>
           </div>

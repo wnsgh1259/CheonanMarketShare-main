@@ -25,8 +25,10 @@ import {
   loadAdminDeletedStoreIds,
   markStoreDeleted,
   refreshDeletedStoreIdsFromRemote,
+  setDeletedStoreIds,
   unmarkStoreDeleted,
 } from "../data/deletedStoreIds";
+import { isDemoNavStore, NAV_TEST_MENUS } from "../data/navTestMenus";
 import { AdminRewardPanel } from "../components/AdminRewardPanel";
 import { refreshSubmissions } from "../data/rewards";
 import { refreshSnsPromos } from "../data/snsPromo";
@@ -58,6 +60,7 @@ import {
   isPlaceholderLocation,
   isPlaceholderStoreName,
   normalizeStoreCategory,
+  normalizeStoreNameKey,
   type StoreData,
 } from "../data/storeData";
 import { SEED_MARKET_ORDER, syntheticSeedStoreId } from "../data/seedStoreIds";
@@ -588,14 +591,67 @@ export function AdminPage() {
     })),
   });
 
+  /** 시드와 같은 이름의 중복 초안 상점을 카탈로그에서 제거 */
+  const purgeDuplicateNamedDrafts = (catalog: ReturnType<typeof loadOwnerCatalog>) => {
+    const stores = catalog.stores ?? [];
+    if (stores.length === 0) return catalog;
+    const seedKeys = new Set<string>();
+    for (const marketId of SEED_MARKET_ORDER) {
+      for (const seed of STORES_BY_MARKET[marketId] ?? []) {
+        const key = normalizeStoreNameKey(seed.name);
+        if (key) seedKeys.add(`${marketId}::${key}`);
+      }
+    }
+    const seedSyn = new Set(
+      SEED_MARKET_ORDER.flatMap((marketId) =>
+        (STORES_BY_MARKET[marketId] ?? []).map((s) => syntheticSeedStoreId(marketId, s.id)),
+      ),
+    );
+    const seenDraftNames = new Set<string>();
+    const nextStores = stores.filter((store) => {
+      if (typeof store.id !== "number") return true;
+      if (seedSyn.has(store.id)) return true;
+      const market = store.marketId;
+      if (!market) return true;
+      const key = `${market}::${normalizeStoreNameKey(store.name)}`;
+      if (!normalizeStoreNameKey(store.name) || isPlaceholderStoreName(store.name)) return true;
+      // 시드와 이름 충돌하는 초안은 제거
+      if (seedKeys.has(key)) return false;
+      // 초안끼리 같은 이름이면 먼저 나온 것만 유지
+      if (seenDraftNames.has(key)) return false;
+      seenDraftNames.add(key);
+      return true;
+    });
+    if (nextStores.length === stores.length) return catalog;
+    const next = { ...catalog, stores: nextStores };
+    saveOwnerCatalog(next);
+    return next;
+  };
+
+  /** 시연용 시드 상점(사과·삼겹살·대파)이 삭제 목록에 있으면 복구 — 관리자 핀이 안 뜨는 문제 방지 */
+  const restoreDemoStoresFromDeleted = (deleted: Set<number>) => {
+    const keep = new Set(deleted);
+    let changed = false;
+    for (const marketId of SEED_MARKET_ORDER) {
+      const demoIds = Object.keys(NAV_TEST_MENUS[marketId] ?? {}).map(Number);
+      for (const seedId of demoIds) {
+        const syn = syntheticSeedStoreId(marketId, seedId);
+        if (keep.delete(syn) || keep.delete(seedId)) changed = true;
+      }
+    }
+    if (!changed) return deleted;
+    const saved = setDeletedStoreIds(keep);
+    return new Set(saved.ids);
+  };
+
   useEffect(() => {
     migrateLegacyOwnerDraftIfNeeded();
     let cancelled = false;
     const load = async () => {
-      const deleted = await refreshDeletedStoreIdsFromRemote();
+      const deleted = restoreDemoStoresFromDeleted(await refreshDeletedStoreIdsFromRemote());
       if (cancelled) return;
       setDeletedIds(deleted);
-      const merged = await refreshOwnerCatalogFromRemote();
+      const merged = purgeDuplicateNamedDrafts(await refreshOwnerCatalogFromRemote());
       if (cancelled) return;
       setDraft(normalizeCatalogDraft(merged));
     };
@@ -609,11 +665,11 @@ export function AdminPage() {
     if (adminPanelView !== "market") return;
     let cancelled = false;
     const refreshMarketData = async () => {
-      const deleted = await refreshDeletedStoreIdsFromRemote();
+      const deleted = restoreDemoStoresFromDeleted(await refreshDeletedStoreIdsFromRemote());
       if (cancelled) return;
       setDeletedIds(deleted);
       const [catalog, applications] = await Promise.all([
-        refreshOwnerCatalogFromRemote(),
+        refreshOwnerCatalogFromRemote().then(purgeDuplicateNamedDrafts),
         refreshOwnerSignupApplicationsFromRemote(),
       ]);
       if (cancelled) return;
@@ -776,7 +832,39 @@ export function AdminPage() {
       });
     });
 
-    return Array.from(byId.values());
+    // 같은 시장·같은 상점명은 하나만 유지 (시드 상점 우선)
+    const groups = new Map<string, DraftStore[]>();
+    for (const store of byId.values()) {
+      const market = store.marketId ?? "jungang";
+      const nameKey = normalizeStoreNameKey(store.name);
+      if (!nameKey || isPlaceholderStoreName(store.name)) {
+        const fallbackKey = `${market}::__id_${store.id}`;
+        groups.set(fallbackKey, [store]);
+        continue;
+      }
+      const key = `${market}::${nameKey}`;
+      const list = groups.get(key) ?? [];
+      list.push(store);
+      groups.set(key, list);
+    }
+    const deduped: DraftStore[] = [];
+    for (const group of groups.values()) {
+      if (group.length === 1) {
+        deduped.push(group[0]);
+        continue;
+      }
+      const market = (group[0].marketId ?? "jungang") as MarketId;
+      const seedSyn = new Set(
+        (STORES_BY_MARKET[market] ?? []).map((s) => syntheticSeedStoreId(market, s.id)),
+      );
+      const seedHit = group.find((s) => seedSyn.has(s.id));
+      if (seedHit) {
+        deduped.push(seedHit);
+        continue;
+      }
+      deduped.push([...group].sort((a, b) => a.id - b.id)[0]);
+    }
+    return deduped;
   }, [dummyStores, draft.stores, signupApplications, storeAccounts]);
 
   const handleApproveSignup = (application: OwnerSignupApplication) => {
@@ -949,9 +1037,13 @@ export function AdminPage() {
     setStoreAccounts(Object.fromEntries(accounts.map((item) => [item.storeId, item])));
   }, [mergedStores]);
 
-  const storesBySelectedMarket = mergedStores.filter(
-    (store) => store.marketId === selectedMarket && !deletedIds.has(store.id),
-  );
+  const storesBySelectedMarket = mergedStores.filter((store) => {
+    if (store.marketId !== selectedMarket) return false;
+    if (!deletedIds.has(store.id)) return true;
+    // 시연 상점은 삭제돼 있어도 관리자 목록·핀에 유지
+    const seedId = store.id >= 10000 ? store.id % 10000 : store.id;
+    return isDemoNavStore(selectedMarket, seedId) && syntheticSeedStoreId(selectedMarket, seedId) === store.id;
+  });
   const facilitiesBySelectedMarket = (draft.facilities ?? []).filter(
     (facility) => facility.marketId === selectedMarket,
   );
@@ -1405,11 +1497,27 @@ export function AdminPage() {
       window.alert("좌표는 숫자로 입력해주세요.");
       return;
     }
+    const nextName = editForm.name.trim();
+    const nameKey = normalizeStoreNameKey(nextName);
+    const marketOfStore = selectedStore.marketId ?? selectedMarket;
+    if (
+      nameKey &&
+      !isPlaceholderStoreName(nextName) &&
+      mergedStores.some(
+        (s) =>
+          s.id !== selectedStore.id &&
+          (s.marketId ?? selectedMarket) === marketOfStore &&
+          normalizeStoreNameKey(s.name) === nameKey,
+      )
+    ) {
+      window.alert("같은 시장에 이미 같은 상점명이 있어요.");
+      return;
+    }
     const nextStores = draft.stores.map((store) =>
       store.id === selectedStore.id
         ? {
             ...store,
-            name: editForm.name.trim(),
+            name: nextName,
             category: editForm.category.trim(),
             location: editForm.location.trim(),
             phone: editForm.phone.trim(),
@@ -1463,6 +1571,19 @@ export function AdminPage() {
 
     if (!storeName) {
       setSettingsError("상점명을 입력해주세요.");
+      return;
+    }
+    const nameKey = normalizeStoreNameKey(storeName);
+    const marketOfTarget =
+      mergedStores.find((s) => s.id === settingsTarget.id)?.marketId ?? selectedMarket;
+    const nameTaken = mergedStores.some(
+      (s) =>
+        s.id !== settingsTarget.id &&
+        (s.marketId ?? selectedMarket) === marketOfTarget &&
+        normalizeStoreNameKey(s.name) === nameKey,
+    );
+    if (nameTaken) {
+      setSettingsError("같은 시장에 이미 같은 상점명이 있어요.");
       return;
     }
     if (!phoneDigits) {

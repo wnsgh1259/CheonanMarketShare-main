@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   IDOL,
+  IDOL_DEFAULT_STAGES,
   drawIdolWinner,
   loadIdolConfig,
   loadIdolTickets,
@@ -32,7 +33,7 @@ export function AdminIdolPanel() {
     void reload();
   }, []);
 
-  const update = (index: number, patch: Partial<IdolStage>) => {
+  const update = (index: number, patch: Partial<Pick<IdolStage, "code" | "answer">>) => {
     setStages((prev) => prev.map((stage, i) => (i === index ? { ...stage, ...patch } : stage)));
     setNotice("");
   };
@@ -42,13 +43,24 @@ export function AdminIdolPanel() {
       setNotice("코드는 숫자 4자리로 입력해 주세요.");
       return;
     }
-    if (stages.some((stage) => !stage.answer.trim() || !stage.question.trim() || !stage.hint.trim())) {
-      setNotice("힌트, 문제, 정답을 모두 입력해 주세요.");
+    if (stages.some((stage) => !stage.answer.trim())) {
+      setNotice("정답을 입력해 주세요.");
       return;
     }
+    // 문제·힌트는 시장 QR용 — 관리자에선 코드·정답만 저장하고 나머지는 기본값 유지
+    const next = stages.map((stage, index) => {
+      const base = IDOL_DEFAULT_STAGES[index] ?? stage;
+      return {
+        hint: base.hint,
+        question: base.question,
+        code: stage.code,
+        answer: stage.answer.trim(),
+      };
+    });
     setBusy(true);
-    await saveIdolConfig(stages);
+    await saveIdolConfig(next);
     setBusy(false);
+    setStages(next);
     setNotice("저장했어요.");
   };
 
@@ -69,12 +81,16 @@ export function AdminIdolPanel() {
       <div className="rounded-xl bg-white p-4 space-y-2">
         <div className="flex items-center justify-between">
           <p className="text-[13px] font-semibold text-gray-800">{IDOL.name} 굿즈 추첨</p>
-          <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-600">추첨권 {ticketCount}장</span>
+          <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-600">
+            추첨권 {ticketCount}장
+          </span>
         </div>
         {winner && (
           <div className="rounded-xl bg-amber-50 px-3 py-2.5">
             <p className="text-[11px] text-amber-600">당첨자</p>
-            <p className="text-[14px] font-semibold text-gray-800">{winner.name} · {maskUser(winner.userId)}</p>
+            <p className="text-[14px] font-semibold text-gray-800">
+              {winner.name} · {maskUser(winner.userId)}
+            </p>
           </div>
         )}
         <button
@@ -87,28 +103,16 @@ export function AdminIdolPanel() {
         </button>
       </div>
 
+      <p className="px-1 text-[12px] text-gray-500">
+        문제는 시장 QR로 안내해요. 여기에는 단계별 코드와 정답만 등록하세요.
+      </p>
+
       {stages.map((stage, index) => (
         <div key={index} className="rounded-xl bg-white p-4 space-y-2">
           <p className="text-[13px] font-semibold text-gray-800">{index + 1}단계</p>
-          <label className="block text-[11px] text-gray-400">
-            힌트 (아이돌이 말해요)
-            <textarea
-              value={stage.hint}
-              onChange={(event) => update(index, { hint: event.target.value })}
-              className="mt-1 h-16 w-full rounded-xl bg-gray-50 p-3 text-[13px] text-gray-800 outline-none"
-            />
-          </label>
-          <label className="block text-[11px] text-gray-400">
-            문제
-            <input
-              value={stage.question}
-              onChange={(event) => update(index, { question: event.target.value })}
-              className="mt-1 h-10 w-full rounded-xl bg-gray-50 px-3 text-[13px] text-gray-800 outline-none"
-            />
-          </label>
           <div className="grid grid-cols-2 gap-2">
             <label className="block text-[11px] text-gray-400">
-              시장에 붙일 코드 (4자리)
+              코드 (4자리)
               <input
                 value={stage.code}
                 inputMode="numeric"
@@ -136,7 +140,7 @@ export function AdminIdolPanel() {
         onClick={() => void handleSave()}
         className="h-11 w-full rounded-xl bg-violet-600 text-[13px] font-semibold text-white disabled:opacity-50"
       >
-        단계 내용 저장
+        코드·정답 저장
       </button>
     </div>
   );

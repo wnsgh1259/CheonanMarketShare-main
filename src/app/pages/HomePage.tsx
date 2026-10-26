@@ -321,18 +321,18 @@ export function HomePage() {
           <div className="mb-6 space-y-3">
             <Link
               to="/idol"
-              className="flex items-center gap-3 rounded-xl border border-[#F5C6D8] bg-[#FCE8F0] p-4 text-[#4A2A38] active:opacity-90"
+              className="flex items-center gap-3 rounded-xl border border-[#D4C4E8] bg-[#F3EEF9] p-4 text-[#3D3550] active:opacity-90"
             >
               <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-white/70 text-[22px]">{IDOL.emoji}</span>
               <div className="min-w-0 flex-1">
-                <p className="text-[14px] font-bold text-[#E85A8C]">{IDOL.name}의 시장 미션</p>
-                <p className="mt-0.5 text-[11px] text-[#8A5A6E]">
+                <p className="text-[14px] font-bold text-[#8B6BB8]">리센느의 시장 미션</p>
+                <p className="mt-0.5 text-[11px] text-[#6B5B82]">
                   {idolStage >= IDOL_STAGE_COUNT
                     ? "미션을 모두 풀었어요"
                     : `힌트를 찾아 문제를 풀면 포인트와 굿즈 추첨권 · ${idolStage}/${IDOL_STAGE_COUNT}`}
                 </p>
               </div>
-              <ChevronRight className="h-5 w-5 flex-shrink-0 text-[#E85A8C]" />
+              <ChevronRight className="h-5 w-5 flex-shrink-0 text-[#8B6BB8]" />
             </Link>
             <Link
               to="/profile?tab=events&section=sns"

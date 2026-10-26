@@ -1,6 +1,8 @@
 import type { MarketId } from "../components/CartContext";
+import { getMarketStorePins } from "../map/marketStorePins";
 import { MARKET_VIEW_CONFIG } from "../map/storeMapPlacement";
 import {
+  ensureStoreFrontNodes,
   haversineMeters,
   loadWalkPathGraphLocal,
   type WalkNode,
@@ -134,17 +136,15 @@ export function findEntranceNode(graph: WalkPathGraph): WalkNode | null {
 
 export function findStoreNode(graph: WalkPathGraph, storeId: number, storePos: LatLng): WalkNode | null {
   const linked = graph.nodes.find((n) => n.type === "store_front" && n.storeId === storeId);
-  if (linked) return linked;
-  let best: WalkNode | null = null;
-  let bestD = Infinity;
-  for (const n of graph.nodes) {
-    const d = haversineMeters(n, storePos);
-    if (d < bestD) {
-      bestD = d;
-      best = n;
+  if (linked) {
+    // 핀이 옮겨졌으면 최신 상점 좌표를 쓴다 (옛 store_front에 경로가 붙는 문제 방지)
+    if (haversineMeters(linked, storePos) > 3) {
+      return { ...linked, lat: storePos.lat, lng: storePos.lng };
     }
+    return linked;
   }
-  return best;
+  // 연결 노드가 없을 때 임의 상점/교차점으로 끌어가지 않음 — 호출측에서 상점 좌표 기준 스냅
+  return null;
 }
 
 export function findNearestGraphNode(
@@ -210,7 +210,12 @@ export function createRoutingContext(
   opts?: CreateRoutingOptions,
 ): RoutingContext {
   // 시드는 hydrateWalkPathGraph가 서버 확인 후에만 채움 (다른 기기 저장본 덮어쓰기 방지)
-  const graph = loadWalkPathGraphLocal(marketId);
+  // 현재 상점 핀과 store_front를 맞춰 경로가 엉뚱한 교차점으로 붙지 않게 함
+  const rawGraph = loadWalkPathGraphLocal(marketId);
+  const graph =
+    rawGraph.nodes.length > 0
+      ? ensureStoreFrontNodes(rawGraph, getMarketStorePins(marketId))
+      : rawGraph;
   const usable = graph.nodes.length > 0 && graph.edges.length > 0 ? graph : null;
   const view = MARKET_VIEW_CONFIG[marketId];
   const focus = focusFromPoints(marketId, opts?.focusPoints);

@@ -24,7 +24,8 @@ export function isNavTestMenusEnabled(): boolean {
   } catch {
     // ignore
   }
-  return import.meta.env.DEV === true;
+  // 시연 영상에서도 최저가/최단 경로 차이가 나도록 기본 켜둠
+  return true;
 }
 
 const t = (id: string, name: string, price: number, originalPrice?: number): MenuItem => ({
@@ -45,6 +46,12 @@ const t = (id: string, name: string, price: number, originalPrice?: number): Men
  *  남쪽: 4 신선정육점, 14 남해수산, 15 통큰건어물, 17 중앙정육센터
  */
 const JUNGANG: Record<number, MenuItem[]> = {
+  // 시연: 사과·삼겹살·대파 — 위치·가격을 갈라 최저가≠최단이 되게
+  4: [t("t-j4-pork", "삼겹살", 11000)],
+  5: [t("t-j5-pa", "대파", 2000), t("t-j5-apple", "사과", 8500)],
+  12: [t("t-j12-pa", "대파", 2800)],
+  13: [t("t-j13-apple", "사과", 7000)],
+  17: [t("t-j17-pork", "삼겹살", 13500)],
   3: [t("t-j3-dumpling", "만두 6개", 4800), t("t-j3-kimchi", "김치 1kg", 7200)],
   8: [t("t-j8-bag", "장바구니", 4200), t("t-j8-glove", "고무장갑 3켤레", 2500)],
   11: [t("t-j11-tteok", "떡볶이", 4000), t("t-j11-sundae", "순대", 3800)],
@@ -53,13 +60,20 @@ const JUNGANG: Record<number, MenuItem[]> = {
 };
 
 /**
- * 천안역전시장 — 계란·대파·고등어·김치·어묵·순대국밥 등 비교용
+ * 천안역전시장 시연 — 사과·삼겹살·대파 각 3상점 (최저가≠최단≠추천)
+ *  가까운 묶음: 4 대산 정육점, 5 송현농원, 8 푸줏간골목
+ *  먼 묶음(저가): 11 과일나라, 12 한돈축산
+ *  중간: 14 햇과일가게
  */
 const BYEONGCHEON: Record<number, MenuItem[]> = {
+  4: [t("t-b4-pork", "삼겹살", 13500)],
+  5: [t("t-b5-apple", "사과", 9000), t("t-b5-pa", "대파", 3600)],
+  8: [t("t-b8-pork", "삼겹살", 15200)],
+  11: [t("t-b11-apple", "사과", 6500), t("t-b11-pa", "대파", 1800)],
+  12: [t("t-b12-pork", "삼겹살", 10500)],
+  14: [t("t-b14-apple", "사과", 7800), t("t-b14-pa", "대파", 2500)],
   3: [t("t-b3-kimchi", "김치 1kg", 7000), t("t-b3-egg", "계란 30구", 6800)],
-  8: [t("t-b8-bag", "장바구니", 4000), t("t-b8-glove", "고무장갑", 2200)],
   9: [t("t-b9-tteok", "떡볶이", 4200), t("t-b9-sundae", "순대", 3800)],
-  14: [t("t-b14-mixed", "잡곡 500g", 3500), t("t-b14-rice", "현미 1kg", 4200)],
 };
 
 /** 성환이화시장은 아직 실험용 메뉴 없음 */
@@ -71,7 +85,15 @@ export const NAV_TEST_MENUS: Record<MarketId, Record<number, MenuItem[]>> = {
   seonghwan: SEONGHWAN,
 };
 
-/** 상점(시드 id) 메뉴에 실험용 메뉴를 덧붙인다. 같은 id 는 중복 추가하지 않는다. */
+/** 시연(사과·삼겹살·대파)용 시드 상점 — 삭제돼도 지도·검색·경로에 유지 */
+export function isDemoNavStore(marketId: MarketId, seedStoreId: number) {
+  return Boolean(NAV_TEST_MENUS[marketId]?.[seedStoreId]?.length);
+}
+
+/**
+ * 상점(시드 id) 메뉴에 실험용 메뉴를 덧붙인다.
+ * 같은 상품명이 있으면 시연용 가격으로 덮어써서 최저가≠최단이 깨지지 않게 한다.
+ */
 export function withNavTestMenus(
   marketId: MarketId,
   storeId: number,
@@ -80,10 +102,22 @@ export function withNavTestMenus(
   if (!isNavTestMenusEnabled()) return menus;
   const extra = NAV_TEST_MENUS[marketId]?.[storeId];
   if (!extra?.length) return menus;
+  const byName = new Map(extra.map((m) => [m.name.trim().toLowerCase(), m]));
   const ids = new Set(menus.map((m) => m.id));
-  const names = new Set(menus.map((m) => m.name.trim().toLowerCase()));
+  const merged = menus.map((m) => {
+    const demo = byName.get(m.name.trim().toLowerCase());
+    if (!demo) return m;
+    return {
+      ...m,
+      price: demo.price,
+      ...(demo.originalPrice != null
+        ? { originalPrice: demo.originalPrice, discount: demo.discount }
+        : { originalPrice: undefined, discount: undefined }),
+    };
+  });
+  const names = new Set(merged.map((m) => m.name.trim().toLowerCase()));
   return [
-    ...menus,
+    ...merged,
     ...extra.filter((m) => !ids.has(m.id) && !names.has(m.name.trim().toLowerCase())),
   ];
 }
