@@ -337,42 +337,74 @@ function assignShortest(marketId: MarketId, items: CartItem[], ctx: RoutingConte
   return { items: out, assigned, skipped };
 }
 
-/** 추천(밸런스): 중간 가격대 상점 + 이미 가는 상점 묶기 (최저가·최단과 확실히 갈라지게) */
+/**
+ * 추천(밸런스): 미지정 상품을 가능하면 한 상점에 모아, 그 상점들의 합계가 중간인 곳을 고른다.
+ * → 최저가보다 비싸고 최단보다 싸며, 쓸데없이 들르는 곳이 늘지 않음.
+ */
 function assignBalanced(marketId: MarketId, items: CartItem[], ctx: RoutingContext): AssignmentResult {
-  const out: CartItem[] = [];
+  const fixed = items.filter((i) => !i.unresolved);
+  const unresolved = items.filter((i) => i.unresolved);
+  const out: CartItem[] = [...fixed];
   let assigned = 0;
   let skipped = 0;
-  const chosenStoreIds = new Set(
-    items.filter((i) => !i.unresolved && i.storeId > 0).map((i) => i.storeId),
-  );
 
-  for (const item of items) {
-    if (!item.unresolved) {
-      out.push(item);
-      continue;
-    }
-    const offers = offersForUnresolved(marketId, item);
-    if (offers.length === 0) {
-      skipped += 1;
-      continue;
-    }
-    const byPrice = [...offers].sort((a, b) => {
-      if (a.price !== b.price) return a.price - b.price;
-      return (
-        distanceFromEntrance(ctx, storePos(marketId, a.store)) -
-        distanceFromEntrance(ctx, storePos(marketId, b.store))
-      );
+  if (unresolved.length === 0) {
+    return { items: out, assigned, skipped };
+  }
+
+  const rows = unresolved.map((item) => ({
+    item,
+    offers: offersForUnresolved(marketId, item),
+  }));
+  for (const row of rows) {
+    if (row.offers.length === 0) skipped += 1;
+  }
+  const usable = rows.filter((r) => r.offers.length > 0);
+  if (usable.length === 0) {
+    return { items: out, assigned, skipped };
+  }
+
+  // 모든 미지정 상품을 파는 상점
+  let common: Set<number> | null = null;
+  for (const { offers } of usable) {
+    const ids = new Set(offers.map((o) => o.store.id));
+    common = common == null ? ids : new Set([...common].filter((id) => ids.has(id)));
+  }
+
+  if (common && common.size > 0) {
+    const scored = [...common]
+      .map((storeId) => {
+        let total = 0;
+        const picks: OfferPick[] = [];
+        for (const { offers } of usable) {
+          const offer = offers.find((o) => o.store.id === storeId)!;
+          total += offer.price;
+          picks.push(offer);
+        }
+        const dist = distanceFromEntrance(ctx, storePos(marketId, picks[0].store));
+        return { storeId, total, picks, dist };
+      })
+      .sort((a, b) => a.total - b.total || a.dist - b.dist);
+
+    // 합계 기준 중간 상점 (최저·최고가 상점 사이)
+    const mid = scored[Math.floor(scored.length / 2)];
+    usable.forEach((row, index) => {
+      const offer = mid.picks[index];
+      out.push(cloneItemToStore(row.item, offer.store, offer.menuId, offer.price));
+      assigned += 1;
     });
-    const median = byPrice[Math.floor(byPrice.length / 2)];
-    const consolidate = offers
-      .filter((o) => chosenStoreIds.has(o.store.id))
-      .sort((a, b) => a.price - b.price)[0];
-    // 이미 가는 상점이 중간가 이하이면 묶어서 추천이 최저가와 달라 보이게
-    const best =
-      consolidate && consolidate.price <= median.price * 1.2 ? consolidate : median;
+    return { items: out, assigned, skipped };
+  }
 
+  // 공통 상점이 없으면: 상품별 중간가 + 이미 고른 상점 우선
+  const chosen = new Set(fixed.map((i) => i.storeId).filter((id) => id > 0));
+  for (const { item, offers } of usable) {
+    const byPrice = [...offers].sort((a, b) => a.price - b.price);
+    const median = byPrice[Math.floor(byPrice.length / 2)];
+    const same = offers.filter((o) => chosen.has(o.store.id)).sort((a, b) => a.price - b.price)[0];
+    const best = same && same.price <= median.price * 1.25 ? same : median;
     out.push(cloneItemToStore(item, best.store, best.menuId, best.price));
-    chosenStoreIds.add(best.store.id);
+    chosen.add(best.store.id);
     assigned += 1;
   }
   return { items: out, assigned, skipped };
@@ -455,9 +487,28 @@ export function planRoutes(
     };
   };
 
-  return {
-    cheapest: pack("cheapest", cheapPath, cheapAssign),
-    shortest: pack("shortest", shortPath, shortAssign),
-    balanced: pack("balanced", balPath, balAssign),
+  const cheapest = pack("cheapest", cheapPath, cheapAssign);
+  const shortest = pack("shortest", shortPath, shortAssign);
+  const mid = pack("balanced", balPath, balAssign);
+
+  // 추천: 가격 + 거리 환산 가성비. 3m 더 걷고 2,500원 아끼는 최저가가 이기도록
+  const WON_PER_METER = 100;
+  const valueOf = (r: PlannedRoute) => r.totalPrice + r.distance * WON_PER_METER;
+  const best = [cheapest, shortest, mid].sort((a, b) => {
+    const dv = valueOf(a) - valueOf(b);
+    if (dv !== 0) return dv;
+    // 동점이면 더 싼 쪽, 그래도 같으면 더 짧은 쪽
+    if (a.totalPrice !== b.totalPrice) return a.totalPrice - b.totalPrice;
+    return a.distance - b.distance;
+  })[0];
+
+  const balanced: PlannedRoute = {
+    ...best,
+    type: "balanced",
+    savings: Math.round(
+      best.path.reduce((sum, stop) => sum + stop.discountSavings, 0) * 0.65,
+    ),
   };
+
+  return { cheapest, shortest, balanced };
 }

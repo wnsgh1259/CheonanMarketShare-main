@@ -203,24 +203,6 @@ export function RouteRecommendation({ items, marketId }: Props) {
         </div>
       )}
 
-      {(() => {
-        const priceGap = Math.abs(routes.cheapest.totalPrice - routes.shortest.totalPrice);
-        const distGap = Math.abs(routes.cheapest.distance - routes.shortest.distance);
-        if (priceGap < 100 && distGap < 20) return null;
-        return (
-          <div className="mb-3 px-3 py-2.5 bg-[#F7F5F1] rounded-lg text-[11px] text-[#6B5142] leading-relaxed">
-            최저가와 최단거리가 달라요.
-            {priceGap >= 100 && (
-              <span className="text-[#46352C]"> 가격 차 {priceGap.toLocaleString()}원</span>
-            )}
-            {distGap >= 20 && (
-              <span className="text-[#46352C]"> · 거리 차 {distGap}m</span>
-            )}
-            — 원하는 기준을 골라 보세요.
-          </div>
-        );
-      })()}
-
       <div className="space-y-2 mb-4">
         {(["cheapest", "shortest", "balanced"] as RouteType[]).map((type) => {
           const r = routes[type];
@@ -285,13 +267,21 @@ export function RouteRecommendation({ items, marketId }: Props) {
                       {r.path.length}곳
                     </span>
                   </div>
-                  {(vsCheap || vsShort) && (
-                    <p className="mt-1 text-[10px] text-[#9A897F]">
-                      {vsCheap && `최저가보다 +${(r.totalPrice - routes.cheapest.totalPrice).toLocaleString()}원`}
-                      {vsCheap && vsShort && " · "}
-                      {vsShort && `최단보다 +${r.distance - routes.shortest.distance}m`}
-                    </p>
-                  )}
+                  {(() => {
+                    const priceExtra = vsCheap ? r.totalPrice - routes.cheapest.totalPrice : 0;
+                    const distExtra = vsShort ? r.distance - routes.shortest.distance : 0;
+                    // 미미한 차이(20m 미만·500원 미만)는 굳이 안 보여 줌
+                    const showPrice = priceExtra >= 500;
+                    const showDist = distExtra >= 20;
+                    if (!showPrice && !showDist) return null;
+                    return (
+                      <p className="mt-1 text-[10px] text-[#9A897F]">
+                        {showPrice && `최저가보다 +${priceExtra.toLocaleString()}원`}
+                        {showPrice && showDist && " · "}
+                        {showDist && `최단보다 +${distExtra}m`}
+                      </p>
+                    );
+                  })()}
                 </div>
                 <ChevronRight className={`w-4 h-4 flex-shrink-0 ${isActive ? m.textColor : "text-[#9A897F]"}`} />
               </div>
