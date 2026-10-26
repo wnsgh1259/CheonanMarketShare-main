@@ -25,10 +25,8 @@ import {
   loadAdminDeletedStoreIds,
   markStoreDeleted,
   refreshDeletedStoreIdsFromRemote,
-  setDeletedStoreIds,
   unmarkStoreDeleted,
 } from "../data/deletedStoreIds";
-import { isDemoNavStore, NAV_TEST_MENUS } from "../data/navTestMenus";
 import { AdminRewardPanel } from "../components/AdminRewardPanel";
 import { refreshSubmissions } from "../data/rewards";
 import { refreshSnsPromos } from "../data/snsPromo";
@@ -628,27 +626,11 @@ export function AdminPage() {
     return next;
   };
 
-  /** 시연용 시드 상점(사과·삼겹살·대파)이 삭제 목록에 있으면 복구 — 관리자 핀이 안 뜨는 문제 방지 */
-  const restoreDemoStoresFromDeleted = (deleted: Set<number>) => {
-    const keep = new Set(deleted);
-    let changed = false;
-    for (const marketId of SEED_MARKET_ORDER) {
-      const demoIds = Object.keys(NAV_TEST_MENUS[marketId] ?? {}).map(Number);
-      for (const seedId of demoIds) {
-        const syn = syntheticSeedStoreId(marketId, seedId);
-        if (keep.delete(syn) || keep.delete(seedId)) changed = true;
-      }
-    }
-    if (!changed) return deleted;
-    const saved = setDeletedStoreIds(keep);
-    return new Set(saved.ids);
-  };
-
   useEffect(() => {
     migrateLegacyOwnerDraftIfNeeded();
     let cancelled = false;
     const load = async () => {
-      const deleted = restoreDemoStoresFromDeleted(await refreshDeletedStoreIdsFromRemote());
+      const deleted = await refreshDeletedStoreIdsFromRemote();
       if (cancelled) return;
       setDeletedIds(deleted);
       const merged = purgeDuplicateNamedDrafts(await refreshOwnerCatalogFromRemote());
@@ -665,7 +647,7 @@ export function AdminPage() {
     if (adminPanelView !== "market") return;
     let cancelled = false;
     const refreshMarketData = async () => {
-      const deleted = restoreDemoStoresFromDeleted(await refreshDeletedStoreIdsFromRemote());
+      const deleted = await refreshDeletedStoreIdsFromRemote();
       if (cancelled) return;
       setDeletedIds(deleted);
       const [catalog, applications] = await Promise.all([
@@ -1037,13 +1019,9 @@ export function AdminPage() {
     setStoreAccounts(Object.fromEntries(accounts.map((item) => [item.storeId, item])));
   }, [mergedStores]);
 
-  const storesBySelectedMarket = mergedStores.filter((store) => {
-    if (store.marketId !== selectedMarket) return false;
-    if (!deletedIds.has(store.id)) return true;
-    // 시연 상점은 삭제돼 있어도 관리자 목록·핀에 유지
-    const seedId = store.id >= 10000 ? store.id % 10000 : store.id;
-    return isDemoNavStore(selectedMarket, seedId) && syntheticSeedStoreId(selectedMarket, seedId) === store.id;
-  });
+  const storesBySelectedMarket = mergedStores.filter(
+    (store) => store.marketId === selectedMarket && !deletedIds.has(store.id),
+  );
   const facilitiesBySelectedMarket = (draft.facilities ?? []).filter(
     (facility) => facility.marketId === selectedMarket,
   );

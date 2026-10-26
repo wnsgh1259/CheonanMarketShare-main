@@ -52,11 +52,6 @@ const JUNGANG: Record<number, MenuItem[]> = {
   12: [t("t-j12-pa", "대파", 2800)],
   13: [t("t-j13-apple", "사과", 7000)],
   17: [t("t-j17-pork", "삼겹살", 13500)],
-  3: [t("t-j3-dumpling", "만두 6개", 4800), t("t-j3-kimchi", "김치 1kg", 7200)],
-  8: [t("t-j8-bag", "장바구니", 4200), t("t-j8-glove", "고무장갑 3켤레", 2500)],
-  11: [t("t-j11-tteok", "떡볶이", 4000), t("t-j11-sundae", "순대", 3800)],
-  16: [t("t-j16-rice", "쌀 5kg", 17000), t("t-j16-mixed", "잡곡 1kg", 4500)],
-  18: [t("t-j18-oden", "어묵 3개", 2800), t("t-j18-kimbap", "야채김밥", 2800)],
 };
 
 /**
@@ -72,8 +67,6 @@ const BYEONGCHEON: Record<number, MenuItem[]> = {
   11: [t("t-b11-apple", "사과", 6500), t("t-b11-pa", "대파", 1800)],
   12: [t("t-b12-pork", "삼겹살", 10500)],
   14: [t("t-b14-apple", "사과", 7800), t("t-b14-pa", "대파", 2500)],
-  3: [t("t-b3-kimchi", "김치 1kg", 7000), t("t-b3-egg", "계란 30구", 6800)],
-  9: [t("t-b9-tteok", "떡볶이", 4200), t("t-b9-sundae", "순대", 3800)],
 };
 
 /** 성환이화시장은 아직 실험용 메뉴 없음 */
@@ -85,9 +78,18 @@ export const NAV_TEST_MENUS: Record<MarketId, Record<number, MenuItem[]>> = {
   seonghwan: SEONGHWAN,
 };
 
-/** 시연(사과·삼겹살·대파)용 시드 상점 — 삭제돼도 지도·검색·경로에 유지 */
+/**
+ * 시연(사과·삼겹살·대파) 상점 — 손님 지도/검색/경로에만 유지.
+ * 관리자에서 삭제한 일반 시드(김밥천국 등)는 여기 넣지 않는다.
+ */
+export const DEMO_SCENARIO_STORE_IDS: Record<MarketId, readonly number[]> = {
+  jungang: [4, 5, 12, 13, 17],
+  byeongcheon: [4, 5, 8, 11, 12, 14],
+  seonghwan: [],
+};
+
 export function isDemoNavStore(marketId: MarketId, seedStoreId: number) {
-  return Boolean(NAV_TEST_MENUS[marketId]?.[seedStoreId]?.length);
+  return DEMO_SCENARIO_STORE_IDS[marketId]?.includes(seedStoreId) ?? false;
 }
 
 /**
