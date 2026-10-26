@@ -55,15 +55,15 @@ const JUNGANG: Record<number, MenuItem[]> = {
 };
 
 /**
- * 천안역전시장 시연 — 사과·삼겹살·대파 각 3상점 (최저가≠최단≠추천)
- *  가까운 묶음: 4 대산 정육점, 5 송현농원, 8 푸줏간골목
+ * 천안역전시장 시연 — 사과·삼겹살·대파 (최저가≠최단≠추천)
+ *  가까운 묶음: 5 송현농원, 8 푸줏간골목 (삼겹살 지정용)
  *  먼 묶음(저가): 11 과일나라, 12 한돈축산
  *  중간: 14 햇과일가게
+ *  ※ 대산 정육점(4)은 관리자에 없어 시연에서 제외 — 삼겹살 역할은 푸줏간골목으로 이전
  */
 const BYEONGCHEON: Record<number, MenuItem[]> = {
-  4: [t("t-b4-pork", "삼겹살", 13500)],
   5: [t("t-b5-apple", "사과", 9000), t("t-b5-pa", "대파", 3600)],
-  8: [t("t-b8-pork", "삼겹살", 15200)],
+  8: [t("t-b8-pork", "삼겹살", 13500)],
   11: [t("t-b11-apple", "사과", 6500), t("t-b11-pa", "대파", 1800)],
   12: [t("t-b12-pork", "삼겹살", 10500)],
   14: [t("t-b14-apple", "사과", 7800), t("t-b14-pa", "대파", 2500)],
@@ -84,7 +84,7 @@ export const NAV_TEST_MENUS: Record<MarketId, Record<number, MenuItem[]>> = {
  */
 export const DEMO_SCENARIO_STORE_IDS: Record<MarketId, readonly number[]> = {
   jungang: [4, 5, 12, 13, 17],
-  byeongcheon: [4, 5, 8, 11, 12, 14],
+  byeongcheon: [5, 8, 11, 12, 14],
   seonghwan: [],
 };
 

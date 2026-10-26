@@ -331,13 +331,13 @@ export const STORES_BY_MARKET: Record<MarketId, StoreData[]> = {
       ]),
     },
     {
-      id: 4, name: "대산 정육점", category: "정육·계란",
+      id: 4, name: "역전정육점", category: "정육·계란",
       location: "천안시 동남구 문화동 12, 역전시장 정육골목 2호", hours: HOURS, phone: "041-566-1201",
       rating: 4.4, bookmark: false, mx: 46, my: 38,
       lat: 36.81058, lng: 127.14910,
       image: IMG_MEAT, description: "삼겹·목살 당일 손질.",
       menus: menus("b4", [
-        ["삼겹살", 13500], ["한돈 목살 500g", 11000], ["돼지불고기용 500g", 9000],
+        ["한돈 목살 500g", 11000], ["돼지불고기용 500g", 9000],
         ["갈비살 500g", 14000], ["양념왕갈비 1kg", 18000], ["계란 30구", 7200],
       ]),
     },
@@ -377,12 +377,12 @@ export const STORES_BY_MARKET: Record<MarketId, StoreData[]> = {
     {
       id: 8, name: "푸줏간골목", category: "정육·계란",
       location: "천안시 동남구 대흥로 68, 역전시장 정육골목 6호", hours: HOURS, phone: "041-566-1601",
-      rating: 4.1, bookmark: false, mx: 42, my: 40,
-      lat: 36.81052, lng: 127.14902,
+      rating: 4.1, bookmark: false, mx: 46, my: 38,
+      lat: 36.81058, lng: 127.14910,
       image: IMG_MEAT, description: "시장 골목 한돈 정육.",
       menus: menus("b8", [
-        ["삼겹살", 15200], ["한돈 목살 500g", 12000], ["다짐육 500g", 7000],
-        ["계란 30구", 7500], ["특란 15구", 4500],
+        ["삼겹살", 13500], ["한돈 목살 500g", 12000], ["다짐육 500g", 7000],
+        ["계란 30구", 7500], ["특란 15구", 4500], ["돼지불고기용 500g", 9000],
       ]),
     },
     {
