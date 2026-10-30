@@ -11,6 +11,8 @@ import {
 import { loadOwnerCatalog } from "./ownerStoreData";
 import { syntheticSeedStoreId } from "./seedStoreIds";
 import { withNavTestMenus } from "./navTestMenus";
+import { displayedSeedNameKeys, isSeedRenamed } from "./seedDisplayNames";
+import { applyDemoPriceLadder } from "./demoPriceLadder";
 import { loadAdminDeletedStoreIds } from "./deletedStoreIds";
 import { pickStoreDisplayLatLng } from "../map/storeMapPlacement";
 import type { SharedDraftStore, SharedOwnerMenu } from "./ownerSharedStore";
@@ -78,6 +80,9 @@ export function getSearchableStores(marketId: MarketId): StoreData[] {
   const drafts = (catalog.stores ?? []).filter(
     (s) => (s.marketId ?? marketId) === marketId && !deleted.has(s.id),
   );
+  const allDraftById = new Map(
+    (catalog.stores ?? []).filter((s) => !deleted.has(s.id)).map((s) => [s.id, s]),
+  );
   const draftBySynthetic = new Map<number, SharedDraftStore>();
   const draftBySeedId = new Map<number, SharedDraftStore>();
   const draftByName = new Map<string, SharedDraftStore>();
@@ -88,7 +93,7 @@ export function getSearchableStores(marketId: MarketId): StoreData[] {
       draftBySynthetic.set(d.id, d);
       // 시드 id로도 매칭 (관리자 시드 id = marketIndex*10000 + seedId)
       const seedId = d.id >= 10000 ? d.id % 10000 : d.id;
-      if (seedId > 0) draftBySeedId.set(seedId, d);
+      if (seedId > 0 && d.id < 100000) draftBySeedId.set(seedId, d);
     }
   }
 
@@ -98,6 +103,9 @@ export function getSearchableStores(marketId: MarketId): StoreData[] {
     const syntheticId = syntheticSeedStoreId(marketId, store.id);
     // 관리자 삭제 목록과 동일 — 삭제된 상점은 검색·경로·지도에 모두 제외
     if (deleted.has(syntheticId)) continue;
+    // 관리자에서 다른 시장으로 옮긴 시드 상점 제외 (지도 핀과 동일)
+    const movedDraft = allDraftById.get(syntheticId);
+    if (movedDraft?.marketId && movedDraft.marketId !== marketId) continue;
     const draft =
       draftBySeedId.get(store.id) ??
       draftBySynthetic.get(syntheticId) ??
@@ -105,25 +113,35 @@ export function getSearchableStores(marketId: MarketId): StoreData[] {
     // 관리자에서 다른 시장으로 옮긴 시드 상점 제외
     if (draft?.marketId && draft.marketId !== marketId) continue;
     const pos = pickStoreDisplayLatLng(marketId, store, draft);
+    const name = resolvedDraftName(draft?.name, store.name);
+    // 다른 상점으로 이름이 바뀐 시드는 원래 시드 메뉴·시연 메뉴를 물려받지 않는다
+    const renamed = isSeedRenamed(store.name, draft?.name);
+    const category = normalizeStoreCategory(renamed ? draft?.category || store.category : store.category);
+    const menus = renamed
+      ? ensureStoreMenus(name, category, draftMenusToMenuItems(draft?.menus), `ps-${store.id}`)
+      : mergeStoreMenus(store, draft);
     merged.push({
       ...store,
-      name: resolvedDraftName(draft?.name, store.name),
+      name,
+      category,
       lat: pos.lat,
       lng: pos.lng,
       image: draft?.image || store.image,
-      menus: withNavTestMenus(marketId, store.id, mergeStoreMenus(store, draft)),
+      menus: withNavTestMenus(marketId, renamed ? null : store.id, menus, name),
     });
   }
 
   const seedIds = new Set(seed.map((s) => s.id));
   const seedSynthetic = new Set(seed.map((s) => syntheticSeedStoreId(marketId, s.id)));
-  const seedNames = new Set(seed.map((s) => normalizeStoreNameKey(s.name)));
+  const seedNames = displayedSeedNameKeys(marketId, [...allDraftById.values()], deleted);
 
   for (const d of drafts) {
     if (typeof d.id !== "number") continue;
     if (seedSynthetic.has(d.id) || seedIds.has(d.id) || seedNames.has(normalizeStoreNameKey(d.name))) continue;
     // 테스트용 이름(1, 2, 트라이 등)은 상품 검색에 노출하지 않음
     if (isPlaceholderStoreName(d.name)) continue;
+    // 시장이 명시된 등록 상점만 (관리자 목록·지도 핀과 동일)
+    if (d.marketId !== marketId) continue;
     const category = normalizeStoreCategory(d.category);
     merged.push({
       id: d.id,
@@ -140,11 +158,16 @@ export function getSearchableStores(marketId: MarketId): StoreData[] {
       lat: d.lat,
       lng: d.lng,
       description: d.description || "",
-      menus: ensureStoreMenus(d.name, category, draftMenusToMenuItems(d.menus), `ps-d${d.id}`),
+      menus: withNavTestMenus(
+        marketId,
+        null,
+        ensureStoreMenus(d.name, category, draftMenusToMenuItems(d.menus), `ps-d${d.id}`),
+        d.name,
+      ),
     });
   }
 
-  return merged;
+  return applyDemoPriceLadder(marketId, merged);
 }
 
 function scoreName(menuName: string, query: string): number {

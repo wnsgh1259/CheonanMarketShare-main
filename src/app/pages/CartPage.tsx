@@ -1166,7 +1166,7 @@ export function CartPage() {
         <p className="text-[12px] text-[#6B5142] mb-3">요리명을 검색하면 재료를 자동 추가해요</p>
         <div className="relative mb-2">
           <div className="flex gap-2">
-            <input
+          <input
               type="text"
               value={recipeQuery}
               onChange={(e) => {
@@ -1182,17 +1182,17 @@ export function CartPage() {
                 if (e.key === "Enter") handleRecipeSearch();
                 if (e.key === "Escape") setRecipeListOpen(false);
               }}
-              placeholder="요리명을 입력하세요"
-              className="flex-1 px-3 py-2.5 bg-[#F7F2E8] rounded-xl text-[14px] focus:outline-none focus:ring-2 focus:ring-[#B89A7D] placeholder:text-[#6B5142]"
-            />
-            <button
+            placeholder="요리명을 입력하세요"
+            className="flex-1 px-3 py-2.5 bg-[#F7F2E8] rounded-xl text-[14px] focus:outline-none focus:ring-2 focus:ring-[#B89A7D] placeholder:text-[#6B5142]"
+          />
+          <button
               type="button"
-              onClick={handleRecipeSearch}
-              className="px-4 py-2.5 bg-[#5B4335] text-white rounded-xl text-[13px] active:bg-[#46352C] transition-colors flex items-center gap-1"
-            >
-              <Search className="w-3.5 h-3.5" />검색
-            </button>
-          </div>
+            onClick={handleRecipeSearch}
+            className="px-4 py-2.5 bg-[#5B4335] text-white rounded-xl text-[13px] active:bg-[#46352C] transition-colors flex items-center gap-1"
+          >
+            <Search className="w-3.5 h-3.5" />검색
+          </button>
+        </div>
           {recipeListOpen && (
             <div
               className="absolute left-0 right-0 z-20 mt-1.5 overflow-hidden rounded-xl bg-white shadow-[0_12px_28px_-12px_rgba(70,53,44,0.35)] ring-1 ring-[#EDE5D8]"
@@ -1218,8 +1218,8 @@ export function CartPage() {
                   filteredRecipeNames.map((name) => {
                     const selected = recipeTitle === name && recipeResults !== null;
                     return (
-                      <button
-                        key={name}
+            <button
+              key={name}
                         type="button"
                         onClick={() => selectRecipe(name)}
                         className={`flex w-full items-center justify-between border-b border-[#F0EBE3] px-3 py-2.5 text-left text-[14px] last:border-b-0 ${
@@ -1232,7 +1232,7 @@ export function CartPage() {
                         <span className="text-[11px] text-[#8A6A52]">
                           {RECIPES[name].length}개 재료
                         </span>
-                      </button>
+            </button>
                     );
                   })
                 )}

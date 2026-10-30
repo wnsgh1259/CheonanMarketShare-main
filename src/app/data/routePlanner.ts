@@ -491,16 +491,24 @@ export function planRoutes(
   const shortest = pack("shortest", shortPath, shortAssign);
   const mid = pack("balanced", balPath, balAssign);
 
-  // 추천: 가격 + 거리 환산 가성비. 3m 더 걷고 2,500원 아끼는 최저가가 이기도록
+  // 추천: 최저가보다 가깝고 최단보다 싼 중간 경로가 있으면 그것을 쓴다
+  const isMiddle =
+    mid.totalPrice > cheapest.totalPrice &&
+    mid.totalPrice < shortest.totalPrice &&
+    mid.distance < cheapest.distance &&
+    mid.distance > shortest.distance;
+  // 중간 경로가 없으면 가격 + 거리 환산 가성비. 3m 더 걷고 2,500원 아끼는 최저가가 이기도록
   const WON_PER_METER = 100;
   const valueOf = (r: PlannedRoute) => r.totalPrice + r.distance * WON_PER_METER;
-  const best = [cheapest, shortest, mid].sort((a, b) => {
-    const dv = valueOf(a) - valueOf(b);
-    if (dv !== 0) return dv;
-    // 동점이면 더 싼 쪽, 그래도 같으면 더 짧은 쪽
-    if (a.totalPrice !== b.totalPrice) return a.totalPrice - b.totalPrice;
-    return a.distance - b.distance;
-  })[0];
+  const best = isMiddle
+    ? mid
+    : [cheapest, shortest, mid].sort((a, b) => {
+        const dv = valueOf(a) - valueOf(b);
+        if (dv !== 0) return dv;
+        // 동점이면 더 싼 쪽, 그래도 같으면 더 짧은 쪽
+        if (a.totalPrice !== b.totalPrice) return a.totalPrice - b.totalPrice;
+        return a.distance - b.distance;
+      })[0];
 
   const balanced: PlannedRoute = {
     ...best,

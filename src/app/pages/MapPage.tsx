@@ -30,6 +30,8 @@ import {
   refreshDeletedStoreIdsFromRemote,
 } from "../data/deletedStoreIds";
 import { withNavTestMenus } from "../data/navTestMenus";
+import { displayedSeedNameKeys, isSeedRenamed } from "../data/seedDisplayNames";
+import { applyDemoPriceLadder } from "../data/demoPriceLadder";
 import { syntheticSeedStoreId } from "../data/seedStoreIds";
 import { buildFacilityMarkerIcon, buildStoreMarkerIcon } from "../map/naverMarkerIcons";
 import { getMarketStorePins } from "../map/marketStorePins";
@@ -228,7 +230,10 @@ function draftOnlyToStoreData(drafts: DraftStorePin[], marketId: MarketId): impo
   const seedSyntheticIds = new Set(
     STORES_BY_MARKET[marketId].map((s) => syntheticSeedStoreId(marketId, s.id)),
   );
-  const seedNames = new Set(STORES_BY_MARKET[marketId].map((s) => normalizeStoreNameKey(s.name)));
+  const seedNames = displayedSeedNameKeys(
+    marketId,
+    drafts.filter((d): d is DraftStorePin & { id: number } => typeof d.id === "number"),
+  );
 
   return drafts
     .filter((d) => {
@@ -1057,6 +1062,8 @@ export function MapPage() {
       const nextName = override.name?.trim();
       const useSeedName = !nextName || isPlaceholderStoreName(nextName);
       const displayName = useSeedName ? pin.name : nextName;
+      // 다른 상점으로 이름이 바뀐 시드는 원래 시드 메뉴·시연 메뉴를 물려받지 않는다
+      const renamed = isSeedRenamed(store.name, override.name);
       const category = normalizeStoreCategory(
         useSeedName && !override.category ? store.category : override.category || store.category,
       );
@@ -1080,13 +1087,14 @@ export function MapPage() {
         category,
         menus: withNavTestMenus(
           selectedMarket,
-          store.id,
+          renamed ? null : store.id,
           ensureStoreMenus(
             displayName,
             category,
-            overrideMenus.length >= 3 ? overrideMenus : store.menus,
+            overrideMenus.length >= 3 || renamed ? overrideMenus : store.menus,
             `j${store.id}`,
           ),
+          displayName,
         ),
       }, override.promotion, now);
     });
@@ -1098,13 +1106,19 @@ export function MapPage() {
         const draft = rawDrafts.find((item) => item.id === store.id);
         const pin = pinById.get(store.id)!;
         return applyLiveDeal(
-          { ...store, name: pin.name, lat: pin.lat, lng: pin.lng },
+          {
+            ...store,
+            name: pin.name,
+            lat: pin.lat,
+            lng: pin.lng,
+            menus: withNavTestMenus(selectedMarket, null, store.menus, store.name),
+          },
           draft?.promotion,
           now,
         );
       });
 
-    return [...seedStores, ...newStores];
+    return applyDemoPriceLadder(selectedMarket, [...seedStores, ...newStores]);
   }, [selectedMarket, sharedStores, now, deletedStoreIds]);
   const marketInfo = MARKET_INFO[selectedMarket];
   const facilities = useMemo(() => {

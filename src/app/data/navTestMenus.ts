@@ -56,14 +56,12 @@ const JUNGANG: Record<number, MenuItem[]> = {
 
 /**
  * 천안역전시장 시연 — 사과·삼겹살·대파 (최저가≠최단≠추천)
- *  가까운 묶음: 5 송현농원, 8 푸줏간골목 (삼겹살 지정용)
+ *  가까운 묶음: 송현농원(관리자 등록 상점, 이름으로 매칭), 8 푸줏간골목 (삼겹살 지정용)
  *  먼 묶음(저가): 11 과일나라, 12 한돈축산
  *  중간: 14 햇과일가게
- *  ※ 대산 정육점(4)은 관리자에 없어 시연에서 제외 — 삼겹살 역할은 푸줏간골목으로 이전
+ *  ※ 시드 5번은 관리자에서 「병천수산코너」로 쓰이므로 시연 메뉴를 붙이지 않는다
  */
 const BYEONGCHEON: Record<number, MenuItem[]> = {
-  // 가까움·비쌈
-  5: [t("t-b5-apple", "사과", 9200), t("t-b5-pa", "대파", 3800)],
   // 지정용 삼겹 (장날정육점 13500과 겹치지 않게)
   8: [t("t-b8-pork", "삼겹살", 14800)],
   // 멂·쌈
@@ -88,25 +86,43 @@ export const NAV_TEST_MENUS: Record<MarketId, Record<number, MenuItem[]>> = {
  */
 export const DEMO_SCENARIO_STORE_IDS: Record<MarketId, readonly number[]> = {
   jungang: [4, 5, 12, 13, 17],
-  byeongcheon: [5, 8, 11, 12, 14],
+  byeongcheon: [8, 11, 12, 14],
   seonghwan: [],
+};
+
+/** 시드에 없고 관리자에서 등록한 상점은 이름으로 시연 메뉴를 붙인다 */
+export const NAV_TEST_MENUS_BY_NAME: Record<MarketId, Record<string, MenuItem[]>> = {
+  jungang: {},
+  byeongcheon: {
+    // 가까움·비쌈
+    송현농원: [t("t-b-songhyeon-apple", "사과", 9200), t("t-b-songhyeon-pa", "대파", 3800)],
+  },
+  seonghwan: {},
 };
 
 export function isDemoNavStore(marketId: MarketId, seedStoreId: number) {
   return DEMO_SCENARIO_STORE_IDS[marketId]?.includes(seedStoreId) ?? false;
 }
 
+function navTestExtraFor(marketId: MarketId, storeId: number | null, storeName?: string) {
+  const byId = storeId == null ? undefined : NAV_TEST_MENUS[marketId]?.[storeId];
+  if (byId?.length) return byId;
+  const key = storeName?.replace(/\s+/g, "");
+  return key ? NAV_TEST_MENUS_BY_NAME[marketId]?.[key] : undefined;
+}
+
 /**
- * 상점(시드 id) 메뉴에 실험용 메뉴를 덧붙인다.
+ * 상점(시드 id 또는 등록 상점명) 메뉴에 실험용 메뉴를 덧붙인다.
  * 같은 상품명이 있으면 시연용 가격으로 덮어써서 최저가≠최단이 깨지지 않게 한다.
  */
 export function withNavTestMenus(
   marketId: MarketId,
-  storeId: number,
+  storeId: number | null,
   menus: MenuItem[],
+  storeName?: string,
 ): MenuItem[] {
   if (!isNavTestMenusEnabled()) return menus;
-  const extra = NAV_TEST_MENUS[marketId]?.[storeId];
+  const extra = navTestExtraFor(marketId, storeId, storeName);
   if (!extra?.length) return menus;
   const byName = new Map(extra.map((m) => [m.name.trim().toLowerCase(), m]));
   const ids = new Set(menus.map((m) => m.id));

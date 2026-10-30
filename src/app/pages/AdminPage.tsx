@@ -64,6 +64,7 @@ import {
 import { SEED_MARKET_ORDER, syntheticSeedStoreId } from "../data/seedStoreIds";
 import { pickStoreDisplayLatLng } from "../map/storeMapPlacement";
 import { getMarketStorePins } from "../map/marketStorePins";
+import { displayedSeedNameKeys } from "../data/seedDisplayNames";
 import { hydrateMarketArea, resolveMarketView } from "../data/marketArea";
 import {
   OWNER_EDIT_STORE_KEY,
@@ -594,11 +595,11 @@ export function AdminPage() {
   const purgeDuplicateNamedDrafts = (catalog: ReturnType<typeof loadOwnerCatalog>) => {
     const stores = catalog.stores ?? [];
     if (stores.length === 0) return catalog;
+    // 관리자가 이름을 바꾼 시드는 바뀐 이름 기준 (예: 송현농원 → 병천수산코너면 「송현농원」 등록 상점은 유지)
     const seedKeys = new Set<string>();
     for (const marketId of SEED_MARKET_ORDER) {
-      for (const seed of STORES_BY_MARKET[marketId] ?? []) {
-        const key = normalizeStoreNameKey(seed.name);
-        if (key) seedKeys.add(`${marketId}::${key}`);
+      for (const key of displayedSeedNameKeys(marketId, stores)) {
+        seedKeys.add(`${marketId}::${key}`);
       }
     }
     const seedSyn = new Set(

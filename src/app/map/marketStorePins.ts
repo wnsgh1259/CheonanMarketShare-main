@@ -1,5 +1,6 @@
 import type { MarketId } from "../components/CartContext";
-import { STORES_BY_MARKET } from "../data/storeData";
+import { STORES_BY_MARKET, normalizeStoreNameKey } from "../data/storeData";
+import { displayedSeedNameKeys } from "../data/seedDisplayNames";
 import { loadOwnerCatalog } from "../data/ownerStoreData";
 import { loadAdminDeletedStoreIds } from "../data/deletedStoreIds";
 import { syntheticSeedStoreId } from "../data/seedStoreIds";
@@ -55,11 +56,17 @@ export function getMarketStorePins(marketId: MarketId): MarketStorePin[] {
     });
   }
 
+  const seedSynthetic = new Set(seed.map((s) => syntheticSeedStoreId(marketId, s.id)));
+  const seedNameKeys = displayedSeedNameKeys(marketId, allDrafts, deleted);
+
   for (const draft of drafts) {
     if (typeof draft.id !== "number") continue;
     if (usedDraftIds.has(draft.id)) continue;
+    if (seedSynthetic.has(draft.id)) continue;
     // 관리자 목록은 시장이 명시된 상점만 해당 시장에 표시
     if (draft.marketId !== marketId) continue;
+    // 시드 상점과 같은 이름이면 중복 핀으로 보고 제외 (검색·관리자 목록과 동일)
+    if (seedNameKeys.has(normalizeStoreNameKey(draft.name))) continue;
     const { lat, lng } = pickStoreDisplayLatLng(
       marketId,
       {
