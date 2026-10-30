@@ -2,9 +2,8 @@ import type { MarketId } from "../components/CartContext";
 import { STORES_BY_MARKET } from "../data/storeData";
 import { loadOwnerCatalog } from "../data/ownerStoreData";
 import { loadAdminDeletedStoreIds } from "../data/deletedStoreIds";
-import { isDemoNavStore } from "../data/navTestMenus";
 import { syntheticSeedStoreId } from "../data/seedStoreIds";
-import { pickStoreDisplayLatLng } from "./storeMapPlacement";
+import { pickStoreDisplayLatLng, spreadOverlappingLatLngs } from "./storeMapPlacement";
 
 export type MarketStorePin = {
   id: number;
@@ -21,6 +20,7 @@ export { loadAdminDeletedStoreIds } from "../data/deletedStoreIds";
  * - 관리자에서 삭제한 상점 제외
  * - 시장이 명시된 추가 상점만 포함
  * - 카탈로그에 저장된 lat/lng(직접 찍은 위치) 우선
+ * - 겹치는 핀은 관리자 지도와 동일하게 살짝 벌림
  */
 export function getMarketStorePins(marketId: MarketId): MarketStorePin[] {
   const catalog = loadOwnerCatalog();
@@ -38,21 +38,18 @@ export function getMarketStorePins(marketId: MarketId): MarketStorePin[] {
 
   for (const store of seed) {
     const syntheticId = syntheticSeedStoreId(marketId, store.id);
-    const demoStore = isDemoNavStore(marketId, store.id);
-    // 시연 상점은 삭제돼도 핀·경로에 유지 (장바구니 검색과 동일)
-    if (deleted.has(syntheticId) && !demoStore) continue;
+    if (deleted.has(syntheticId)) continue;
     const byId = draftBySyntheticIdAll.get(syntheticId);
     // 관리자에서 다른 시장으로 옮긴 시드 상점은 이 시장에서 제외 (관리자 목록과 동일)
-    if (byId && byId.marketId && byId.marketId !== marketId && !demoStore) continue;
+    if (byId && byId.marketId && byId.marketId !== marketId) continue;
     const draft = byId ?? draftByName.get(store.name);
 
     if (draft && typeof draft.id === "number") usedDraftIds.add(draft.id);
 
-    // 시연 상점은 시드 좌표·이름 고정 (옛 초안 좌표에 경로가 붙는 일 방지)
-    const { lat, lng } = pickStoreDisplayLatLng(marketId, store, demoStore ? null : draft);
+    const { lat, lng } = pickStoreDisplayLatLng(marketId, store, draft);
     pins.push({
       id: store.id,
-      name: demoStore ? store.name : (draft?.name ?? store.name),
+      name: draft?.name ?? store.name,
       lat,
       lng,
     });
@@ -82,5 +79,5 @@ export function getMarketStorePins(marketId: MarketId): MarketStorePin[] {
     });
   }
 
-  return pins;
+  return spreadOverlappingLatLngs(pins, { minMeters: 12 });
 }

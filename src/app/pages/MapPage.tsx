@@ -29,7 +29,7 @@ import {
   loadAdminDeletedStoreIds,
   refreshDeletedStoreIdsFromRemote,
 } from "../data/deletedStoreIds";
-import { isDemoNavStore, withNavTestMenus } from "../data/navTestMenus";
+import { withNavTestMenus } from "../data/navTestMenus";
 import { syntheticSeedStoreId } from "../data/seedStoreIds";
 import { buildFacilityMarkerIcon, buildStoreMarkerIcon } from "../map/naverMarkerIcons";
 import { getMarketStorePins } from "../map/marketStorePins";
@@ -1019,6 +1019,9 @@ export function MapPage() {
   }, []);
 
   const allStores = useMemo(() => {
+    // 관리자 등록 상점과 동일한 핀 집합·좌표 (삭제·시장 이동·겹침 벌림 포함)
+    const pins = getMarketStorePins(selectedMarket);
+    const pinById = new Map(pins.map((p) => [p.id, p]));
     const deleted = deletedStoreIds;
     const rawDrafts = sharedStores.filter(
       (s) =>
@@ -1031,25 +1034,19 @@ export function MapPage() {
     );
 
     const maps = buildDraftOverridesForMarket(rawDrafts, selectedMarket);
+    const seedIdSet = new Set((STORES_BY_MARKET[selectedMarket] ?? []).map((s) => s.id));
 
-    // 기존 시드 상점 (draft 오버라이드 적용) — 관리자 삭제분 제외
-    // 시연(사과·삼겹살·대파) 상점은 삭제돼도 지도·경로에 유지
     const seedStores = STORES_BY_MARKET[selectedMarket]
-      .filter((store) => {
-        const syn = syntheticSeedStoreId(selectedMarket, store.id);
-        if (isDemoNavStore(selectedMarket, store.id)) return true;
-        return !deleted.has(syn) && !deleted.has(store.id);
-      })
+      .filter((store) => pinById.has(store.id))
       .map((store) => {
-      const demoStore = isDemoNavStore(selectedMarket, store.id);
+      const pin = pinById.get(store.id)!;
       const override = resolveDraftOverride(selectedMarket, store, maps);
-      if (demoStore) {
-        const pos = pickStoreDisplayLatLng(selectedMarket, store, null);
+      if (!override) {
         return {
           ...store,
-          lat: pos.lat,
-          lng: pos.lng,
-          image: override?.image || store.image,
+          name: pin.name,
+          lat: pin.lat,
+          lng: pin.lng,
           menus: withNavTestMenus(
             selectedMarket,
             store.id,
@@ -1057,13 +1054,9 @@ export function MapPage() {
           ),
         };
       }
-      if (!override) {
-        const pos = pickStoreDisplayLatLng(selectedMarket, store);
-        return { ...store, lat: pos.lat, lng: pos.lng };
-      }
       const nextName = override.name?.trim();
       const useSeedName = !nextName || isPlaceholderStoreName(nextName);
-      const displayName = useSeedName ? store.name : nextName;
+      const displayName = useSeedName ? pin.name : nextName;
       const category = normalizeStoreCategory(
         useSeedName && !override.category ? store.category : override.category || store.category,
       );
@@ -1074,32 +1067,42 @@ export function MapPage() {
             price: Number(menu.price) || 0,
           })))
         : [];
-      const pos = pickStoreDisplayLatLng(selectedMarket, store, override);
       return applyLiveDeal({
         ...store,
         name: displayName,
-        lat: pos.lat,
-        lng: pos.lng,
+        lat: pin.lat,
+        lng: pin.lng,
         image: override.image || store.image,
         description: override.description || store.description,
         location: isPlaceholderLocation(override.location) ? store.location : (override.location || store.location),
         hours: override.hours?.trim() ? override.hours : store.hours,
         phone: override.phone?.trim() ? override.phone : store.phone,
         category,
-        menus: ensureStoreMenus(
-          displayName,
-          category,
-          overrideMenus.length >= 3 ? overrideMenus : store.menus,
-          `j${store.id}`,
+        menus: withNavTestMenus(
+          selectedMarket,
+          store.id,
+          ensureStoreMenus(
+            displayName,
+            category,
+            overrideMenus.length >= 3 ? overrideMenus : store.menus,
+            `j${store.id}`,
+          ),
         ),
       }, override.promotion, now);
     });
 
-    // 관리자에서 새로 추가한 상점 (시드에 없는 상점) 추가
-    const newStores = draftOnlyToStoreData(rawDrafts, selectedMarket).map((store) => {
-      const draft = rawDrafts.find((item) => item.id === store.id);
-      return applyLiveDeal(store, draft?.promotion, now);
-    });
+    // 관리자에서 새로 추가한 상점 (시드에 없는 상점) — 핀 목록에 있는 것만
+    const newStores = draftOnlyToStoreData(rawDrafts, selectedMarket)
+      .filter((store) => !seedIdSet.has(store.id) && pinById.has(store.id))
+      .map((store) => {
+        const draft = rawDrafts.find((item) => item.id === store.id);
+        const pin = pinById.get(store.id)!;
+        return applyLiveDeal(
+          { ...store, name: pin.name, lat: pin.lat, lng: pin.lng },
+          draft?.promotion,
+          now,
+        );
+      });
 
     return [...seedStores, ...newStores];
   }, [selectedMarket, sharedStores, now, deletedStoreIds]);

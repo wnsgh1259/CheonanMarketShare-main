@@ -83,8 +83,8 @@ export const NAV_TEST_MENUS: Record<MarketId, Record<number, MenuItem[]>> = {
 };
 
 /**
- * 시연(사과·삼겹살·대파) 상점 — 손님 지도/검색/경로에만 유지.
- * 관리자에서 삭제한 일반 시드(김밥천국 등)는 여기 넣지 않는다.
+ * 시연(사과·삼겹살·대파) 시나리오 상점 id.
+ * 메뉴 가격만 시연용으로 덮어쓰며, 삭제·표시 여부는 관리자와 동일하게 적용한다.
  */
 export const DEMO_SCENARIO_STORE_IDS: Record<MarketId, readonly number[]> = {
   jungang: [4, 5, 12, 13, 17],

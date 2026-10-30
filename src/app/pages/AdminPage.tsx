@@ -62,7 +62,8 @@ import {
   type StoreData,
 } from "../data/storeData";
 import { SEED_MARKET_ORDER, syntheticSeedStoreId } from "../data/seedStoreIds";
-import { pickStoreDisplayLatLng, spreadOverlappingLatLngs } from "../map/storeMapPlacement";
+import { pickStoreDisplayLatLng } from "../map/storeMapPlacement";
+import { getMarketStorePins } from "../map/marketStorePins";
 import { hydrateMarketArea, resolveMarketView } from "../data/marketArea";
 import {
   OWNER_EDIT_STORE_KEY,
@@ -1415,36 +1416,26 @@ export function AdminPage() {
   });
 
   const storesForMapPreview = useMemo(() => {
-    const rows = STORES_BY_MARKET[selectedMarket];
-    const marketDrafts = draft.stores.filter((s) => (s.marketId ?? selectedMarket) === selectedMarket);
-    const pins = filteredStores.map((adminStore) => {
-      const seedRow =
-        rows.find((s) => syntheticSeedStoreId(selectedMarket, s.id) === adminStore.id) ??
-        rows.find((s) => s.name === adminStore.name);
-      // 위치 미지정 상점에 mx/my=50 기본값을 넣지 않음 → 한 점에 몰리는 문제 방지
-      const pin = seedRow
-        ? { id: seedRow.id, mx: seedRow.mx, my: seedRow.my, lat: seedRow.lat, lng: seedRow.lng }
-        : {
-            id: adminStore.id,
-            mx: typeof adminStore.mx === "number" ? adminStore.mx : undefined,
-            my: typeof adminStore.my === "number" ? adminStore.my : undefined,
-            lat: adminStore.lat,
-            lng: adminStore.lng,
-          };
-      const override =
-        marketDrafts.find((d) => d.id === adminStore.id) ??
-        (seedRow ? marketDrafts.find((d) => d.name === seedRow.name) : undefined);
-      const pos = pickStoreDisplayLatLng(selectedMarket, pin, override ?? undefined);
+    // 손님 지도와 동일한 좌표 소스 (getMarketStorePins)
+    const livePins = getMarketStorePins(selectedMarket);
+    const bySeedId = new Map(livePins.map((p) => [p.id, p]));
+    const byName = new Map(livePins.map((p) => [p.name, p]));
+    return filteredStores.map((adminStore) => {
+      const seedId =
+        adminStore.id >= 10000 ? adminStore.id % 10000 : adminStore.id;
+      const pin =
+        bySeedId.get(adminStore.id) ??
+        bySeedId.get(seedId) ??
+        byName.get(adminStore.name);
       return {
         id: adminStore.id,
         name: adminStore.name,
         category: adminStore.category,
-        lat: pos.lat,
-        lng: pos.lng,
+        lat: pin?.lat ?? adminStore.lat,
+        lng: pin?.lng ?? adminStore.lng,
       };
     });
-    return spreadOverlappingLatLngs(pins, { minMeters: 12 });
-  }, [filteredStores, selectedMarket, draft.stores]);
+  }, [filteredStores, selectedMarket, draft.stores, deletedIds]);
 
   const selectedMarketLabel =
     MARKET_BUTTONS.find((market) => market.id === selectedMarket)?.label ?? "선택 시장";

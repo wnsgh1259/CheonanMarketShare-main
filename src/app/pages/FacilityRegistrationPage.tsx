@@ -12,9 +12,8 @@ import {
 } from "../data/ownerSharedStore";
 import {
   loadOwnerCatalog,
-  loadOwnerCatalogRemote,
-  mergeOwnerCatalog,
   migrateLegacyOwnerDraftIfNeeded,
+  refreshOwnerCatalogFromRemote,
   saveOwnerCatalog,
 } from "../data/ownerStoreData";
 
@@ -144,14 +143,7 @@ export function FacilityRegistrationPage() {
     let cancelled = false;
     const load = async () => {
       try {
-        const remoteCatalog = await loadOwnerCatalogRemote();
-        const localCatalog = loadOwnerCatalog();
-        const catalog = remoteCatalog
-          ? mergeOwnerCatalog(localCatalog, remoteCatalog)
-          : localCatalog;
-        if (remoteCatalog) {
-          saveOwnerCatalog(catalog);
-        }
+        const catalog = await refreshOwnerCatalogFromRemote();
         if (cancelled) return;
         const facilities = catalog.facilities ?? [];
 

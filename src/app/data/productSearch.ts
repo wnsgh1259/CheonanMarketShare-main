@@ -10,7 +10,7 @@ import {
 } from "./storeData";
 import { loadOwnerCatalog } from "./ownerStoreData";
 import { syntheticSeedStoreId } from "./seedStoreIds";
-import { isDemoNavStore, withNavTestMenus } from "./navTestMenus";
+import { withNavTestMenus } from "./navTestMenus";
 import { loadAdminDeletedStoreIds } from "./deletedStoreIds";
 import { pickStoreDisplayLatLng } from "../map/storeMapPlacement";
 import type { SharedDraftStore, SharedOwnerMenu } from "./ownerSharedStore";
@@ -96,32 +96,20 @@ export function getSearchableStores(marketId: MarketId): StoreData[] {
   const merged: StoreData[] = [];
   for (const store of seed) {
     const syntheticId = syntheticSeedStoreId(marketId, store.id);
-    const demoStore = isDemoNavStore(marketId, store.id);
-    // 시연 상점은 삭제 목록에 있어도 검색·경로에 남겨 사과 등이 안 뜨는 일을 막음
-    if (deleted.has(syntheticId) && !demoStore) continue;
+    // 관리자 삭제 목록과 동일 — 삭제된 상점은 검색·경로·지도에 모두 제외
+    if (deleted.has(syntheticId)) continue;
     const draft =
       draftBySeedId.get(store.id) ??
       draftBySynthetic.get(syntheticId) ??
       draftByName.get(store.name);
-    if (demoStore) {
-      const pos = pickStoreDisplayLatLng(marketId, store, null);
-      merged.push({
-        ...store,
-        // 시나리오용 상점명·메뉴·좌표는 시드 고정
-        lat: pos.lat,
-        lng: pos.lng,
-        image: draft?.image || store.image,
-        menus: withNavTestMenus(
-          marketId,
-          store.id,
-          ensureStoreMenus(store.name, store.category, store.menus, `ps-${store.id}`),
-        ),
-      });
-      continue;
-    }
+    // 관리자에서 다른 시장으로 옮긴 시드 상점 제외
+    if (draft?.marketId && draft.marketId !== marketId) continue;
+    const pos = pickStoreDisplayLatLng(marketId, store, draft);
     merged.push({
       ...store,
       name: resolvedDraftName(draft?.name, store.name),
+      lat: pos.lat,
+      lng: pos.lng,
       image: draft?.image || store.image,
       menus: withNavTestMenus(marketId, store.id, mergeStoreMenus(store, draft)),
     });

@@ -41,6 +41,8 @@ export type SharedDraftStore = {
   menus?: SharedOwnerMenu[];
   promotion?: StorePromotion;
   checkinCode?: string;
+  /** 마지막 수정 시각(ms). 기기 간 병합 시 최신 값이 이긴다. */
+  updatedAt?: number;
 };
 
 export type SharedOwnerDashboardDraft = {

@@ -62,7 +62,25 @@ export function loadOwnerCatalog(): OwnerDashboardCatalog {
   }
 }
 
-export function saveOwnerCatalog(catalog: OwnerDashboardCatalog) {
+function storeContentKey(store: SharedDraftStore) {
+  const { updatedAt: _ignored, ...rest } = store;
+  return JSON.stringify(rest);
+}
+
+/** 이전 로컬 값과 내용이 달라진 상점에만 updatedAt을 새로 찍는다 */
+function stampChangedStores(stores: SharedDraftStore[]): SharedDraftStore[] {
+  const prevById = new Map(loadOwnerCatalog().stores.map((s) => [s.id, s]));
+  const now = Date.now();
+  return stores.map((store) => {
+    const prev = prevById.get(store.id);
+    if (prev && storeContentKey(prev) === storeContentKey(store)) {
+      return store.updatedAt === prev.updatedAt ? store : { ...store, updatedAt: prev.updatedAt };
+    }
+    return { ...store, updatedAt: now };
+  });
+}
+
+function writeOwnerCatalogLocal(catalog: OwnerDashboardCatalog) {
   localStorage.setItem(
     OWNER_DASHBOARD_STORAGE_KEY,
     JSON.stringify({
@@ -70,7 +88,12 @@ export function saveOwnerCatalog(catalog: OwnerDashboardCatalog) {
       facilities: catalog.facilities ?? [],
     }),
   );
-  void pushOwnerCatalogRemote(catalog);
+}
+
+export function saveOwnerCatalog(catalog: OwnerDashboardCatalog) {
+  const next = { ...catalog, stores: stampChangedStores(catalog.stores ?? []) };
+  writeOwnerCatalogLocal(next);
+  void pushOwnerCatalogRemote(next);
 }
 
 /** 원격 저장: 상점 목록이 비어 있으면 기존 remote/legacy 상점을 지우지 않는다. */
@@ -226,14 +249,36 @@ function stripDeletedStores(catalog: OwnerDashboardCatalog): OwnerDashboardCatal
   return { ...catalog, stores };
 }
 
+/**
+ * 로컬·원격 병합: 상점별 updatedAt이 더 큰 쪽이 이긴다.
+ * 같거나 둘 다 없으면 원격(공유 기준)을 쓴다 — 예전 로컬 좌표가 다른 기기를 덮어쓰지 않게.
+ */
+function mergeLocalWithRemote(
+  local: OwnerDashboardCatalog,
+  remote: OwnerDashboardCatalog,
+): OwnerDashboardCatalog {
+  const storeById = new Map<number, SharedDraftStore>();
+  for (const store of remote.stores ?? []) storeById.set(store.id, store);
+  for (const store of local.stores ?? []) {
+    const existing = storeById.get(store.id);
+    if (!existing || (store.updatedAt ?? 0) > (existing.updatedAt ?? 0)) {
+      storeById.set(store.id, store);
+    }
+  }
+  return {
+    stores: Array.from(storeById.values()),
+    facilities: mergeOwnerCatalog(local, remote).facilities,
+  };
+}
+
 export async function refreshOwnerCatalogFromRemote(): Promise<OwnerDashboardCatalog> {
   const local = loadOwnerCatalog();
   const remote = await loadOwnerCatalogRemote();
   if (!remote) return stripDeletedStores(local);
-  const merged = stripDeletedStores(mergeOwnerCatalog(local, remote));
-  // 로컬·catalog가 비어 있어도 legacy에서 복구된 내용을 다시 catalog/local에 심는다
+  const merged = stripDeletedStores(mergeLocalWithRemote(local, remote));
   // 삭제된 상점은 빼고 다시 올려서 다른 기기에서 부활하지 않게 한다
-  saveOwnerCatalog(merged);
+  writeOwnerCatalogLocal(merged);
+  void pushOwnerCatalogRemote(merged);
   return merged;
 }
 

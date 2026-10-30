@@ -25,11 +25,10 @@ import {
 } from "../data/ownerSharedStore";
 import {
   loadOwnerCatalog,
-  loadOwnerCatalogRemote,
   loadOwnerStoreWorkspace,
   loadOwnerStoreWorkspaceRemote,
-  mergeOwnerCatalog,
   migrateLegacyOwnerDraftIfNeeded,
+  refreshOwnerCatalogFromRemote,
   saveOwnerCatalog,
   saveOwnerStoreWorkspace,
   upsertCatalogStore,
@@ -717,15 +716,8 @@ export function StoreRegistrationPage() {
           }
         }
 
-        const remoteCatalog = await loadOwnerCatalogRemote();
+        const catalog = await refreshOwnerCatalogFromRemote();
         if (cancelled || loadGeneration !== storeLoadGenerationRef.current) return;
-
-        const catalog = remoteCatalog
-          ? mergeOwnerCatalog(localCatalog, remoteCatalog)
-          : localCatalog;
-        if (remoteCatalog) {
-          saveOwnerCatalog(catalog);
-        }
 
         setStores(catalog.stores ?? []);
 
