@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useLocation } from "react-router";
 import {
   ChevronLeft, Zap, Trash2, ShoppingCart,
   Search, CheckCircle2, PlusCircle, X, ChevronDown, ChevronUp, Route,
@@ -511,7 +511,11 @@ const RECIPES: Record<string, RecipeIngredient[]> = {
 
 const RECIPE_NAMES = Object.keys(RECIPES);
 
+const CART_FOCUS_ROUTES_KEY = "cart-focus-routes";
+
 export function CartPage() {
+  const location = useLocation();
+  const routeSectionRef = useRef<HTMLDivElement>(null);
   const {
     items, removeItem, updateQuantity, clearCart, totalCount, totalPrice,
     currentMarketId, addItem, switchMarketAndAdd,
@@ -549,6 +553,33 @@ export function CartPage() {
   useEffect(() => {
     saveSelectedMarket(activeSearchMarket);
   }, [activeSearchMarket]);
+
+  // 지도에서 경로 보기를 켠 뒤 돌아오면 맞춤형 경로 추천(하단)으로 스크롤
+  useEffect(() => {
+    let shouldFocus = false;
+    try {
+      shouldFocus = sessionStorage.getItem(CART_FOCUS_ROUTES_KEY) === "1";
+      if (shouldFocus) sessionStorage.removeItem(CART_FOCUS_ROUTES_KEY);
+    } catch {
+      /* ignore */
+    }
+    if (!shouldFocus && new URLSearchParams(location.search).get("focus") !== "routes") return;
+
+    const scrollToRoutes = () => {
+      const el = routeSectionRef.current;
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "end" });
+      } else {
+        window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
+      }
+    };
+    const t1 = window.setTimeout(scrollToRoutes, 50);
+    const t2 = window.setTimeout(scrollToRoutes, 280);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, [location.key, location.search]);
 
   const cartIdSet = useMemo(() => new Set(items.map((i) => i.id)), [items]);
 
@@ -1378,7 +1409,10 @@ export function CartPage() {
       </div>
 
       {/* Route Recommendation */}
-      <div className="bg-white mx-4 mt-3 rounded-2xl p-4 ring-1 ring-inset ring-[#EAE8DF] shadow-[0_8px_24px_-22px_rgba(70,53,44,0.28)]">
+      <div
+        ref={routeSectionRef}
+        className="bg-white mx-4 mt-3 mb-2 rounded-2xl p-4 ring-1 ring-inset ring-[#EAE8DF] shadow-[0_8px_24px_-22px_rgba(70,53,44,0.28)]"
+      >
         <div className="flex items-center gap-2 mb-1">
           <Route className="w-4 h-4 text-[#A9652D]" />
           <h2 className="text-[14px] text-[#46352C]">맞춤형 경로 추천</h2>

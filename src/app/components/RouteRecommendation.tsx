@@ -149,6 +149,12 @@ export function RouteRecommendation({ items, marketId }: Props) {
       startSource: planned.startSource,
       savedAt: new Date().toISOString(),
     });
+    // 지도에서 장바구니로 돌아올 때 경로 추천 구간으로 스크롤
+    try {
+      sessionStorage.setItem("cart-focus-routes", "1");
+    } catch {
+      /* ignore */
+    }
     navigate(`/map?market=${marketId}&navRoute=1`);
   };
 

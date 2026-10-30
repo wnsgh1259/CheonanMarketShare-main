@@ -1467,7 +1467,19 @@ export function MapPage() {
               </button>
             )}
           </div>
-          <Link to="/cart" className="group relative p-1">
+          <Link
+            to="/cart"
+            className="group relative p-1"
+            onClick={() => {
+              if (activeNavRoute) {
+                try {
+                  sessionStorage.setItem("cart-focus-routes", "1");
+                } catch {
+                  /* ignore */
+                }
+              }
+            }}
+          >
             <ShoppingCart className="cart-pull-target w-5 h-5 text-[#5A453B]" />
             {totalCount > 0 && (
               <span className="absolute -top-1 -right-1 bg-[#A9652D] text-white text-[10px] min-w-[16px] h-4 rounded-full flex items-center justify-center px-1">

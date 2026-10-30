@@ -86,7 +86,21 @@ export function BottomNav() {
             <Link
               key={to}
               to={to}
-              onClick={exitOwnerMode ? () => setOwnerMode(false) : undefined}
+              onClick={() => {
+                if (exitOwnerMode) setOwnerMode(false);
+                // 지도에 경로가 떠 있는 상태에서 장바구니로 가면 경로 비교 구간으로
+                if (
+                  isCart &&
+                  location.pathname === "/map" &&
+                  new URLSearchParams(location.search).get("navRoute") === "1"
+                ) {
+                  try {
+                    sessionStorage.setItem("cart-focus-routes", "1");
+                  } catch {
+                    /* ignore */
+                  }
+                }
+              }}
               className={`flex-1 flex flex-col items-center justify-center gap-0.5 relative transition-colors active:text-[#8E463B] ${
                 isActive ? "text-[#A55345]" : "text-[#76645A]"
               }`}
