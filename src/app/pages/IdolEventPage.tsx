@@ -159,7 +159,7 @@ export function IdolEventPage() {
     if (!result) return;
     setProgress(loadIdolProgress());
     setTicketCount(myIdolTicketCount());
-    say(`${IDOL_REWARD_POINTS}P와 굿즈 추첨권 1장이 들어왔어요! ${IDOL_VOICE.done}`);
+    say(IDOL_VOICE.done, "done");
   };
 
   const handleRestart = () => {
