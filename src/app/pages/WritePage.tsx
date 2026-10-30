@@ -1,14 +1,17 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import { loadOwnerCatalog } from "../data/ownerStoreData";
+import { loadOwnerCatalog, refreshOwnerCatalogFromRemote } from "../data/ownerStoreData";
+import { refreshDeletedStoreIdsFromRemote } from "../data/deletedStoreIds";
+import { getSearchableStores } from "../data/productSearch";
+import { getMarketStorePins } from "../map/marketStorePins";
 import {
   X, ChevronDown, Image, MapPin, BarChart2, Hash, Check, Plus, Trash2, Star, UserX, User,
 } from "lucide-react";
 import { addPost } from "../data/postStore";
 import type { Category, MarketKey, PostLocationPin } from "../data/postStore";
 import { TITLE_LIST, getActiveTitle } from "../data/userStore";
-import { STORES_BY_MARKET, type StoreData } from "../data/storeData";
-import { MARKET_VIEW_CONFIG, pickStoreDisplayLatLng } from "../map/storeMapPlacement";
+import type { StoreData } from "../data/storeData";
+import { MARKET_VIEW_CONFIG } from "../map/storeMapPlacement";
 import { buildStoreMarkerIcon } from "../map/naverMarkerIcons";
 import type { MarketId } from "../components/CartContext";
 
@@ -59,6 +62,20 @@ function LocationPickerMap({
   const onMapClickRef = useRef(onMapClick);
   onMapClickRef.current = onMapClick;
   const [mapReady, setMapReady] = useState(false);
+  const [catalogVersion, setCatalogVersion] = useState(0);
+
+  // 다른 기기에서 등록·삭제한 상점까지 반영되게 서버 목록을 받아 다시 그림
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      await refreshDeletedStoreIdsFromRemote();
+      await refreshOwnerCatalogFromRemote();
+      if (!cancelled) setCatalogVersion((v) => v + 1);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const clientId      = import.meta.env.VITE_NAVER_MAP_CLIENT_ID as string | undefined;
   const isPlaceholder = !clientId || clientId === "your_naver_map_client_id";
@@ -126,13 +143,20 @@ function LocationPickerMap({
     storeMarkersRef.current.forEach((m) => m.setMap(null));
     storeMarkersRef.current = [];
 
-    const stores = STORES_BY_MARKET[market as MarketId] ?? [];
+    // 메인 지도·관리자와 같은 상점 목록과 핀 좌표 (관리자 등록·삭제·이동 반영)
+    const marketId = market as MarketId;
+    const pinById = new Map(getMarketStorePins(marketId).map((p) => [p.id, p]));
+    const stores = getSearchableStores(marketId)
+      .filter((store) => pinById.has(store.id))
+      .map((store) => {
+        const pin = pinById.get(store.id)!;
+        return { ...store, lat: pin.lat, lng: pin.lng };
+      });
     storeMarkersRef.current = stores.map((store) => {
-      const pos  = pickStoreDisplayLatLng(market as MarketId, store);
       const icon = buildStoreMarkerIcon(naver, store, { highlighted: false, circleSize: 14 });
       const marker = new naver.maps.Marker({
         map:      mapRef.current,
-        position: new naver.maps.LatLng(pos.lat, pos.lng),
+        position: new naver.maps.LatLng(store.lat, store.lng),
         title:    store.name,
         icon:     { content: icon.content, size: icon.size, anchor: icon.anchor },
         zIndex:   20,
@@ -147,7 +171,7 @@ function LocationPickerMap({
       storeMarkersRef.current.forEach((m) => m.setMap(null));
       storeMarkersRef.current = [];
     };
-  }, [market, mapReady]);
+  }, [market, mapReady, catalogVersion]);
 
   // 커스텀 빨간 핀 마커
   useEffect(() => {

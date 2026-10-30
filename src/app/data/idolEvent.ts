@@ -87,6 +87,12 @@ export function advanceIdolStage(current: number) {
   return next;
 }
 
+/** 1단계부터 다시 시작. 포인트·추첨권은 같은 id라 다시 받아도 중복 지급되지 않는다. */
+export function resetIdolProgress() {
+  saveIdolProgress({ stage: 0, claimed: false });
+  return loadIdolProgress();
+}
+
 /** 전 단계를 통과했을 때 포인트와 추첨권을 한 번만 지급한다. */
 export function claimIdolReward() {
   const progress = loadIdolProgress();

@@ -2,7 +2,8 @@ import { IDOL_VOICE } from "./idolEvent";
 
 let current: HTMLAudioElement | null = null;
 let seq = 0;
-let elevenAvailable: boolean | null = null;
+
+const AUDIO_EXTS = ["mp3", "m4a"] as const;
 
 export function stopIdolVoice() {
   seq += 1;
@@ -13,63 +14,42 @@ export function stopIdolVoice() {
   if ("speechSynthesis" in window) window.speechSynthesis.cancel();
 }
 
-async function playBlob(blob: Blob, mine: number, onStateChange?: (speaking: boolean) => void) {
-  const url = URL.createObjectURL(blob);
-  const audio = new Audio(url);
-  audio.preload = "auto";
-  current = audio;
-  const cleanup = () => {
-    URL.revokeObjectURL(url);
-    if (mine === seq) onStateChange?.(false);
-  };
-  audio.onended = cleanup;
-  audio.onerror = cleanup;
-  await audio.play();
+function tryPlay(url: string, mine: number, onStateChange?: (speaking: boolean) => void) {
+  return new Promise<boolean>((resolve) => {
+    const audio = new Audio(url);
+    audio.preload = "auto";
+    current = audio;
+    let settled = false;
+    const finish = (ok: boolean) => {
+      if (settled) return;
+      settled = true;
+      if (!ok && mine === seq) onStateChange?.(false);
+      resolve(ok);
+    };
+    audio.onended = () => {
+      if (mine === seq) onStateChange?.(false);
+    };
+    audio.onerror = () => finish(false);
+    void audio
+      .play()
+      .then(() => finish(true))
+      .catch(() => finish(false));
+  });
 }
 
-/** 개발 서버(/api/idol-tts) — ElevenLabs 보이스 ID로 아무 대사나 바로 읽기 */
-async function speakViaElevenLabs(text: string, mine: number, onStateChange?: (speaking: boolean) => void) {
-  if (elevenAvailable === false) return false;
-  try {
-    const res = await fetch("/api/idol-tts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
-    });
-    if (res.status === 503 || res.status === 404) {
-      elevenAvailable = false;
-      return false;
-    }
-    if (!res.ok) return false;
-    elevenAvailable = true;
-    if (mine !== seq) return true;
-    await playBlob(await res.blob(), mine, onStateChange);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function speakViaMp3(
-  text: string,
+/** public/idol/{voiceKey}.mp3 또는 .m4a 재생. 실시간 ElevenLabs는 쓰지 않는다. */
+async function speakViaFile(
   voiceKey: string | undefined,
   mine: number,
   onStateChange?: (speaking: boolean) => void,
 ) {
-  const canUseFile = Boolean(voiceKey) && IDOL_VOICE[voiceKey as string] === text;
-  if (!canUseFile || !voiceKey) return false;
-  try {
-    const audio = new Audio(`/idol/${voiceKey}.mp3`);
-    audio.preload = "auto";
-    current = audio;
-    audio.onended = () => {
-      if (mine === seq) onStateChange?.(false);
-    };
-    await audio.play();
-    return true;
-  } catch {
-    return false;
+  if (!voiceKey || !(voiceKey in IDOL_VOICE)) return false;
+  for (const ext of AUDIO_EXTS) {
+    if (mine !== seq) return false;
+    const ok = await tryPlay(`/idol/${voiceKey}.${ext}`, mine, onStateChange);
+    if (ok) return true;
   }
+  return false;
 }
 
 function speakViaBrowser(text: string, mine: number, onStateChange?: (speaking: boolean) => void) {
@@ -90,9 +70,8 @@ function speakViaBrowser(text: string, mine: number, onStateChange?: (speaking: 
 
 /**
  * 재생 우선순위
- * 1) ElevenLabs (npm run dev + .env 의 ELEVEN_* ) — 대사 바꿔도 재생성 불필요
- * 2) public/idol/{voiceKey}.mp3 (npm run idol:voice 로 만든 파일)
- * 3) 브라우저 TTS
+ * 1) public/idol/{voiceKey}.mp3 또는 .m4a
+ * 2) 브라우저 TTS (파일이 없을 때만)
  */
 export async function speakIdol(
   text: string,
@@ -103,9 +82,7 @@ export async function speakIdol(
   const mine = seq;
   onStateChange?.(true);
 
-  if (await speakViaElevenLabs(text, mine, onStateChange)) return;
-  if (mine !== seq) return;
-  if (await speakViaMp3(text, voiceKey, mine, onStateChange)) return;
+  if (await speakViaFile(voiceKey, mine, onStateChange)) return;
   if (mine !== seq) return;
   speakViaBrowser(text, mine, onStateChange);
 }

@@ -32,6 +32,7 @@ import {
 import { withNavTestMenus } from "../data/navTestMenus";
 import { displayedSeedNameKeys, isSeedRenamed } from "../data/seedDisplayNames";
 import { applyDemoPriceLadder } from "../data/demoPriceLadder";
+import { loadSelectedMarket, saveSelectedMarket } from "../data/selectedMarket";
 import { syntheticSeedStoreId } from "../data/seedStoreIds";
 import { buildFacilityMarkerIcon, buildStoreMarkerIcon } from "../map/naverMarkerIcons";
 import { getMarketStorePins } from "../map/marketStorePins";
@@ -856,8 +857,12 @@ export function MapPage() {
     if (nav && new URLSearchParams(window.location.search).get("navRoute") === "1") {
       return nav.marketId;
     }
-    return "byeongcheon";
+    return loadSelectedMarket() ?? "byeongcheon";
   });
+
+  useEffect(() => {
+    saveSelectedMarket(selectedMarket);
+  }, [selectedMarket]);
   const [activeNavRoute, setActiveNavRoute] = useState<ActiveNavRoute | null>(() => {
     if (new URLSearchParams(window.location.search).get("navRoute") !== "1") return null;
     return loadActiveNavRoute();

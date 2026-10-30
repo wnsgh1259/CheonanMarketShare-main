@@ -15,6 +15,7 @@ import {
   loadIdolWinner,
   myIdolTicketCount,
   refreshIdolEvent,
+  resetIdolProgress,
   type IdolStage,
 } from "../data/idolEvent";
 import { speakIdol, stopIdolVoice } from "../data/idolVoice";
@@ -74,23 +75,25 @@ export function IdolEventPage() {
       setHinted(false);
       setTicketCount(myIdolTicketCount());
       setIsWinner(loadIdolWinner()?.userId === rewardUserId());
-      // 입장 시에는 환영 멘트만. "N단계 통과"는 정답을 맞춘 뒤에만 붙인다.
+      // 입장 시에는 환영 멘트. "N단계 통과"는 정답을 맞춘 뒤에만 붙인다.
       const start: Message[] = [{ id: ++messageSeq, role: "idol", text: IDOL_VOICE.greeting }];
+      let voiceKey: "greeting" | "done" | "final" = "greeting";
       if (latest.claimed) {
         start.push({ id: ++messageSeq, role: "idol", text: IDOL_VOICE.done });
+        voiceKey = "done";
       } else if (latest.stage >= IDOL_STAGE_COUNT) {
         start.push({ id: ++messageSeq, role: "idol", text: IDOL_VOICE.final });
+        voiceKey = "final";
+      } else if (latest.stage > 0) {
+        // 이전에 푼 단계가 있으면 이어하기임을 글로만 알려준다 (음성은 환영 멘트)
+        start.push({
+          id: ++messageSeq,
+          role: "idol",
+          text: `지난번에 ${latest.stage}단계까지 통과하셨어요. 이어서 ${latest.stage + 1}단계를 진행할게요!`,
+        });
       }
       setMessages(start);
-      const last = start[start.length - 1].text;
-      const voiceKey = (
-        [
-          ["greeting", IDOL_VOICE.greeting],
-          ["done", IDOL_VOICE.done],
-          ["final", IDOL_VOICE.final],
-        ] as const
-      ).find(([, text]) => text === last)?.[0];
-      if (voiceOnRef.current) void speakIdol(last, voiceKey, setSpeaking);
+      if (voiceOnRef.current) void speakIdol(IDOL_VOICE[voiceKey], voiceKey, setSpeaking);
     })();
     return () => {
       alive = false;
@@ -157,6 +160,18 @@ export function IdolEventPage() {
     setProgress(loadIdolProgress());
     setTicketCount(myIdolTicketCount());
     say(`${IDOL_REWARD_POINTS}P와 굿즈 추첨권 1장이 들어왔어요! ${IDOL_VOICE.done}`);
+  };
+
+  const handleRestart = () => {
+    if (!window.confirm("1단계부터 다시 시작할까요?")) return;
+    stopIdolVoice();
+    setProgress(resetIdolProgress());
+    setHinted(false);
+    setCode("");
+    setAnswer("");
+    setError("");
+    setMessages([]);
+    say(IDOL_VOICE.greeting, "greeting");
   };
 
   const replayLast = () => {
@@ -319,6 +334,15 @@ export function IdolEventPage() {
               </div>
               {error && <p className="text-[12px] text-red-400">{error}</p>}
             </>
+          )}
+          {(progress.stage > 0 || progress.claimed) && (
+            <button
+              type="button"
+              onClick={handleRestart}
+              className={`w-full pt-1 text-center text-[12px] underline underline-offset-2 ${T.muted}`}
+            >
+              처음부터 다시하기
+            </button>
           )}
         </div>
       </div>

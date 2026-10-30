@@ -17,6 +17,7 @@ import {
   type ProductStoreOffer,
 } from "../data/productSearch";
 import { readAuthSession } from "../data/authSession";
+import { loadSelectedMarket, saveSelectedMarket } from "../data/selectedMarket";
 import {
   PICKUP_ORDERS_CHANGED,
   cancelPickupOrder,
@@ -525,7 +526,9 @@ export function CartPage() {
     return listPickupOrdersForCustomer(resolveCustomerPickupKey(session.phone));
   });
 
-  const [searchMarket, setSearchMarket] = useState<MarketId>(currentMarketId ?? "jungang");
+  const [searchMarket, setSearchMarket] = useState<MarketId>(
+    () => currentMarketId ?? loadSelectedMarket() ?? "jungang",
+  );
   const [productQuery, setProductQuery] = useState("");
   const [productGroups, setProductGroups] = useState<ProductSearchGroup[] | null>(null);
   const [productSearched, setProductSearched] = useState(false);
@@ -541,6 +544,11 @@ export function CartPage() {
   const [recipeListOpen, setRecipeListOpen] = useState(false);
 
   const activeSearchMarket = currentMarketId ?? searchMarket;
+
+  // 장바구니에서 보고 있는 시장을 지도에서도 그대로 열리게 저장
+  useEffect(() => {
+    saveSelectedMarket(activeSearchMarket);
+  }, [activeSearchMarket]);
 
   const cartIdSet = useMemo(() => new Set(items.map((i) => i.id)), [items]);
 
@@ -598,6 +606,17 @@ export function CartPage() {
     cancelPickupOrder(orderId);
     refreshMyPickups();
     setPickupNotice("픽업 요청을 취소했어요.");
+  };
+
+  const handleDismissPickup = (order: PickupOrder) => {
+    if (order.status === "requested") {
+      if (!window.confirm("아직 요청 중인 픽업이에요. 목록에서 지울까요?")) return;
+    }
+    cancelPickupOrder(order.id);
+    refreshMyPickups();
+    setPickupNotice(
+      order.status === "requested" ? "픽업 요청을 취소했어요." : "픽업 내역을 목록에서 지웠어요.",
+    );
   };
 
   const submitPickupRequest = () => {
@@ -767,7 +786,7 @@ export function CartPage() {
     else setConflictMsg("");
   };
 
-  const marketName = currentMarketId ? MARKET_NAMES[currentMarketId] : "시장을 선택하세요";
+  const marketName = MARKET_NAMES[activeSearchMarket];
   const directItems = items.filter((i) => !i.isQuickAdd);
   const quickItems  = items.filter((i) =>  i.isQuickAdd);
 
@@ -1104,17 +1123,27 @@ export function CartPage() {
                     <p className="text-[13px] font-semibold text-[#46352C] truncate">{order.storeName}</p>
                     <p className="text-[11px] text-[#6B5142] mt-0.5">{formatPickupItemsSummary(order)}</p>
                   </div>
-                  <span
-                    className={`shrink-0 text-[11px] font-semibold px-2 py-1 rounded-full ${
-                      order.status === "requested"
-                        ? "bg-amber-100 text-amber-800"
-                        : order.status === "accepted"
-                          ? "bg-emerald-100 text-emerald-800"
-                          : "bg-red-100 text-red-700"
-                    }`}
-                  >
-                    {pickupStatusLabel(order.status)}
-                  </span>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <span
+                      className={`text-[11px] font-semibold px-2 py-1 rounded-full ${
+                        order.status === "requested"
+                          ? "bg-amber-100 text-amber-800"
+                          : order.status === "accepted"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-red-100 text-red-700"
+                      }`}
+                    >
+                      {pickupStatusLabel(order.status)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleDismissPickup(order)}
+                      className="flex h-7 w-7 items-center justify-center rounded-full text-[#8A776B] hover:bg-[#EFEAE3] active:bg-[#E5D9CB]"
+                      aria-label="픽업 내역 삭제"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
                 <p className="text-[12px] text-[#46352C] mt-1.5">{pickupOrderTotal(order).toLocaleString()}원</p>
                 {order.customerMessage && (

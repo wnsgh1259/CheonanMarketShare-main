@@ -197,10 +197,10 @@ type PointMeta = { base: number; paid: string[] };
  * 아이돌 시장 미션 진행. stage: 통과한 단계 수(0~3).
  * gen 이 바뀌면(문제·흐름 변경) 이전 테스트 진행을 버리고 1단계부터 다시 시작.
  */
-export type IdolProgress = { stage: number; claimed: boolean; gen?: number };
+export type IdolProgress = { stage: number; claimed: boolean; gen?: number; updatedAt?: number };
 
-/** QR·코드/정답만 입력 흐름으로 바뀐 뒤 진행도 초기화용 */
-const IDOL_PROGRESS_GEN = 2;
+/** 진행도 일괄 초기화용 세대 번호 (3: 시연 전 테스트 진행도 초기화) */
+const IDOL_PROGRESS_GEN = 3;
 
 type UserRewardState = {
   progress: RewardProgress;
@@ -220,6 +220,7 @@ function normalizeIdolProgress(raw?: Partial<IdolProgress> | null): IdolProgress
     stage: Math.max(0, Number(raw.stage) || 0),
     claimed: Boolean(raw.claimed),
     gen: IDOL_PROGRESS_GEN,
+    updatedAt: Number(raw.updatedAt) || 0,
   };
 }
 
@@ -228,7 +229,11 @@ export function loadIdolProgress(userId = rewardUserId()): IdolProgress {
 }
 
 export function saveIdolProgress(progress: IdolProgress, userId = rewardUserId()) {
-  writeMapEntry(IDOL_KEY, userId, normalizeIdolProgress(progress));
+  writeMapEntry(
+    IDOL_KEY,
+    userId,
+    normalizeIdolProgress({ ...progress, gen: IDOL_PROGRESS_GEN, updatedAt: Date.now() }),
+  );
   scheduleRewardSync();
 }
 
@@ -432,10 +437,15 @@ function mergeUserState(local: UserRewardState, remote: Partial<UserRewardState>
     idol: (() => {
       const localIdol = normalizeIdolProgress(local.idol);
       const remoteIdol = normalizeIdolProgress(remote.idol);
+      // 더 최근에 저장된 쪽을 쓴다 (처음부터 다시하기가 다른 기기 진행도에 덮이지 않게)
+      const lt = localIdol.updatedAt ?? 0;
+      const rt = remoteIdol.updatedAt ?? 0;
+      if (lt !== rt) return lt > rt ? localIdol : remoteIdol;
       return {
         stage: Math.max(localIdol.stage, remoteIdol.stage),
         claimed: localIdol.claimed || remoteIdol.claimed,
         gen: IDOL_PROGRESS_GEN,
+        updatedAt: lt,
       };
     })(),
     meta: {
